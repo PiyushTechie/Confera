@@ -10,16 +10,23 @@ passport.use(
         {
             clientID: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            callbackURL: "https://confera-backend-nixq.onrender.com/auth/google/callback",
+            callbackURL: process.env.CALLBACK_URL, 
+            proxy: true, 
         },
         async (accessToken, refreshToken, profile, done) => {
             try {
-                let user = await User.findOne({ username: profile.emails[0].value });
+                const email = profile.emails?.[0]?.value; 
+                
+                if (!email) {
+                    return done(new Error("No email found in Google profile"), null);
+                }
+
+                let user = await User.findOne({ username: email });
 
                 if (!user) {
                     user = new User({
                         name: profile.displayName,
-                        username: profile.emails[0].value,
+                        username: email,
                         password: "",
                     });
                     await user.save();
