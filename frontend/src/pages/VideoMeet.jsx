@@ -8,8 +8,9 @@ import {
   // NEW ICONS
   ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
 } from "lucide-react";
+import server from "../environment";
 
-const server_url = "http://localhost:8000";
+const server_url = server;
 
 const peerConfigConnecions = {
   iceServers: [ { urls: "stun:stun.l.google.com:19302" } ],

@@ -1,12 +1,12 @@
 import axios, { HttpStatusCode } from "axios";
 import { createContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
+import server from "../environment";
 export const AuthContext = createContext({});
 
 const client = axios.create({
-    baseURL: "http://localhost:8000/api/v1/users",
-    timeout: 5000 // FIX 1: Add timeout so it doesn't hang forever
+    baseURL: `${server}/api/v1/users`,
+    timeout: 5000
 });
 
 export const AuthProvider = ({ children }) => {
