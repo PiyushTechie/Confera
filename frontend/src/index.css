@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+
+@theme {
+  --font-brand: "Outfit", ui-sans-serif, system-ui;
+}
+
+body {
+  font-family: var(--font-brand);
+}
+
+/* Force Outfit on everything */
+@layer base {
+  html, body, #root {
+    font-family: 'Outfit', sans-serif !important;
+  }
+}
