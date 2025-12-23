@@ -9,8 +9,6 @@ export default function GuestJoin() {
   const handleJoin = (e) => {
     e.preventDefault();
     if (meetingCode.trim().length > 0) {
-      // Navigate to the meeting URL. 
-      // Since we pass NO state, the meeting page will ask for their Name (Lobby Mode).
       navigate(`/${meetingCode}`);
     }
   };
@@ -18,7 +16,6 @@ export default function GuestJoin() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center font-sans text-neutral-800 px-4">
       
-      {/* Back Button */}
       <div className="absolute top-6 left-6">
         <button 
             onClick={() => navigate("/")}
@@ -29,10 +26,8 @@ export default function GuestJoin() {
         </button>
       </div>
 
-      {/* Main Card */}
       <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl w-full max-w-lg border border-gray-100 text-center">
         
-        {/* Logo Icon */}
         <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-blue-500/30">
             <Video size={32} />
         </div>
@@ -40,7 +35,6 @@ export default function GuestJoin() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Join a Meeting</h1>
         <p className="text-gray-500 mb-8">Enter the meeting code provided by the host.</p>
 
-        {/* Join Form */}
         <form onSubmit={handleJoin} className="space-y-4">
             <div className="relative group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
@@ -71,7 +65,6 @@ export default function GuestJoin() {
 
       </div>
       
-      {/* Footer */}
       <p className="mt-8 text-sm text-gray-400">
           Don't have an account? <span onClick={() => navigate("/auth")} className="text-blue-600 cursor-pointer hover:underline">Sign up for free</span>
       </p>

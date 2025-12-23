@@ -33,15 +33,12 @@ app.use(passport.initialize());
 app.use("/auth", authRoutes); 
 app.use("/api/v1/users", userRoutes);
 
-// 1. Existing Active Connections
 let connections = {};
-// 2. NEW: Waiting Rooms Storage
 let waitingRooms = {};
 
 io.on("connection", (socket) => {
     console.log("SOCKET CONNECTED::", socket.id);
 
-    // --- STANDARD JOIN (For Hosts or Admitted Guests) ---
     socket.on("join-call", ({ path, username }) => {
         if(connections[path] === undefined){
             connections[path] = []
@@ -60,47 +57,37 @@ io.on("connection", (socket) => {
         console.log(`User ${username} (${socket.id}) joined room: ${path}`);
     });
 
-    // --- NEW: GUEST REQUESTS TO JOIN (Waiting Room) ---
     socket.on("request-join", ({ path, username }) => {
-        socket.join(path); // Join socket room to handle signals
+        socket.join(path);
         socket.roomId = path;
 
         if (!waitingRooms[path]) {
             waitingRooms[path] = [];
         }
 
-        // Add to waiting list
         waitingRooms[path].push({ 
             socketId: socket.id, 
             username: username || "Guest" 
         });
 
-        // Notify the Host (broadcast to room, Host UI filters this)
         io.to(path).emit("update-waiting-list", waitingRooms[path]);
         console.log(`User ${username} is waiting in room: ${path}`);
     });
 
-    // --- NEW: HOST ADMITS USER ---
     socket.on("admit-user", ({ socketId }) => {
-        // Notify specific user
         io.to(socketId).emit("admitted");
 
-        // Clean up waiting list
         for (const roomId in waitingRooms) {
             const originalLength = waitingRooms[roomId].length;
             waitingRooms[roomId] = waitingRooms[roomId].filter(user => user.socketId !== socketId);
             
-            // If we removed someone, update the host's view
             if (waitingRooms[roomId].length !== originalLength) {
                 io.to(roomId).emit("update-waiting-list", waitingRooms[roomId]);
             }
         }
     });
 
-    // --- NEW: HOST KICKS USER ---
-    // --- UPDATED: HOST KICKS USER ---
     socket.on("kick-user", ({ socketId }) => {
-        // 1. Find the room this user is in
         let roomKey = null;
         for (let key in connections) {
             if (connections[key].some(u => u.socketId === socketId)) {
@@ -110,17 +97,13 @@ io.on("connection", (socket) => {
         }
 
         if (roomKey) {
-            // 2. Notify everyone else in the room IMMEDIATELY that this user left
-            // (This ensures the grid updates even if the disconnect event lags)
             const remainingUsers = connections[roomKey].filter(u => u.socketId !== socketId);
             remainingUsers.forEach(user => {
                 io.to(user.socketId).emit("user-left", socketId);
             });
 
-            // 3. Notify the target user they were kicked
             io.to(socketId).emit("kicked");
 
-            // 4. Force disconnect the target socket
             const targetSocket = io.sockets.sockets.get(socketId);
             if (targetSocket) {
                 targetSocket.leave(roomKey);
@@ -148,7 +131,6 @@ io.on("connection", (socket) => {
     socket.on("disconnect", () => {
         console.log("SOCKET DISCONNECTED::", socket.id);
         
-        // 1. Remove from Active Connections
         for(let key in connections){
             let index = connections[key].findIndex(u => u.socketId === socket.id);
             if(index !== -1){
@@ -159,7 +141,6 @@ io.on("connection", (socket) => {
             }
         }
 
-        // 2. NEW: Remove from Waiting Rooms (if they leave while waiting)
         for (const roomId in waitingRooms) {
             const initialLength = waitingRooms[roomId].length;
             waitingRooms[roomId] = waitingRooms[roomId].filter(user => user.socketId !== socket.id);

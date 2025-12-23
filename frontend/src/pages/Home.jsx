@@ -14,7 +14,7 @@ import {
   Copy,
   Check,
   User,
-  Clock, // CHANGED: Used 'Clock' because 'History' icon might crash older versions
+  Clock,
   LogOut 
 } from "lucide-react";
 
@@ -122,10 +122,8 @@ function HomeComponent() {
   const formatDate = (date) => date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 
   return (
-    // FIX: Using min-h-screen ensures it always fills the view, but scrolls if needed.
     <div className="min-h-screen w-full bg-gray-50 flex flex-col items-center relative font-sans text-neutral-800">
       
-      {/* NAVBAR */}
       <div className="w-full px-6 py-5 flex justify-between items-center bg-transparent z-50">
         <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-600/20">
@@ -146,7 +144,6 @@ function HomeComponent() {
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl p-6 -mt-20">
         <div className="text-center mb-16">
           <h1 className="text-7xl font-bold text-gray-800 mb-4 tracking-tight">{formatTime(date)}</h1>

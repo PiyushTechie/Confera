@@ -51,12 +51,9 @@ export default function Authentication() {
     };
 
     return (
-        // CHANGE: bg-slate-950 -> bg-white, text-white -> text-slate-900
         <div className="min-h-screen flex bg-white text-slate-900 font-sans selection:bg-indigo-100">
             
-            {/* Left Side: Image/Background */}
             <div className="hidden lg:flex w-2/3 relative items-center justify-center overflow-hidden">
-                 {/* CHANGE: Overlay made lighter/cleaner */}
                  <div className="absolute inset-0 bg-indigo-900/40 z-10" />
                  <img 
                     src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop" 
@@ -73,7 +70,6 @@ export default function Authentication() {
 
             <div className="w-full lg:w-1/3 flex items-center justify-center p-8 relative bg-white">
                 
-                {/* Notification Toast */}
                 {open && (
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 lg:left-6 lg:translate-x-0 bg-emerald-50 border border-emerald-200 text-emerald-700 px-6 py-3 rounded-xl flex items-center gap-3 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300 z-50">
                         <CheckCircle className="w-5 h-5 text-emerald-500" />
@@ -101,7 +97,6 @@ export default function Authentication() {
                         </p>
                     </div>
 
-                    {/* CHANGE: Card background is white with shadow, borders light gray */}
                     <div className="space-y-6 mt-8 bg-white p-8 rounded-2xl border border-slate-100 shadow-2xl shadow-indigo-100/50">
                         
                         <div className="space-y-4">
@@ -129,7 +124,6 @@ export default function Authentication() {
                                 </div>
                             )}
 
-                            {/* Username */}
                             <div>
                                 <label htmlFor="username" className="block text-sm font-bold text-slate-700 mb-1">
                                     Username
@@ -151,7 +145,6 @@ export default function Authentication() {
                                 </div>
                             </div>
 
-                            {/* Password */}
                             <div>
                                 <label htmlFor="password" className="block text-sm font-bold text-slate-700 mb-1">
                                     Password
@@ -174,7 +167,6 @@ export default function Authentication() {
                             </div>
                         </div>
 
-                        {/* Error Message */}
                         {error && (
                             <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
                                 <XCircle className="w-4 h-4" />
@@ -182,14 +174,12 @@ export default function Authentication() {
                             </div>
                         )}
 
-                        {/* Styled Components Button */}
                         <StyledWrapper>
                             <button onClick={handleAuth}>
                                 {formState === 0 ? "Sign In" : "Create Account"}
                             </button>
                         </StyledWrapper>
 
-                        {/* Divider */}
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
                                 <span className="w-full border-t border-slate-200" />
@@ -201,7 +191,6 @@ export default function Authentication() {
                             </div>
                         </div>
 
-                        {/* Google Button - Light Theme Style */}
                         <button
                             onClick={handleGoogleLogin}
                             className="w-full flex items-center justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98]"
@@ -218,8 +207,6 @@ export default function Authentication() {
     );
 }
 
-// CHANGE: Updated Styled Component for Light Theme
-// Uses Indigo-600 as base, darkens on hover
 const StyledWrapper = styled.div`
   button {
     width: 100%;

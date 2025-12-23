@@ -6,23 +6,21 @@ import {
     Copy, 
     Check, 
     Video,
-    Loader2 // Added a loader icon for better UX
+    Loader2 
 } from "lucide-react";
 
 function History() {
     const { getHistoryOfUser } = useContext(AuthContext);
     const [meetings, setMeetings] = useState([]);
-    const [isLoading, setIsLoading] = useState(true); // Add loading state
+    const [isLoading, setIsLoading] = useState(true); 
     const [copiedId, setCopiedId] = useState(null);
 
     useEffect(() => {
         const fetchHistory = async () => {
             try {
                 const history = await getHistoryOfUser();
-                // SAFETY CHECK: Ensure history is an array before reversing
-                //
+                
                 if (Array.isArray(history)) {
-                    // Create a copy [...] before reversing to avoid mutation errors
                     setMeetings([...history].reverse());
                 } else {
                     setMeetings([]);
@@ -38,7 +36,6 @@ function History() {
     }, [getHistoryOfUser]);
 
     const formatDate = (dateString) => {
-        // Handle missing or invalid dates gracefully
         if (!dateString) return { day: "Unknown", time: "--:--" };
         
         try {

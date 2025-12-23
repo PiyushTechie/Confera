@@ -19,7 +19,6 @@ export default function VideoMeetComponent() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Extract isHost from location state
   const { bypassLobby, isAudioOn, isVideoOn, username: passedUsername, isHost } = location.state || {};
   const meetingCode = window.location.pathname.replace("/", "");
 
@@ -39,7 +38,6 @@ export default function VideoMeetComponent() {
   const audioAnalysersRef = useRef({}); 
   const animationFrameRef = useRef(null);
 
-  // --- STATE ---
   let [videoAvailable, setVideoAvailable] = useState(true);
   let [audioAvailable, setAudioAvailable] = useState(true);
   let [video, setVideo] = useState(isVideoOn !== undefined ? isVideoOn : true);
@@ -68,11 +66,9 @@ export default function VideoMeetComponent() {
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
-  // --- NEW: HOST & WAITING ROOM STATE ---
   const [waitingUsers, setWaitingUsers] = useState([]); // List of users waiting (Host view)
   const [isInWaitingRoom, setIsInWaitingRoom] = useState(false); // Guest view
 
-  // --- AUDIO ANALYZER (Unchanged) ---
   const setupAudioAnalysis = (stream, socketId) => {
     if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -122,47 +118,36 @@ export default function VideoMeetComponent() {
     attachStream(localGridRef);
     attachStream(localSpotlightRef);
     attachStream(localFloatingRef);
-  }, [viewMode, spotlightId, screen, isInWaitingRoom]); // Added isInWaitingRoom dep
+  }, [viewMode, spotlightId, screen, isInWaitingRoom]); 
 
-  // --- SOCKET LOGIC ---
   const connectToSocketServer = () => {
     socketRef.current = io.connect(server_url, { secure: false });
 
     socketRef.current.on("connect", () => {
       socketIdRef.current = socketRef.current.id;
 
-      // --- NEW: WAITING ROOM LOGIC ---
       if (isHost) {
-          // Host joins immediately
           socketRef.current.emit("join-call", { path: window.location.href, username: userName });
       } else {
-          // Guest requests to join
           socketRef.current.emit("request-join", { path: window.location.href, username: userName });
           setIsInWaitingRoom(true);
       }
     });
 
-    // --- NEW: HOST LISTENERS ---
-    // Update waiting list when a guest requests to join
     socketRef.current.on("update-waiting-list", (users) => {
         if(isHost) setWaitingUsers(users);
     });
 
-    // --- NEW: GUEST LISTENERS ---
-    // When host admits you
     socketRef.current.on("admitted", () => {
         setIsInWaitingRoom(false);
-        // Now actually join the call logic
         socketRef.current.emit("join-call", { path: window.location.href, username: userName });
     });
 
-    // When host kicks you
     socketRef.current.on("kicked", () => {
         alert("You have been removed from the meeting.");
         handleEndCall();
     });
 
-    // --- EXISTING WEBRTC LOGIC ---
     socketRef.current.on("user-joined", (participants) => {
         const connections = connectionsRef.current;
         const newUserMap = {};
@@ -288,7 +273,6 @@ export default function VideoMeetComponent() {
     getPermissions();
   }, []);
 
-  // --- DRAG HANDLERS (Unchanged) ---
   const handleMouseDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -325,7 +309,6 @@ export default function VideoMeetComponent() {
     return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
   }, [isDragging, position]);
 
-  // --- UTILS ---
   const connect = () => { setAskForUsername(false); connectToSocketServer(); };
   const handleVideo = () => {
     setVideo(!video);
@@ -350,39 +333,26 @@ export default function VideoMeetComponent() {
         console.error("Error ending call:", e); 
     }
     
-    // --- FIX START ---
-    // Use { replace: true } to overwrite the current history entry.
-    // This makes the "Back" button go to where you were BEFORE the meeting,
-    // not back into the meeting.
     if (localStorage.getItem("token")) { 
         navigate("/home", { replace: true }); 
     } else { 
         navigate("/", { replace: true }); 
     }
-    // --- FIX END ---
   };
 
-  // Add this inside VideoMeetComponent
 useEffect(() => {
-    // If user tries to go back, reload the page to clear any stale state
-    // or redirect them if specific state (like 'isHost' or 'username') is missing
     if (!location.state) {
-        // If someone joins via URL or Back button without state, kick them out
-        // (Unless you want to allow direct URL joins - logic depends on your app)
         navigate("/"); 
     }
     
-    // Clean up history on unmount
     window.history.pushState(null, document.title, window.location.href);
     window.addEventListener('popstate', function (event) {
         window.history.pushState(null, document.title, window.location.href);
     });
 }, []);
   
-  // --- UPDATED SCREEN SHARE HANDLER ---
   const handleScreen = async () => {
     if (screen) {
-        // STOP Screen Share
         try {
             const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             const cameraVideoTrack = cameraStream.getVideoTracks()[0];
@@ -395,7 +365,6 @@ useEffect(() => {
             const newStream = new MediaStream([cameraVideoTrack, window.localStream.getAudioTracks()[0]]);
             window.localStream = newStream;
             
-            // FIX: Check if ref exists before assigning
             if (localGridRef.current) {
                 localGridRef.current.srcObject = newStream;
             }
@@ -405,7 +374,6 @@ useEffect(() => {
             setViewMode("GRID");
         } catch (e) { console.error(e); }
     } else {
-        // START Screen Share
         try {
             const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
             const screenTrack = displayStream.getVideoTracks()[0];
@@ -447,19 +415,14 @@ useEffect(() => {
   };
   useEffect(() => { if (viewMode !== "SPOTLIGHT") { setSpotlightId(null); } }, [viewMode]);
 
-  // --- NEW: HOST ACTION HANDLERS ---
   const handleAdmit = (socketId) => {
       socketRef.current.emit("admit-user", { socketId });
   };
 
-  // --- UPDATED: HANDLE KICK ---
   const handleKick = (socketId) => {
       if(window.confirm("Are you sure you want to remove this user?")) {
-          // 1. Emit event to server
           socketRef.current.emit("kick-user", { socketId });
 
-          // 2. OPTIMISTIC UPDATE: Remove user from local state immediately
-          // This ensures they disappear from the Host's view instantly
           setVideos((prevVideos) => prevVideos.filter((video) => video.socketId !== socketId));
           setUserMap((prevMap) => {
               const newMap = { ...prevMap };
@@ -467,18 +430,14 @@ useEffect(() => {
               return newMap;
           });
           
-          // 3. Remove their audio analyzer if exists
           if (audioAnalysersRef.current[socketId]) {
               delete audioAnalysersRef.current[socketId];
           }
-          
-          // 4. Close peer connection
           if(connectionsRef.current[socketId]) { 
               connectionsRef.current[socketId].close(); 
               delete connectionsRef.current[socketId]; 
           }
 
-          // 5. Reset view if we were spotlighting them
           if (spotlightId === socketId) { 
               setSpotlightId(null); 
               setViewMode("GRID"); 
@@ -489,7 +448,6 @@ useEffect(() => {
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
       
-      {/* 1. LOBBY VIEW (Unchanged) */}
       {askForUsername ? (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
@@ -509,7 +467,6 @@ useEffect(() => {
           </div>
         </div>
       ) : isInWaitingRoom ? (
-        // --- WAITING ROOM UI (Unchanged) ---
         <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900 p-4 text-center">
             <div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full">
                 <div className="w-20 h-20 bg-yellow-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -525,11 +482,9 @@ useEffect(() => {
             </div>
         </div>
       ) : (
-        // 2. MEETING VIEW
         <div className="flex flex-col h-screen relative">
             <div className="flex-1 bg-black relative flex overflow-hidden">
                 
-                {/* SPOTLIGHT VIEW */}
                 {viewMode === "SPOTLIGHT" && spotlightId && (
                     <div className="flex-1 flex items-center justify-center p-4 bg-neutral-900">
                           {spotlightId === "local" ? (
@@ -557,7 +512,6 @@ useEffect(() => {
                     </div>
                 )}
 
-                {/* GRID VIEW */}
                 <div className={`${viewMode === "SPOTLIGHT" ? "hidden md:flex w-64 border-l border-neutral-800 flex-col overflow-y-auto" : "flex-1 flex-wrap items-center justify-center"} flex p-4 gap-4 bg-black transition-all duration-300`}>
                     
                     {spotlightId !== "local" && (
@@ -598,7 +552,6 @@ useEffect(() => {
                 </div>
             </div>
 
-            {/* DRAGGABLE LOCAL PREVIEW (Spotlight Mode) */}
             {viewMode === "SPOTLIGHT" && spotlightId === "local" && (
                 <div 
                     ref={draggableRef}
@@ -611,29 +564,23 @@ useEffect(() => {
                 </div>
             )}
 
-            {/* --- CONTROL BAR WITH "MORE" BUTTON --- */}
             <div className="h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-center z-20 px-4 relative">
                 
-                {/* 1. CENTER CONTROLS (Mic, Video, End always visible. Screen/Layout hidden on mobile) */}
                 <div className="flex items-center gap-4">
                     <button onClick={handleAudio} className={`p-4 rounded-full transition-all ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</button>
                     <button onClick={handleVideo} className={`p-4 rounded-full transition-all ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</button>
                     
-                    {/* Hidden on Mobile, Visible on Desktop */}
                     <button onClick={handleScreen} className={`hidden md:block p-4 rounded-full transition-all ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>{screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}</button>
                     <button onClick={() => setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID")} className="hidden md:block p-4 rounded-full bg-neutral-700 hover:bg-neutral-600" title="Toggle Layout"><LayoutDashboard size={24} /></button>
                     
                     <button onClick={handleEndCall} className="p-4 rounded-full bg-red-600 hover:bg-red-700 text-white ml-2"><PhoneOff size={24} /></button>
                 
-                    {/* MOBILE ONLY: MORE BUTTON */}
                     <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 relative ml-2">
                         <MoreVertical size={24} />
-                        {/* Red Dot on More button if something is waiting inside */}
                         {((isHost && waitingUsers.length > 0) || newMessagesCount > 0) && <span className="absolute top-2 right-2 h-3 w-3 bg-red-600 rounded-full"></span>}
                     </button>
                 </div>
                 
-                {/* 2. DESKTOP RIGHT CONTROLS (Hidden on Mobile) */}
                 <div className="hidden md:flex absolute right-6 items-center gap-3">
                     <button onClick={() => setShowInfo(!showInfo)} className={`p-3 rounded-xl transition-colors ${showInfo ? "bg-blue-600 text-white" : "bg-neutral-800 text-gray-300"}`}><Info size={24} /></button>
                     <button onClick={toggleParticipants} className={`p-3 rounded-xl transition-colors relative ${showParticipants ? "bg-blue-600 text-white" : "bg-neutral-800 text-gray-300"}`}>
@@ -646,33 +593,27 @@ useEffect(() => {
                     </button>
                 </div>
 
-                {/* 3. MOBILE MENU POPUP (Visible only when showMobileMenu is true) */}
                 {showMobileMenu && (
                     <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden animate-in slide-in-from-bottom-5">
-                        {/* Screen Share (Mobile Menu) */}
                         <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg ${screen ? 'bg-blue-600 text-white' : 'hover:bg-neutral-700 text-gray-200'}`}>
                             {screen ? <MonitorOff size={20} /> : <ScreenShare size={20} />} <span className="text-sm font-medium">Share Screen</span>
                         </button>
                         
-                        {/* Layout (Mobile Menu) */}
                         <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-gray-200">
                             <LayoutDashboard size={20} /> <span className="text-sm font-medium">Switch Layout</span>
                         </button>
 
                         <div className="h-px bg-neutral-700 my-1"></div>
 
-                        {/* Info (Mobile Menu) */}
                         <button onClick={() => { setShowInfo(!showInfo); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg ${showInfo ? "bg-blue-600 text-white" : "hover:bg-neutral-700 text-gray-200"}`}>
                             <Info size={20} /> <span className="text-sm font-medium">Meeting Info</span>
                         </button>
 
-                        {/* Participants (Mobile Menu) */}
                         <button onClick={() => { toggleParticipants(); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg relative ${showParticipants ? "bg-blue-600 text-white" : "hover:bg-neutral-700 text-gray-200"}`}>
                             <Users size={20} /> <span className="text-sm font-medium">Participants</span>
                             {isHost && waitingUsers.length > 0 && <span className="ml-auto bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{waitingUsers.length}</span>}
                         </button>
 
-                        {/* Chat (Mobile Menu) */}
                         <button onClick={() => { toggleChat(); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg relative ${showChat ? "bg-blue-600 text-white" : "hover:bg-neutral-700 text-gray-200"}`}>
                             <MessageSquare size={20} /> <span className="text-sm font-medium">Chat</span>
                             {newMessagesCount > 0 && <span className="ml-auto bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{newMessagesCount}</span>}
@@ -681,7 +622,6 @@ useEffect(() => {
                 )}
             </div>
 
-            {/* INFO MODAL (Unchanged) */}
             {showInfo && (
                 <div className="absolute bottom-20 md:bottom-24 right-4 md:right-6 w-72 md:w-80 bg-neutral-800 rounded-xl border border-neutral-700 shadow-2xl z-30">
                     <div className="p-4 border-b border-neutral-700 flex justify-between items-center"><h3 className="font-bold text-white">Meeting Details</h3><button onClick={() => setShowInfo(false)} className="text-gray-400 hover:text-white"><X size={18}/></button></div>
@@ -693,7 +633,6 @@ useEffect(() => {
                 </div>
             )}
 
-            {/* PARTICIPANTS PANEL (Unchanged logic, just ensure z-index handles overlap) */}
             {showParticipants && (
                 <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
                     <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold text-lg">Participants ({Object.keys(userMap).length + 1})</h3><button onClick={toggleParticipants} className="text-gray-400 hover:text-white"><X size={20} /></button></div>
@@ -735,7 +674,6 @@ useEffect(() => {
                 </div>
             )}
 
-            {/* CHAT (Unchanged) */}
             {showChat && (
                 <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
                     <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold text-lg">In-Call Messages</h3><button onClick={toggleChat} className="text-gray-400 hover:text-white"><X size={20} /></button></div>

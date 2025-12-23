@@ -8,23 +8,19 @@ const withAuth = (WrappedComponent) => {
         const { userData, isLoading } = useContext(AuthContext);
 
         useEffect(() => {
-            // Only redirect if we are DONE loading and there is NO user data
             if (!isLoading && !userData) {
                 router("/auth");
             }
         }, [userData, isLoading, router]);
 
-        // If still loading (AuthContext handles main loading, but double check here)
         if (isLoading) {
             return null; // Or a spinner
         }
 
-        // If not authenticated, return null (useEffect will trigger redirect)
         if (!userData) {
             return null;
         }
 
-        // If authenticated, render the component
         return <WrappedComponent {...props} />;
     };
 

@@ -14,18 +14,14 @@ const LandingPage = () => {
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans selection:bg-indigo-100 overflow-x-hidden">
       <Navbar />
 
-      {/* 1. HERO SECTION */}
       <main className="relative pt-32 pb-20 px-6 lg:px-8 bg-white">
-        {/* Background Blobs */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
             <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-b from-indigo-50 to-white rounded-full blur-3xl opacity-60 translate-x-1/3 -translate-y-1/4" />
             <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-50 rounded-full blur-3xl opacity-60 -translate-x-1/3 translate-y-1/4" />
         </div>
 
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-20 items-center relative z-10">
-          {/* Copywriting */}
           <div className="space-y-8 text-center lg:text-left">
-
             <h1 className="font-outfit text-5xl md:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900">
               Connect deeper <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
@@ -54,14 +50,10 @@ const LandingPage = () => {
             </div>
           </div>
 
-          {/* --- NEW IMAGE FRAME SECTION (Smaller & No Animation) --- */}
           <div className="relative h-[500px] w-full flex items-center justify-center hidden md:flex">
             
              <div className="relative z-10 w-full max-w-sm aspect-[4/5] bg-slate-50 rounded-[2.5rem] border-8 border-slate-900 shadow-2xl shadow-indigo-500/20 transform -rotate-2 overflow-hidden">
                 
-                {/* Changes made:
-                   1. Removed 'group-hover:scale-105' (Stops zoom animation)
-                */}
                 <img 
                     src="https://images.unsplash.com/photo-1616587894289-86480e533129?q=80&w=2070&auto=format&fit=crop" 
                     alt="App Interface Preview" 
@@ -88,7 +80,6 @@ const LandingPage = () => {
         </div>
       </main>
 
-      {/* 2. TRUST & SOCIAL PROOF */}
       <section className="py-10 border-y border-slate-100 bg-slate-50/50">
          <div className="max-w-7xl mx-auto px-6 text-center">
             <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-6">Trusted by 2,000+ teams and developers</p>
@@ -113,7 +104,6 @@ const LandingPage = () => {
          </div>
       </section>
 
-      {/* 3. CORE FEATURES */}
       <section className="py-24 px-6 bg-white">
         <div className="max-w-7xl mx-auto">
            <div className="text-center mb-16">
@@ -142,13 +132,11 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* 4. HOW IT WORKS */}
       <section className="py-24 px-6 bg-slate-50">
          <div className="max-w-7xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 text-center mb-16">Start meeting in seconds</h2>
             
             <div className="grid md:grid-cols-3 gap-12 relative">
-               {/* Connecting Line (Desktop) */}
                <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-0.5 bg-slate-200 -z-10" />
 
                {[
@@ -168,7 +156,6 @@ const LandingPage = () => {
          </div>
       </section>
 
-      {/* 5. USE CASES */}
       <section className="py-24 px-6 bg-white">
          <div className="max-w-7xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-12">Built for every conversation</h2>
@@ -189,7 +176,6 @@ const LandingPage = () => {
          </div>
       </section>
 
-      {/* 6. WHY CHOOSE US (Differentiation) */}
       <section className="py-24 px-6 bg-indigo-900 text-white relative overflow-hidden">
          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500 rounded-full blur-[120px] opacity-20 pointer-events-none" />
          
@@ -225,7 +211,6 @@ const LandingPage = () => {
                      <p className="text-indigo-300 text-sm">Benchmarks vs Competitors</p>
                   </div>
                </div>
-               {/* Mock Chart */}
                <div className="space-y-4">
                   <div>
                      <div className="flex justify-between text-sm mb-1"><span>Cenfora</span> <span className="font-bold">0.4s</span></div>
@@ -244,14 +229,12 @@ const LandingPage = () => {
          </div>
       </section>
 
-      {/* 7. PRICING */}
       <section className="py-24 px-6 bg-slate-50">
          <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">Simple, transparent pricing</h2>
             <p className="text-slate-500 mb-12">No hidden fees. Cancel anytime.</p>
             
             <div className="grid md:grid-cols-2 gap-8 items-start">
-               {/* Free Plan */}
                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow">
                   <h3 className="text-xl font-bold text-slate-900 mb-2">Starter</h3>
                   <div className="text-4xl font-bold text-slate-900 mb-6">$0</div>
@@ -265,7 +248,6 @@ const LandingPage = () => {
                   <button className="w-full py-3 rounded-xl border-2 border-slate-900 text-slate-900 font-bold hover:bg-slate-50 transition-colors">Start Free</button>
                </div>
                
-               {/* Pro Plan */}
                <div className="bg-white p-8 rounded-3xl border-2 border-indigo-600 shadow-xl relative">
                   <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-xl">POPULAR</div>
                   <h3 className="text-xl font-bold text-slate-900 mb-2">Pro</h3>
@@ -283,7 +265,6 @@ const LandingPage = () => {
          </div>
       </section>
 
-      {/* 8. SECURITY & RELIABILITY */}
       <section className="py-20 px-6 bg-white border-t border-slate-100">
          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 text-center">
             <div className="p-6">
@@ -310,7 +291,6 @@ const LandingPage = () => {
          </div>
       </section>
 
-      {/* 9. FINAL CTA */}
       <section className="py-24 px-6">
          <div className="max-w-5xl mx-auto bg-slate-900 rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-indigo-900 to-purple-900 opacity-50" />

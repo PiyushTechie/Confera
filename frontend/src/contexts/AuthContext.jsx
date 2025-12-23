@@ -26,16 +26,13 @@ export const AuthProvider = ({ children }) => {
             });
         } catch (error) {
             console.error("Failed to fetch user history:", error);
-            // We do NOT logout here automatically to prevent flicker 
-            // if it's just a network glitch.
+            
         }
     };
 
     useEffect(() => {
         const checkAuth = async () => {
-            // FIX 2: Wrap everything in try/finally to GUARANTEE loading stops
             try {
-                // 1. Check URL Token
                 const query = new URLSearchParams(window.location.search);
                 const urlToken = query.get("token");
 
@@ -45,32 +42,27 @@ export const AuthProvider = ({ children }) => {
                     
                     setUserData({ token: urlToken, history: [] });
                     await fetchUserData(urlToken);
-                    return; // "finally" block will still run!
+                    return;
                 }
 
-                // 2. Check Local Storage
                 const localToken = localStorage.getItem("token");
                 const localUser = localStorage.getItem("userData");
 
                 if (localToken) {
-                    // Restore name immediately
                     if (localUser) {
                         setUserData(JSON.parse(localUser));
                     } else {
                         setUserData({ token: localToken });
                     }
                     
-                    // Fetch updates (awaiting here is what caused the stuck screen before)
                     await fetchUserData(localToken);
                 }
             } catch (error) {
                 console.error("Auth Check Error:", error);
-                // If critical error, clear everything so user can try login again
                 localStorage.removeItem("token");
                 localStorage.removeItem("userData");
                 setUserData(null);
             } finally {
-                // FIX 3: THIS ALWAYS RUNS. The loading screen WILL disappear.
                 setIsLoading(false);
             }
         };
@@ -78,7 +70,6 @@ export const AuthProvider = ({ children }) => {
         checkAuth();
     }, []);
 
-    // ... Keep your handleRegister, handleLogin, etc. exactly the same ...
     const handleRegister = async (name, username, password) => {
         let request = await client.post("/register", { name, username, password });
         if (request.status === HttpStatusCode.Created) return request.data.message;

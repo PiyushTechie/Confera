@@ -70,7 +70,6 @@ const getUserHistory = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Return the history array
         res.status(200).json(user.history);
 
 
@@ -79,7 +78,6 @@ const getUserHistory = async (req, res) => {
     }
 }
 
-// controllers/user.controller.js
 
 const addToHistory = async (req, res) => {
     const { token, meeting_code } = req.body;
@@ -91,19 +89,12 @@ const addToHistory = async (req, res) => {
             return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
         }
 
-        // --- STEP 1: Add to User History (Embedded) ---
-        // Since your User schema defines history structure, just push a plain object.
-        // Mongoose will automatically add the date and _id for this entry.
         user.history.push({
             meetingCode: meeting_code,
             date: new Date()
         });
         
-        await user.save(); // This saves the user AND the new history entry
-
-        // --- STEP 2: Save to Global Meeting Collection (Optional) ---
-        // If you want a separate collection for analytics (to count total meetings across all users), keep this.
-        // If you only care about user history, you can delete this part and the Meeting model entirely.
+        await user.save();
         const newMeeting = new Meeting({
             user_id: user.username,
             meetingCode: meeting_code,
