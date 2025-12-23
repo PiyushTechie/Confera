@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 const router = Router();
 
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+const clientURL = process.env.CLIENT_URL
 
 router.get(
     "/google/callback",
@@ -17,7 +18,7 @@ router.get(
             { expiresIn: "7d" }
         );
 
-        res.redirect(`http://localhost:5173/home?token=${token}`);
+        res.redirect(`${clientURL}/home?token=${token}`);
     }
 );
 
