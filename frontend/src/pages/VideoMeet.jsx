@@ -85,47 +85,46 @@ export default function VideoMeetComponent() {
 
   /* ------------------ PEER CONNECTION ------------------ */
 
-  const createPeer = (targetId) => {
-    const pc = new RTCPeerConnection(peerConfig);
-    pc.targetId = targetId;
-    connectionsRef.current[targetId] = pc;
+const createPeer = (targetId) => {
+  const pc = new RTCPeerConnection(peerConfig);
+  pc.targetId = targetId;
+  connectionsRef.current[targetId] = pc;
 
-    // Add current tracks (camera or screen)
-    const videoTrack = screen && displayStreamRef.current
-      ? displayStreamRef.current.getVideoTracks()[0]
-      : localStreamRef.current?.getVideoTracks()[0];
+  // Add current tracks
+  const videoTrack = screen && displayStreamRef.current
+    ? displayStreamRef.current.getVideoTracks()[0]
+    : localStreamRef.current?.getVideoTracks()[0];
 
-    const audioTrack = localStreamRef.current?.getAudioTracks()[0];
+  const audioTrack = localStreamRef.current?.getAudioTracks()[0];
 
-    if (videoTrack) pc.addTrack(videoTrack, localStreamRef.current);
-    if (audioTrack) pc.addTrack(audioTrack, localStreamRef.current);
+  if (videoTrack) pc.addTrack(videoTrack, localStreamRef.current);
+  if (audioTrack) pc.addTrack(audioTrack, localStreamRef.current);
 
-    pc.onicecandidate = e => {
-      if (e.candidate) {
-        socketRef.current.emit("signal", targetId, JSON.stringify({ ice: e.candidate }));
-      }
-    };
-
-    pc.ontrack = e => {
-      const stream = e.streams[0];
-      setVideos(prev => {
-        if (prev.some(v => v.socketId === pc.targetId)) return prev;
-        return [...prev, { socketId: pc.targetId, stream }];
-      });
-    };
-
-    pc.onnegotiationneeded = async () => {
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socketRef.current.emit("signal", targetId, JSON.stringify({ sdp: pc.localDescription }));
-      } catch (err) {
-        console.error("Negotiation error:", err);
-      }
-    };
-
-    return pc;
+  pc.onicecandidate = e => {
+    if (e.candidate) {
+      socketRef.current.emit("signal", targetId, JSON.stringify({ ice: e.candidate }));
+    }
   };
+
+  pc.ontrack = e => {
+    const stream = e.streams[0];
+    setVideos(prev => {
+      if (prev.some(v => v.socketId === pc.targetId)) return prev;
+      return [...prev, { socketId: pc.targetId, stream }];
+    });
+  };
+
+  // === CRITICAL FIX: Manually create and send offer ===
+  pc.createOffer()
+    .then(offer => pc.setLocalDescription(offer))
+    .then(() => {
+      socketRef.current.emit("signal", targetId, JSON.stringify({ sdp: pc.localDescription }));
+    })
+    .catch(err => console.error("Manual offer error:", err));
+
+  return pc;
+};
+
 
   const replaceVideoTrack = (newTrack) => {
     Object.values(connectionsRef.current).forEach(pc => {
