@@ -5,9 +5,18 @@ import server from "../environment";
 export const AuthContext = createContext({});
 
 const client = axios.create({
-    baseURL: `${server}/api/v1/users`,
-    timeout: 5000
+  baseURL: `${server}/api/v1/users`,
+  timeout: 5000,
 });
+
+client.interceptors.request.use(config => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 
 export const AuthProvider = ({ children }) => {
     const [userData, setUserData] = useState(null);
@@ -16,9 +25,7 @@ export const AuthProvider = ({ children }) => {
 
     const fetchUserData = async (token) => {
         try {
-            const response = await client.get("/get_all_activity", {
-                params: { token: token }
-            });
+            const response = await client.get("/activity",)
             
             setUserData(prev => {
                 const current = prev || { token: token };
@@ -97,10 +104,9 @@ export const AuthProvider = ({ children }) => {
             const token = localStorage.getItem("token");
             const meeting_code = typeof meetingDetails === 'object' ? meetingDetails.id : meetingDetails;
             
-            await client.post("/add_to_activity", { 
-            token: token, 
-            meeting_code: meeting_code 
-        });
+            await client.post("/activity", {
+                meeting_code
+                });
 
             if (userData) {
                 const newHistoryItem = typeof meetingDetails === 'object' ? meetingDetails : { meetingCode: meetingDetails, date: new Date() };
