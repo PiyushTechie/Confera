@@ -16,15 +16,24 @@ const app = express();
 const server = createServer(app);
 
 const io = new Server(server, {
-    cors: {
-        origin: process.env.CLIENT_URL, 
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: process.env.CLIENT_URL,
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true,
+  }
 });
 
-const PORT = process.env.PORT || 8000;
 
-app.use(cors());
+const PORT = process.env.PORT || 8000;
+app.use(cors({
+  origin: process.env.CLIENT_URL,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+app.options("*", cors());
+
 app.use(express.json({ limit: "40kb" }));
 app.use(express.urlencoded({ limit: "40kb", extended: true }));
 
@@ -32,6 +41,9 @@ app.use(passport.initialize());
 
 app.use("/auth", authRoutes); 
 app.use("/api/v1/users", userRoutes);
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 
 let connections = {};
 let waitingRooms = {};
