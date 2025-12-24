@@ -78,6 +78,7 @@ export default function VideoMeetComponent() {
       [localGridRef, localSpotlightRef, localFloatingRef].forEach(ref => {
         if (ref.current) ref.current.srcObject = stream;
       });
+      console.log("Local media obtained");
     } catch (err) {
       console.error("Media error:", err);
     }
@@ -85,46 +86,58 @@ export default function VideoMeetComponent() {
 
   /* ------------------ PEER CONNECTION ------------------ */
 
-const createPeer = (targetId) => {
-  const pc = new RTCPeerConnection(peerConfig);
-  pc.targetId = targetId;
-  connectionsRef.current[targetId] = pc;
+  const createPeer = (targetId) => {
+    console.log("Creating peer for:", targetId);
+    const pc = new RTCPeerConnection(peerConfig);
+    pc.targetId = targetId;
+    connectionsRef.current[targetId] = pc;
 
-  // Add current tracks
-  const videoTrack = screen && displayStreamRef.current
-    ? displayStreamRef.current.getVideoTracks()[0]
-    : localStreamRef.current?.getVideoTracks()[0];
+    // Add current tracks (camera or screen)
+    const videoTrack = screen && displayStreamRef.current
+      ? displayStreamRef.current.getVideoTracks()[0]
+      : localStreamRef.current?.getVideoTracks()[0];
 
-  const audioTrack = localStreamRef.current?.getAudioTracks()[0];
+    const audioTrack = localStreamRef.current?.getAudioTracks()[0];
 
-  if (videoTrack) pc.addTrack(videoTrack, localStreamRef.current);
-  if (audioTrack) pc.addTrack(audioTrack, localStreamRef.current);
+    if (videoTrack) pc.addTrack(videoTrack, localStreamRef.current);
+    if (audioTrack) pc.addTrack(audioTrack, localStreamRef.current);
 
-  pc.onicecandidate = e => {
-    if (e.candidate) {
-      socketRef.current.emit("signal", targetId, JSON.stringify({ ice: e.candidate }));
-    }
+    pc.onicecandidate = e => {
+      if (e.candidate) {
+        socketRef.current.emit("signal", targetId, JSON.stringify({ ice: e.candidate }));
+        console.log("Sent ICE to:", targetId);
+      }
+    };
+
+    pc.ontrack = e => {
+      console.log("Received remote stream from:", targetId);
+      const stream = e.streams[0];
+      setVideos(prev => {
+        if (prev.some(v => v.socketId === pc.targetId)) return prev;
+        return [...prev, { socketId: pc.targetId, stream }];
+      });
+    };
+
+    // Debug connection states
+    pc.onconnectionstatechange = () => console.log(`Connection state for ${targetId}:`, pc.connectionState);
+    pc.oniceconnectionstatechange = () => console.log(`ICE state for ${targetId}:`, pc.iceConnectionState);
+
+    // CRITICAL FIX: Manually create and send offer (don't rely on onnegotiationneeded)
+    const initiateOffer = async () => {
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socketRef.current.emit("signal", targetId, JSON.stringify({ sdp: pc.localDescription }));
+        console.log("Manually sent offer to:", targetId);
+      } catch (err) {
+        console.error("Manual offer error:", err);
+      }
+    };
+
+    initiateOffer();
+
+    return pc;
   };
-
-  pc.ontrack = e => {
-    const stream = e.streams[0];
-    setVideos(prev => {
-      if (prev.some(v => v.socketId === pc.targetId)) return prev;
-      return [...prev, { socketId: pc.targetId, stream }];
-    });
-  };
-
-  // === CRITICAL FIX: Manually create and send offer ===
-  pc.createOffer()
-    .then(offer => pc.setLocalDescription(offer))
-    .then(() => {
-      socketRef.current.emit("signal", targetId, JSON.stringify({ sdp: pc.localDescription }));
-    })
-    .catch(err => console.error("Manual offer error:", err));
-
-  return pc;
-};
-
 
   const replaceVideoTrack = (newTrack) => {
     Object.values(connectionsRef.current).forEach(pc => {
@@ -140,12 +153,12 @@ const createPeer = (targetId) => {
 
     socketRef.current.on("connect", () => {
       socketIdRef.current = socketRef.current.id;
+      console.log("Socket connected, ID:", socketIdRef.current);
 
       if (isHost) {
         socketRef.current.emit("join-call", {
           path: window.location.href,
           username: userName,
-          isHost: true,
         });
       } else {
         socketRef.current.emit("request-join", {
@@ -157,19 +170,21 @@ const createPeer = (targetId) => {
     });
 
     socketRef.current.on("update-waiting-list", (users) => {
+      console.log("Waiting users updated:", users);
       if (isHost) setWaitingUsers(users);
     });
 
     socketRef.current.on("admitted", () => {
+      console.log("Admitted by host");
       setIsInWaitingRoom(false);
       socketRef.current.emit("join-call", {
         path: window.location.href,
         username: userName,
-        isHost: false,
       });
     });
 
     socketRef.current.on("user-joined", (users) => {
+      console.log("User joined event:", users);
       users.forEach(u => {
         if (u.socketId === socketIdRef.current) return;
 
@@ -182,6 +197,7 @@ const createPeer = (targetId) => {
     });
 
     socketRef.current.on("signal", async (fromId, msg) => {
+      console.log("Received signal from:", fromId, msg);
       const signal = JSON.parse(msg);
       let pc = connectionsRef.current[fromId];
 
@@ -193,6 +209,7 @@ const createPeer = (targetId) => {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           socketRef.current.emit("signal", fromId, JSON.stringify({ sdp: pc.localDescription }));
+          console.log("Sent answer to:", fromId);
         }
         if (pendingIce.current[fromId]) {
           pendingIce.current[fromId].forEach(c => pc.addIceCandidate(new RTCIceCandidate(c)));
@@ -201,6 +218,7 @@ const createPeer = (targetId) => {
       } else if (signal.ice) {
         if (pc.remoteDescription) {
           await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
+          console.log("Added ICE from:", fromId);
         } else {
           pendingIce.current[fromId] = pendingIce.current[fromId] || [];
           pendingIce.current[fromId].push(signal.ice);
@@ -209,6 +227,7 @@ const createPeer = (targetId) => {
     });
 
     socketRef.current.on("user-left", (id) => {
+      console.log("User left:", id);
       connectionsRef.current[id]?.close();
       delete connectionsRef.current[id];
       setVideos(v => v.filter(x => x.socketId !== id));
@@ -234,6 +253,7 @@ const createPeer = (targetId) => {
         track.onended = () => handleScreen();
 
         setScreen(true);
+        console.log("Screen sharing started");
       } catch (err) {
         console.log("Screen share cancelled");
       }
@@ -245,6 +265,7 @@ const createPeer = (targetId) => {
       if (camTrack) replaceVideoTrack(camTrack);
 
       setScreen(false);
+      console.log("Screen sharing stopped");
     }
   };
 
@@ -253,6 +274,7 @@ const createPeer = (targetId) => {
     if (track) {
       track.enabled = !video;
       setVideo(!video);
+      console.log("Video toggled:", !video);
     }
   };
 
@@ -261,11 +283,13 @@ const createPeer = (targetId) => {
     if (track) {
       track.enabled = !audio;
       setAudio(!audio);
+      console.log("Audio toggled:", !audio);
     }
   };
 
   const handleAdmit = (socketId) => {
     socketRef.current.emit("admit-user", socketId);
+    console.log("Admitted:", socketId);
   };
 
   const handleCopyLink = () => {
@@ -280,6 +304,11 @@ const createPeer = (targetId) => {
     Object.values(connectionsRef.current).forEach(pc => pc.close());
     socketRef.current?.disconnect();
     navigate("/");
+  };
+
+  const handleTileClick = (id) => {
+    setSpotlightId(id);
+    setViewMode("SPOTLIGHT");
   };
 
   /* ------------------ INIT ------------------ */
@@ -649,7 +678,8 @@ const createPeer = (targetId) => {
             </div>
           )}
 
-          {showChat && (
+          
+        {showChat && (
                 <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
                     <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold text-lg">In-Call Messages</h3><button onClick={toggleChat} className="text-gray-400 hover:text-white"><X size={20} /></button></div>
                     <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-neutral-600">
