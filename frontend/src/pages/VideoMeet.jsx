@@ -9,6 +9,7 @@ import {
   ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
 } from "lucide-react";
 import server from "../environment";
+import { useParams } from "react-router-dom";
 
 const server_url = server;
 
@@ -28,7 +29,8 @@ export default function VideoMeetComponent() {
   isHost = false,
 } = location.state || {};
 
-  const meetingCode = window.location.pathname.replace("/", "");
+const { url: meetingCode } = useParams();
+
 
   const socketRef = useRef(null);
   const socketIdRef = useRef(null);
@@ -40,8 +42,7 @@ export default function VideoMeetComponent() {
   const localFloatingRef = useRef(null);
 
   const [askForUsername, setAskForUsername] = useState(!bypassLobby);
-  const [userName, setUsername] = useState(passedUsername || "");
-
+const [userName, setUsername] = useState(username || "");
   const [video, setVideo] = useState(isVideoOn ?? true);
   const [audio, setAudio] = useState(isAudioOn ?? true);
   const [screen, setScreen] = useState(false);
