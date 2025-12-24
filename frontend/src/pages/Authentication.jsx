@@ -47,8 +47,9 @@ export default function Authentication() {
     }
 
     const handleGoogleLogin = () => {
-        window.location.href = "http://localhost:8000/auth/google";
-    };
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+};
+
 
     return (
         <div className="min-h-screen flex bg-white text-slate-900 font-sans selection:bg-indigo-100">

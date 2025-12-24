@@ -50,6 +50,16 @@ function HomeComponent() {
     navigate("/auth");
   };
 
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+
+  if (token) {
+    localStorage.setItem("token", token);
+    window.history.replaceState({}, document.title, "/home");
+  }
+}, []);
+
   const handleNewMeeting = () => {
     setIsJoining(false);
     const randomId = Math.floor(100000000 + Math.random() * 900000000).toString();
@@ -224,4 +234,4 @@ function HomeComponent() {
   );
 }
 
-export default withAuth(HomeComponent);
+ export default HomeComponent;

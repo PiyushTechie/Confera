@@ -10,7 +10,7 @@ const clientURL = process.env.CLIENT_URL
 
 router.get(
     "/google/callback",
-    passport.authenticate("google", { session: false, failureRedirect: "/auth" }),
+    passport.authenticate("google", { session: false, failureRedirect: `${process.env.CLIENT_URL}/auth` }),
     (req, res) => {
         const token = jwt.sign(
             { userId: req.user._id },
