@@ -14,9 +14,18 @@ const server_url = server;
 
 const peerConfig = {
   iceServers: [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" }, // Free public TURN
-]
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp"
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ],
 };
 
 export default function VideoMeetComponent() {
@@ -136,6 +145,9 @@ export default function VideoMeetComponent() {
         console.error("Manual offer error:", err);
       }
     };
+
+    pc.onsignalingstatechange = () => console.log(`Signaling state for ${targetId}:`, pc.signalingState);
+    pc.onnegotiationneeded = () => console.log(`Negotiation needed for ${targetId}`);
 
     initiateOffer();
 
