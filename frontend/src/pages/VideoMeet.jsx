@@ -13,7 +13,10 @@ import server from "../environment";
 const server_url = server;
 
 const peerConfig = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  iceServers: [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" }, // Free public TURN
+]
 };
 
 export default function VideoMeetComponent() {
