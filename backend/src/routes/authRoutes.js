@@ -2,24 +2,41 @@
 import { Router } from "express";
 import passport from "passport";
 import jwt from "jsonwebtoken";
+import { login, register } from "../controllers/authentication.js";
 
 const router = Router();
 
-router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
-const clientURL = process.env.CLIENT_URL
+/* ======================
+   EMAIL / PASSWORD AUTH
+====================== */
+
+router.post("/login", login);
+router.post("/register", register);
+
+/* ======================
+   GOOGLE OAUTH
+====================== */
 
 router.get(
-    "/google/callback",
-    passport.authenticate("google", { session: false, failureRedirect: `${process.env.CLIENT_URL}/auth` }),
-    (req, res) => {
-        const token = jwt.sign(
-            { userId: req.user._id },
-            process.env.JWT_SECRET || "YOUR_SECRET_KEY",
-            { expiresIn: "7d" }
-        );
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
 
-        res.redirect(`${clientURL}/home?token=${token}`);
-    }
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: `${process.env.CLIENT_URL}/auth`,
+  }),
+  (req, res) => {
+    const token = jwt.sign(
+      { userId: req.user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.redirect(`${process.env.CLIENT_URL}/home?token=${token}`);
+  }
 );
 
 export default router;

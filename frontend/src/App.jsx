@@ -31,7 +31,8 @@ function App() {
           <Route path='/home' element={<ProtectedRoute><HomeComponent/></ProtectedRoute>} />
           <Route path='/history' element={<ProtectedRoute><History/></ProtectedRoute>} />
 
-          <Route path='/:url' element={<VideoMeetComponent />} />
+          <Route path='/meeting/:url' element={<VideoMeetComponent />} />
+
         </Routes>
       </AuthProvider>
     </BrowserRouter>

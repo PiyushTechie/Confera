@@ -1,12 +1,38 @@
+// backend/src/routes/users.js
 import { Router } from "express";
-import { addToHistory, getUserHistory, login, register } from "../controllers/authentication.js";
+import jwt from "jsonwebtoken";
+import {
+  addToHistory,
+  getUserHistory,
+} from "../controllers/authentication.js";
 
 const router = Router();
 
-router.route("/login").post(login);
-router.route("/register").post(register);
-router.route("/add_to_activity").post(addToHistory);
-router.route("/get_all_activity").get(getUserHistory);
+/* ======================
+   JWT MIDDLEWARE
+====================== */
+const verifyToken = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Token missing" });
+    }
 
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid token" });
+  }
+};
+
+/* ======================
+   USER ACTIVITY
+====================== */
+
+router.post("/activity", verifyToken, addToHistory);
+router.get("/activity", verifyToken, getUserHistory);
 
 export default router;

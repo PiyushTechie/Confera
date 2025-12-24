@@ -20,8 +20,13 @@ export default function VideoMeetComponent() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { bypassLobby, isAudioOn, isVideoOn, username: passedUsername, isHost } =
-    location.state || {};
+  const {
+  bypassLobby = false,
+  isAudioOn = true,
+  isVideoOn = true,
+  username = "Guest",
+  isHost = false,
+} = location.state || {};
 
   const meetingCode = window.location.pathname.replace("/", "");
 

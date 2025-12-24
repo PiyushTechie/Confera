@@ -101,9 +101,9 @@ useEffect(() => {
     stopPreviewCamera();
     await addToUserHistory(generatedMeetingId);
     const finalName = participantName.trim() || "Host"; 
-    navigate(`/${generatedMeetingId}`, {
-      state: { bypassLobby: true, isAudioOn, isVideoOn, username: finalName, isHost: true },
-    });
+    navigate(`/meeting/${generatedMeetingId}`, {
+  state: { bypassLobby: true, isAudioOn, isVideoOn, username: finalName, isHost: true },
+});
   };
 
   const togglePreviewVideo = () => {
