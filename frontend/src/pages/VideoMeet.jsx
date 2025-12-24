@@ -40,8 +40,7 @@ const { url: meetingCode } = useParams();
   const localGridRef = useRef(null);
   const localSpotlightRef = useRef(null);
   const localFloatingRef = useRef(null);
-
-  const [askForUsername, setAskForUsername] = useState(!bypassLobby);
+const [askForUsername, setAskForUsername] = useState(false);
 const [userName, setUsername] = useState(username || "");
   const [video, setVideo] = useState(isVideoOn ?? true);
   const [audio, setAudio] = useState(isAudioOn ?? true);
@@ -53,6 +52,27 @@ const [userName, setUsername] = useState(username || "");
   const [waitingUsers, setWaitingUsers] = useState([]);
 
   const pendingIce = useRef({});
+
+  // ---------- REQUIRED UI STATE ----------
+const [viewMode, setViewMode] = useState("GRID");
+const [spotlightId, setSpotlightId] = useState(null);
+const [activeSpeakerId, setActiveSpeakerId] = useState(null);
+
+const [showInfo, setShowInfo] = useState(false);
+const [showParticipants, setShowParticipants] = useState(false);
+const [showChat, setShowChat] = useState(false);
+const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+const [messages, setMessages] = useState([]);
+const [currentMessage, setCurrentMessage] = useState("");
+const [newMessagesCount, setNewMessagesCount] = useState(0);
+
+const draggableRef = useRef(null);
+const chatContainerRef = useRef(null);
+const [position, setPosition] = useState({ x: 20, y: 20 });
+const [isDragging, setIsDragging] = useState(false);
+// --------------------------------------
+
 
   /* --------------------- MEDIA --------------------- */
 
@@ -241,6 +261,25 @@ const [userName, setUsername] = useState(username || "");
     setAudio(!audio);
   };
 
+
+  // ---------- UI HANDLERS ----------
+const toggleParticipants = () => setShowParticipants(p => !p);
+const toggleChat = () => setShowChat(c => !c);
+
+const handleTileClick = (id) => {
+  setSpotlightId(id);
+  setViewMode("SPOTLIGHT");
+};
+
+const handleKick = () => {};
+const handleAdmit = () => {};
+const handleSendMessage = () => {};
+
+const handleCopyLink = () => {
+  navigator.clipboard.writeText(window.location.href);
+};
+// --------------------------------
+
   /* -------------------- INIT -------------------- */
 
   useEffect(() => {
@@ -248,6 +287,13 @@ const [userName, setUsername] = useState(username || "");
       if (bypassLobby) connectSocket();
     });
   }, []);
+
+  useEffect(() => {
+  if (bypassLobby) {
+    setAskForUsername(false);
+  }
+}, [bypassLobby]);
+
 
   const connect = () => {
     setAskForUsername(false);
