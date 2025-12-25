@@ -1,3 +1,4 @@
+// VideoMeetComponent.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import io from "socket.io-client";
@@ -13,10 +14,18 @@ const server_url = server;
 
 const peerConfig = {
   iceServers: [
-    { urls: "stun:stun.expressturn.com:3478" },
-    { urls: "turn:turn.expressturn.com:3478", username: "free", credential: "free" },
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    {
+      urls: [
+        "turn:openrelay.metered.ca:80",
+        "turn:openrelay.metered.ca:443",
+        "turn:openrelay.metered.ca:443?transport=tcp"
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
   ],
-  iceTransportPolicy: "relay"
 };
 
 export default function VideoMeetComponent() {
@@ -41,9 +50,6 @@ export default function VideoMeetComponent() {
   const localGridRef = useRef(null);
   const localSpotlightRef = useRef(null);
   const localFloatingRef = useRef(null);
-  
-  // Chat Refs
-  const chatContainerRef = useRef(null);
 
   const [askForUsername, setAskForUsername] = useState(false);
   const [userName, setUsername] = useState(username || "");
@@ -68,11 +74,6 @@ export default function VideoMeetComponent() {
 
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [isDragging, setIsDragging] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Chat State
-  const [messages, setMessages] = useState([]);
-  const [currentMessage, setCurrentMessage] = useState("");
 
   /* --------------------- MEDIA --------------------- */
 
@@ -251,61 +252,36 @@ export default function VideoMeetComponent() {
         return copy;
       });
     });
-
-    // --- CHAT LISTENER ---
-    socketRef.current.on("receive-message", (data) => {
-      // Determine if the message is from me or someone else
-      const isMe = data.socketId === socketRef.current.id;
-      setMessages(prev => [...prev, { ...data, isMe }]);
-    });
   };
 
   /* ------------------ CONTROLS ------------------ */
 
   const handleScreen = async () => {
-    // START: Added If-Else Statement for Mobile Check
-    if (isMobile) {
-      alert("Screen sharing is not supported on mobile devices due to browser limitations. Please use a desktop computer.");
-      return;
-    } else {
-      // Logic for Desktop devices
-      if (!screen) {
-        try {
-          const display = await navigator.mediaDevices.getDisplayMedia({
-            video: true,
-            audio: false
-          });
-          displayStreamRef.current = display;
-          const track = display.getVideoTracks()[0];
+    if (!screen) {
+      try {
+        const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        displayStreamRef.current = display;
+        const track = display.getVideoTracks()[0];
 
-          replaceVideoTrack(track);
+        replaceVideoTrack(track);
 
-          track.onended = () => {
-            handleScreen();
-          };
+        track.onended = () => handleScreen();
 
-          setScreen(true);
-          console.log("Screen sharing started");
-        } catch (err) {
-          if (err.name !== "NotAllowedError") {
-            console.error("Screen share error:", err);
-            alert("Unable to start screen sharing. Please try again or check browser permissions.");
-          }
-          console.log("Screen share cancelled or denied");
-        }
-      } else {
-        // Stop sharing
-        displayStreamRef.current?.getTracks().forEach(t => t.stop());
-        displayStreamRef.current = null;
-
-        const camTrack = localStreamRef.current?.getVideoTracks()[0];
-        if (camTrack) replaceVideoTrack(camTrack);
-
-        setScreen(false);
-        console.log("Screen sharing stopped");
+        setScreen(true);
+        console.log("Screen sharing started");
+      } catch (err) {
+        console.log("Screen share cancelled");
       }
+    } else {
+      displayStreamRef.current?.getTracks().forEach(t => t.stop());
+      displayStreamRef.current = null;
+
+      const camTrack = localStreamRef.current?.getVideoTracks()[0];
+      if (camTrack) replaceVideoTrack(camTrack);
+
+      setScreen(false);
+      console.log("Screen sharing stopped");
     }
-    // END: Added If-Else Statement
   };
 
   const handleVideo = () => {
@@ -350,26 +326,6 @@ export default function VideoMeetComponent() {
     setViewMode("SPOTLIGHT");
   };
 
-  // --- CHAT SEND HANDLER ---
-  const handleSendMessage = () => {
-    if (!currentMessage.trim() || !socketRef.current) return;
-
-    const messageData = {
-      text: currentMessage,
-      sender: userName,
-      socketId: socketRef.current.id,
-      timestamp: new Date().toISOString()
-    };
-
-    // Emit to server
-    socketRef.current.emit("send-message", messageData);
-
-    // Optimistically update local UI (or rely on server broadcast if server echoes back to sender)
-    // Assuming here we update locally for instant feedback:
-    setMessages(prev => [...prev, { ...messageData, isMe: true }]);
-    setCurrentMessage("");
-  };
-
   /* ------------------ INIT ------------------ */
 
   useEffect(() => {
@@ -383,13 +339,6 @@ export default function VideoMeetComponent() {
 
     return () => handleEndCall();
   }, []);
-
-  // Auto-scroll chat
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages, showChat]);
 
   const connect = () => {
     setAskForUsername(false);
@@ -412,18 +361,6 @@ export default function VideoMeetComponent() {
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   };
-
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        'ontouchstart' in window ||
-        navigator.maxTouchPoints > 0;
-      setIsMobile(mobile);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
@@ -592,11 +529,7 @@ export default function VideoMeetComponent() {
               <button onClick={handleVideo} className={`p-4 rounded-full ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>
                 {video ? <Video size={24} /> : <VideoOff size={24} />}
               </button>
-              <button
-                onClick={handleScreen}
-                className={`hidden md:block p-4 rounded-full ${screen ? 'bg-blue-600' : isMobile ? 'bg-neutral-800 opacity-50 cursor-not-allowed' : 'bg-neutral-700'}`}
-                title={isMobile ? "Not available on mobile" : "Share Screen"}
-              >
+              <button onClick={handleScreen} className={`hidden md:block p-4 rounded-full ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>
                 {screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}
               </button>
               <button onClick={() => setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID")} className="hidden md:block p-4 rounded-full bg-neutral-700 hover:bg-neutral-600">
@@ -760,47 +693,20 @@ export default function VideoMeetComponent() {
             </div>
           )}
 
-          {/* Chat Panel */}
-          {showChat && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
-              <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
-                <h3 className="font-bold text-lg">In-Call Messages</h3>
-                <button onClick={() => setShowChat(false)} className="text-gray-400 hover:text-white">
-                  <X size={20} />
-                </button>
-              </div>
-              <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-neutral-600">
-                {messages.length === 0 ? (
-                  <div className="text-center text-neutral-500 text-sm mt-10">No messages yet</div>
-                ) : (
-                  messages.map((msg, idx) => (
-                    <div key={idx} className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}>
-                      <div className={`text-xs text-gray-400 mb-1 ${msg.isMe ? "text-right" : "text-left"}`}>
-                        {msg.sender}
-                      </div>
-                      <div className={`px-4 py-2 rounded-lg max-w-[85%] break-words text-sm ${msg.isMe ? "bg-blue-600 text-white" : "bg-neutral-700 text-gray-100"}`}>
-                        {msg.text}
-                      </div>
+          
+        {showChat && (
+                <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
+                    <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold text-lg">In-Call Messages</h3><button onClick={toggleChat} className="text-gray-400 hover:text-white"><X size={20} /></button></div>
+                    <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-neutral-600">
+                        {messages.length === 0 ? <div className="text-center text-neutral-500 text-sm mt-10">No messages yet</div> : messages.map((msg, idx) => (
+                            <div key={idx} className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}><div className={`text-xs text-gray-400 mb-1 ${msg.isMe ? "text-right" : "text-left"}`}>{msg.sender}</div><div className={`px-4 py-2 rounded-lg max-w-[85%] break-words text-sm ${msg.isMe ? "bg-blue-600 text-white" : "bg-neutral-700 text-gray-100"}`}>{msg.text}</div></div>
+                        ))}
                     </div>
-                  ))
-                )}
-              </div>
-              <div className="p-4 border-t border-neutral-700 bg-neutral-900">
-                <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2">
-                  <input
-                    type="text"
-                    className="flex-1 bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    placeholder="Send a message..."
-                    value={currentMessage}
-                    onChange={(e) => setCurrentMessage(e.target.value)}
-                  />
-                  <button type="submit" className="p-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-white">
-                    <Send size={18} />
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
+                    <div className="p-4 border-t border-neutral-700 bg-neutral-900">
+                        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2"><input type="text" className="flex-1 bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Send a message..." value={currentMessage} onChange={(e) => setCurrentMessage(e.target.value)} /><button type="submit" className="p-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-white"><Send size={18} /></button></form>
+                    </div>
+                </div>
+            )}
         </div>
       )}
     </div>
