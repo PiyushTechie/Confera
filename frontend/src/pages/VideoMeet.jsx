@@ -38,7 +38,7 @@ export default function VideoMeetComponent() {
     isVideoOn = true,
     username = "Guest",
     isHost = false,
-    passcode = null
+    passcode = null 
   } = location.state || {};
 
   const socketRef = useRef(null);
@@ -186,7 +186,7 @@ export default function VideoMeetComponent() {
     });
 
     socketRef.current.on("invalid-meeting", () => {
-        alert("Meeting not found! Please check the code or wait for the host to start the meeting.");
+        alert("Meeting not found!");
         socketRef.current.disconnect();
         navigate("/");
     });
@@ -426,7 +426,7 @@ export default function VideoMeetComponent() {
                     <Lock size={32} />
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Passcode Required</h2>
-                <p className="text-gray-400 mb-6 text-sm">This meeting is protected.</p>
+                <p className="text-gray-400 mb-6 text-sm">This meeting is protected. Please enter the passcode to join.</p>
                 <form onSubmit={handleSubmitPasscode}>
                     <input 
                         type="password" autoFocus
@@ -434,7 +434,7 @@ export default function VideoMeetComponent() {
                         placeholder="Enter Passcode"
                         value={passcodeInput} onChange={e => setPasscodeInput(e.target.value)}
                     />
-                    {passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect passcode.</p>}
+                    {passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect passcode. Try again.</p>}
                     <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold transition-all">Submit</button>
                 </form>
             </div>
@@ -537,7 +537,17 @@ export default function VideoMeetComponent() {
              
              <div className="hidden md:flex absolute right-6 gap-3">
                <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
-               <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800"><Users size={24} /></button>
+               
+               {/* --- PARTICIPANTS BUTTON WITH BADGE --- */}
+               <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative">
+                 <Users size={24} />
+                 {isHost && waitingUsers.length > 0 && (
+                   <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[18px]">
+                     {waitingUsers.length}
+                   </span>
+                 )}
+               </button>
+
                <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative">
                  <MessageSquare size={24} />
                  {unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}
@@ -548,6 +558,7 @@ export default function VideoMeetComponent() {
                  <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden">
                     <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><ScreenShare size={20} /> Share Screen</button>
                     <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><LayoutDashboard size={20} /> Layout</button>
+                    
                     <button onClick={() => { setShowChat(!showChat); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative">
                       <div className="relative"><MessageSquare size={20} />{unreadMessages > 0 && <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</div><span>Chat</span>
                     </button>
@@ -581,23 +592,29 @@ export default function VideoMeetComponent() {
             <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col">
                 <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold">Participants</h3><button onClick={() => setShowParticipants(false)}><X size={20} /></button></div>
                 <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-                    {isHost && waitingUsers.length > 0 && (
+                    {/* --- CRASH FIX: Ensure waitingUsers is an array --- */}
+                    {isHost && waitingUsers && waitingUsers.length > 0 && (
                         <div className="pb-4 border-b border-neutral-700">
                             <h4 className="text-xs font-bold text-yellow-500 uppercase mb-3">Waiting</h4>
                             {waitingUsers.map(u => (
                                 <div key={u.socketId} className="flex justify-between items-center bg-neutral-700/50 p-2 rounded mb-2">
-                                    <span className="text-sm">{u.username}</span>
+                                    {/* CRASH FIX: Safe access for username */}
+                                    <span className="text-sm">{u.username || "Guest"}</span>
                                     <button onClick={() => handleAdmit(u.socketId)} className="p-1 bg-green-600 rounded text-xs"><UserCheck size={14}/></button>
                                 </div>
                             ))}
                         </div>
                     )}
                     <div className="flex justify-between items-center bg-neutral-700/50 p-2 rounded">
-                        <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs">{userName.charAt(0)}</div><span className="text-sm">{userName} (You)</span></div>
+                        <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs">{(userName || "G").charAt(0)}</div><span className="text-sm">{userName} (You)</span></div>
                     </div>
-                    {Object.values(userMap).map(u => (
+                    {/* CRASH FIX: Ensure Object.values returns array and userMap is safe */}
+                    {userMap && Object.values(userMap).map(u => (
                         <div key={u.socketId} className="flex justify-between items-center bg-neutral-700/50 p-2 rounded">
-                            <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-xs">{u.username.charAt(0)}</div><span className="text-sm">{u.username}</span></div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-xs">{(u.username || "G").charAt(0)}</div>
+                                <span className="text-sm">{u.username || "Guest"}</span>
+                            </div>
                             <div className={u.isMuted ? "text-red-500" : "text-gray-400"}>{u.isMuted ? <MicOff size={14} /> : <Mic size={14} />}</div>
                         </div>
                     ))}
