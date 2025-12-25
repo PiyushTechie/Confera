@@ -15,7 +15,8 @@ import {
   Check,
   User,
   Clock,
-  LogOut 
+  LogOut,
+  ArrowRight
 } from "lucide-react";
 
 function HomeComponent() {
@@ -23,11 +24,15 @@ function HomeComponent() {
   const { addToUserHistory, userData } = useContext(AuthContext);
 
   const [date, setDate] = useState(new Date());
+  
+  // New state for the input popup
+  const [showJoinInputModal, setShowJoinInputModal] = useState(false);
+  
   const [meetingCode, setMeetingCode] = useState("");
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [generatedMeetingId, setGeneratedMeetingId] = useState("");
   const [isJoining, setIsJoining] = useState(false);
-  const [participantName, setParticipantName] = useState(""); 
+  const [participantName, setParticipantName] = useState("");
   const localVideoRef = useRef(null);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
@@ -40,7 +45,7 @@ function HomeComponent() {
 
   useEffect(() => {
     if (userData?.name) {
-        setParticipantName(userData.name);
+      setParticipantName(userData.name);
     }
   }, [userData]);
 
@@ -50,31 +55,38 @@ function HomeComponent() {
     navigate("/auth");
   };
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("token");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
 
-  if (token) {
-    localStorage.setItem("token", token);
-    window.history.replaceState({}, document.title, "/home");
-  }
-}, []);
+    if (token) {
+      localStorage.setItem("token", token);
+      window.history.replaceState({}, document.title, "/home");
+    }
+  }, []);
 
   const handleNewMeeting = () => {
     setIsJoining(false);
     const randomId = Math.floor(100000000 + Math.random() * 900000000).toString();
     const formattedId = `${randomId.substring(0, 3)}-${randomId.substring(3, 6)}-${randomId.substring(6, 9)}`;
     setGeneratedMeetingId(formattedId);
-    setParticipantName(userData?.name || ""); 
+    setParticipantName(userData?.name || "");
     setShowPreviewModal(true);
     startPreviewCamera();
   };
 
+  // Triggered after entering code in the new Join Input Modal
   const handleJoinVideoCall = () => {
     if (meetingCode.trim() === "") return;
+    
+    // Close the input modal
+    setShowJoinInputModal(false);
+    
     setIsJoining(true);
     setGeneratedMeetingId(meetingCode);
-    setParticipantName(userData?.name || ""); 
+    setParticipantName(userData?.name || "");
+    
+    // Open the Camera Preview modal
     setShowPreviewModal(true);
     startPreviewCamera();
   };
@@ -100,10 +112,10 @@ useEffect(() => {
   const startMeeting = async () => {
     stopPreviewCamera();
     await addToUserHistory(generatedMeetingId);
-    const finalName = participantName.trim() || "Host"; 
+    const finalName = participantName.trim() || "Host";
     navigate(`/meeting/${generatedMeetingId}`, {
-  state: { bypassLobby: true, isAudioOn, isVideoOn, username: finalName, isHost: true },
-});
+      state: { bypassLobby: true, isAudioOn, isVideoOn, username: finalName, isHost: true },
+    });
   };
 
   const togglePreviewVideo = () => {
@@ -133,24 +145,24 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen w-full bg-gray-50 flex flex-col items-center relative font-sans text-neutral-800">
-      
+
       <div className="w-full px-6 py-5 flex justify-between items-center bg-transparent z-50">
         <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-600/20">
-                <Video size={20} />
-            </div>
-            <span className="text-xl font-bold text-gray-800 tracking-tight">VideoMeet</span>
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-600/20">
+            <Video size={20} />
+          </div>
+          <span className="text-xl font-bold text-gray-800 tracking-tight">VideoMeet</span>
         </div>
 
         <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/history")} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition-all">
-                <Clock size={18} />
-                <span className="hidden sm:inline">History</span>
-            </button>
-            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all">
-                <LogOut size={18} />
-                <span className="hidden sm:inline">Logout</span>
-            </button>
+          <button onClick={() => navigate("/history")} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition-all">
+            <Clock size={18} />
+            <span className="hidden sm:inline">History</span>
+          </button>
+          <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all">
+            <LogOut size={18} />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
         </div>
       </div>
 
@@ -161,6 +173,7 @@ useEffect(() => {
         </div>
 
         <div className="flex flex-wrap justify-center gap-8 mb-16">
+          {/* NEW MEETING BUTTON */}
           <div onClick={handleNewMeeting} className="flex flex-col items-center gap-3 cursor-pointer group">
             <div className="w-20 h-20 bg-orange-500 hover:bg-orange-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-orange-500/30 transition-all transform group-hover:scale-105 group-hover:-translate-y-1">
               <Video size={36} />
@@ -168,21 +181,18 @@ useEffect(() => {
             <span className="text-sm font-semibold text-gray-700">New Meeting</span>
           </div>
 
-          <div className="flex flex-col items-center gap-3 cursor-pointer group relative">
+          {/* JOIN BUTTON (UPDATED) */}
+          <div 
+            onClick={() => setShowJoinInputModal(true)} 
+            className="flex flex-col items-center gap-3 cursor-pointer group"
+          >
             <div className="w-20 h-20 bg-blue-600 hover:bg-blue-700 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-blue-500/30 transition-all transform group-hover:scale-105 group-hover:-translate-y-1">
               <Plus size={36} />
             </div>
             <span className="text-sm font-semibold text-gray-700">Join</span>
-            {/* Hover Menu */}
-            <div className="absolute top-24 bg-white p-4 rounded-xl shadow-2xl border border-gray-100 w-72 z-20 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 translate-y-2 group-hover:translate-y-0">
-              <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Join with ID</h3>
-              <div className="flex gap-2">
-                <input type="text" placeholder="Enter Code" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" value={meetingCode} onChange={(e) => setMeetingCode(e.target.value)}/>
-                <button onClick={handleJoinVideoCall} className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"><Plus size={16} /></button>
-              </div>
-            </div>
           </div>
 
+          {/* SCHEDULE BUTTON */}
           <div className="flex flex-col items-center gap-3 cursor-pointer group">
             <div className="w-20 h-20 bg-blue-600 hover:bg-blue-700 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-blue-500/30 transition-all transform group-hover:scale-105 group-hover:-translate-y-1">
               <Calendar size={36} />
@@ -190,6 +200,7 @@ useEffect(() => {
             <span className="text-sm font-semibold text-gray-700">Schedule</span>
           </div>
 
+          {/* SCREEN SHARE BUTTON */}
           <div className="flex flex-col items-center gap-3 cursor-pointer group">
             <div className="w-20 h-20 bg-blue-600 hover:bg-blue-700 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-blue-500/30 transition-all transform group-hover:scale-105 group-hover:-translate-y-1">
               <ScreenShare size={36} />
@@ -199,10 +210,49 @@ useEffect(() => {
         </div>
       </div>
 
+      {/* NEW: JOIN MEETING INPUT MODAL */}
+      {showJoinInputModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm m-4">
+             <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800">Join Meeting</h3>
+                <button onClick={() => setShowJoinInputModal(false)} className="text-gray-400 hover:text-gray-600">
+                    <X size={20} />
+                </button>
+             </div>
+             
+             <p className="text-sm text-gray-500 mb-4">Enter the meeting code shared by the host.</p>
+             
+             <div className="space-y-4">
+                <input 
+                    type="text" 
+                    placeholder="Example: 123-456-789" 
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    value={meetingCode}
+                    onChange={(e) => setMeetingCode(e.target.value)}
+                    autoFocus
+                />
+                
+                <button 
+                    onClick={handleJoinVideoCall}
+                    disabled={!meetingCode.trim()}
+                    className={`w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+                        meetingCode.trim() 
+                        ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/20" 
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }`}
+                >
+                    Join Now <ArrowRight size={18} />
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
       {/* PREVIEW MODAL */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-neutral-800 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[550px]"> 
+          <div className="bg-white dark:bg-neutral-800 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[550px]">
             <div className="h-12 border-b border-gray-200 dark:border-neutral-700 flex items-center justify-between px-4 bg-gray-50 dark:bg-neutral-900">
               <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm">{isJoining ? "Join Meeting" : "New Meeting"}</span>
               <button onClick={stopPreviewCamera} className="text-gray-500 hover:text-red-500 transition-colors"><X size={20} /></button>
@@ -223,7 +273,7 @@ useEffect(() => {
             <div className="h-20 border-t border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex items-center justify-between px-6 z-30">
               <div className="flex items-center gap-3 w-full max-w-xs">
                 <div className="bg-gray-100 dark:bg-neutral-800 p-2 rounded-lg text-gray-500"><User size={20} /></div>
-                <div className="flex-1"><label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Display Name</label><input type="text" value={participantName} onChange={(e) => setParticipantName(e.target.value)} className="w-full bg-transparent border-none p-0 text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-0 placeholder-gray-400" placeholder="Enter your name"/></div>
+                <div className="flex-1"><label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Display Name</label><input type="text" value={participantName} onChange={(e) => setParticipantName(e.target.value)} className="w-full bg-transparent border-none p-0 text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-0 placeholder-gray-400" placeholder="Enter your name" /></div>
               </div>
               <button onClick={startMeeting} disabled={!participantName.trim()} className={`px-8 py-3 rounded-xl font-bold text-sm transition-all shadow-lg ${participantName.trim() ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>{isJoining ? "Join Now" : "Start Meeting"}</button>
             </div>
@@ -234,4 +284,4 @@ useEffect(() => {
   );
 }
 
- export default HomeComponent;
+export default HomeComponent;

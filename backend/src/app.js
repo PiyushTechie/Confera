@@ -54,46 +54,30 @@ io.on("connection", (socket) => {
 
   // Guest requests to join
   socket.on("request-join", ({ path, username }) => {
-    console.log(`Request to join: ${username} (${socket.id}) → ${path}`);
-
     if (!rooms[path]) {
       rooms[path] = { users: [], waiting: [], hostId: null };
     }
-
-    // Add to waiting room
     rooms[path].waiting.push({
       socketId: socket.id,
       username: username || "Guest",
     });
-
     socket.join(path);
-    socket.roomPath = path; // Store for later use
+    socket.roomPath = path;
 
-    // Notify ONLY the host about new waiting user
     if (rooms[path].hostId) {
       io.to(rooms[path].hostId).emit("update-waiting-list", rooms[path].waiting);
     }
-
-    console.log(`User ${username} added to waiting room for ${path}`);
   });
 
   // User joins the call (host or admitted guest)
   socket.on("join-call", ({ path, username }) => {
-    console.log(`Joining call: ${username} (${socket.id}) → ${path}`);
-
     if (!rooms[path]) {
-      rooms[path] = { users: [], waiting: [], hostId: socket.id }; // First user = host
+      rooms[path] = { users: [], waiting: [], hostId: socket.id }; 
     }
+    if (!rooms[path].hostId) rooms[path].hostId = socket.id;
 
-    // If no host yet, this user becomes host
-    if (!rooms[path].hostId) {
-      rooms[path].hostId = socket.id;
-    }
-
-    // Remove from waiting if they were there
     rooms[path].waiting = rooms[path].waiting.filter((u) => u.socketId !== socket.id);
 
-    // Add to active users
     const userData = {
       socketId: socket.id,
       username: username || "Guest",
@@ -101,51 +85,33 @@ io.on("connection", (socket) => {
     };
 
     rooms[path].users.push(userData);
-
     socket.join(path);
     socket.roomPath = path;
 
-    // Notify everyone in room about updated user list
-    io.to(path).emit("user-joined", rooms[path].users);
+    // --- CRITICAL FIX: Prevent Connection Collisions ---
+    // 1. Tell the NEW user about existing users (so they can wait for calls)
+    const otherUsers = rooms[path].users.filter(u => u.socketId !== socket.id);
+    socket.emit("all-users", otherUsers);
 
-    // Send waiting list to host only
+    // 2. Tell EXISTING users about the new user (so they can initiate calls)
+    socket.to(path).emit("user-joined", userData);
+    
+    // Update host waiting list
     if (rooms[path].hostId === socket.id) {
       socket.emit("update-waiting-list", rooms[path].waiting);
     }
-
-    console.log(`${username} (${socket.id}) joined call. Total users: ${rooms[path].users.length}`);
   });
 
   // Host admits a user
   socket.on("admit-user", (targetSocketId) => {
-    console.log(`Host ${socket.id} admitting user ${targetSocketId}`);
-
     const room = Object.values(rooms).find((r) =>
       r.waiting.some((u) => u.socketId === targetSocketId)
     );
-
-    if (!room) {
-      console.log("User not found in any waiting room");
-      return;
+    if (room) {
+      room.waiting = room.waiting.filter((u) => u.socketId !== targetSocketId);
+      io.to(targetSocketId).emit("admitted");
+      if (room.hostId) io.to(room.hostId).emit("update-waiting-list", room.waiting);
     }
-
-    const user = room.waiting.find((u) => u.socketId === targetSocketId);
-    if (!user) return;
-
-    const path = Object.keys(rooms).find((key) => rooms[key] === room);
-
-    // Remove from waiting
-    room.waiting = room.waiting.filter((u) => u.socketId !== targetSocketId);
-
-    // Tell the admitted user they can join
-    io.to(targetSocketId).emit("admitted");
-
-    // Update waiting list for host
-    if (room.hostId) {
-      io.to(room.hostId).emit("update-waiting-list", room.waiting);
-    }
-
-    console.log(`User ${user.username} admitted to ${path}`);
   });
 
   // WebRTC signaling
@@ -153,59 +119,49 @@ io.on("connection", (socket) => {
     io.to(toId).emit("signal", socket.id, message);
   });
 
-  // Optional: audio toggle
+  // Audio toggle
   socket.on("toggle-audio", ({ isMuted }) => {
     const path = socket.roomPath;
-    if (!path || !rooms[path]) return;
-
-    const user = rooms[path].users.find((u) => u.socketId === socket.id);
-    if (user) {
-      user.isMuted = isMuted;
-      socket.to(path).emit("audio-toggled", { socketId: socket.id, isMuted });
+    if (rooms[path]) {
+      const user = rooms[path].users.find((u) => u.socketId === socket.id);
+      if (user) {
+        user.isMuted = isMuted;
+        socket.to(path).emit("audio-toggled", { socketId: socket.id, isMuted });
+      }
     }
   });
 
-  // Chat message
-  socket.on("chat-message", (data, sender) => {
+  // --- CRITICAL FIX: Chat Event Name ---
+  // Must match Frontend: "send-message" -> "receive-message"
+  socket.on("send-message", (data) => {
     const path = socket.roomPath;
     if (path) {
-      socket.to(path).emit("chat-message", data, sender, socket.id);
+      socket.to(path).emit("receive-message", data);
     }
   });
 
   // Disconnect handling
   socket.on("disconnect", () => {
-    console.log("SOCKET DISCONNECTED::", socket.id);
-
     for (const path in rooms) {
       const room = rooms[path];
-
-      // Remove from active users
       const userIndex = room.users.findIndex((u) => u.socketId === socket.id);
+      
       if (userIndex !== -1) {
         room.users.splice(userIndex, 1);
-        io.to(path).emit("user-joined", room.users); // Update user list
-        socket.to(path).emit("user-left", socket.id);
+        // Only notify others if user was actually in the call
+        socket.to(path).emit("user-left", socket.id); 
 
-        // If host left, assign new host if users remain
         if (room.hostId === socket.id && room.users.length > 0) {
           room.hostId = room.users[0].socketId;
           io.to(room.hostId).emit("update-waiting-list", room.waiting);
         }
       }
 
-      // Remove from waiting
       room.waiting = room.waiting.filter((u) => u.socketId !== socket.id);
+      if (room.hostId) io.to(room.hostId).emit("update-waiting-list", room.waiting);
 
-      // Update waiting list for host
-      if (room.hostId) {
-        io.to(room.hostId).emit("update-waiting-list", room.waiting);
-      }
-
-      // Cleanup empty room
       if (room.users.length === 0 && room.waiting.length === 0) {
         delete rooms[path];
-        console.log(`Room ${path} cleaned up`);
       }
     }
   });
@@ -214,11 +170,7 @@ io.on("connection", (socket) => {
 const start = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URL);
-    console.log("MongoDB Connected");
-
-    server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (error) {
     console.error("Error starting server:", error);
   }
