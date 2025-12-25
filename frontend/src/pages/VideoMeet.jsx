@@ -13,12 +13,10 @@ const server_url = server;
 
 const peerConfig = {
   iceServers: [
-    { urls: "stun:openrelay.metered.ca:80" },
-    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "stun:stun.expressturn.com:3478" },
+    { urls: "turn:turn.expressturn.com:3478", username: "free", credential: "free" },
   ],
-  iceTransportPolicy: "relay"  // ← ADD THIS LINE (forces TURN only)
+  iceTransportPolicy: "relay"
 };
 
 export default function VideoMeetComponent() {
