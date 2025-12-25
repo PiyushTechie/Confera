@@ -17,10 +17,7 @@ import {
   Clock,
   LogOut,
   ArrowRight,
-  Lock // 
-
-[Image of Lock Icon]
-
+  Lock 
 } from "lucide-react";
 
 function HomeComponent() {
