@@ -1,17 +1,26 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Video, Keyboard, ArrowLeft } from "lucide-react";
+import { Video, Keyboard, ArrowLeft, User } from "lucide-react";
 
 export default function GuestJoin() {
   const navigate = useNavigate();
   const [meetingCode, setMeetingCode] = useState("");
+  const [name, setName] = useState("");
 
   const handleJoin = (e) => {
-    e.preventDefault();
-    if (meetingCode.trim().length > 0) {
-      navigate(`/${meetingCode}`);
-    }
-  };
+  e.preventDefault();
+  if (meetingCode.trim().length > 0 && name.trim().length > 0) {
+    // ✅ FIX: Add "/meeting/" here so it matches the Host's URL
+    navigate(`/meeting/${meetingCode}`, {
+      state: {
+        username: name,
+        isHost: false,
+        isAudioOn: true,
+        isVideoOn: true,
+      },
+    });
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center font-sans text-neutral-800 px-4">
@@ -33,16 +42,17 @@ export default function GuestJoin() {
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Join a Meeting</h1>
-        <p className="text-gray-500 mb-8">Enter the meeting code provided by the host.</p>
+        <p className="text-gray-500 mb-8">Enter the meeting code and your name.</p>
 
         <form onSubmit={handleJoin} className="space-y-4">
+            {/* Meeting Code Input */}
             <div className="relative group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
                     <Keyboard size={20} />
                 </div>
                 <input 
                     type="text" 
-                    placeholder="e.g. 123-456-789" 
+                    placeholder="Meeting Code (e.g. abc-123)" 
                     className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-lg rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block pl-12 p-4 transition-all outline-none"
                     value={meetingCode}
                     onChange={(e) => setMeetingCode(e.target.value)}
@@ -50,11 +60,25 @@ export default function GuestJoin() {
                 />
             </div>
 
+            {/* NEW: Name Input */}
+            <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <User size={20} />
+                </div>
+                <input 
+                    type="text" 
+                    placeholder="Your Display Name" 
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-lg rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block pl-12 p-4 transition-all outline-none"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                />
+            </div>
+
             <button 
                 type="submit"
-                disabled={meetingCode.length === 0}
+                disabled={meetingCode.length === 0 || name.length === 0}
                 className={`w-full flex items-center justify-center gap-2 font-semibold rounded-xl text-lg px-8 py-4 transition-all ${
-                    meetingCode.length > 0 
+                    meetingCode.length > 0 && name.length > 0
                     ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 cursor-pointer" 
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
