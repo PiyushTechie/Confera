@@ -56,8 +56,8 @@ io.on("connection", (socket) => {
   // UPDATED: Destructure 'passcode' from the payload
   socket.on("request-join", ({ path, username, passcode }) => {
     if (!rooms[path]) {
-      // Create room if it doesn't exist (Guest waiting for Host)
-      rooms[path] = { users: [], waiting: [], hostId: null, passcode: null };
+      socket.emit("invalid-meeting"); // Tell client the meeting wasn't found
+      return; // Stop execution
     }
 
     // --- PASSCODE CHECK START ---

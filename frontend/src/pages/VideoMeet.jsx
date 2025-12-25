@@ -229,6 +229,12 @@ export default function VideoMeetComponent() {
       const isMe = data.socketId === socketRef.current.id;
       setMessages(prev => [...prev, { ...data, isMe }]);
     });
+
+    socketRef.current.on("invalid-meeting", () => {
+        alert("Meeting not found! Please check the code or wait for the host to start the meeting.");
+        socketRef.current.disconnect();
+        navigate("/"); // Send back to home
+    });
   };
 
   /* ------------------ CONTROLS ------------------ */
