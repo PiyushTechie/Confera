@@ -5,7 +5,7 @@ import {
   Mic, MicOff, Video, VideoOff, ScreenShare, MonitorOff,
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
   Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
-  Lock // [Image of Lock Icon]
+  Lock, Hand, Smile
 } from "lucide-react";
 import server from "../environment";
 
@@ -38,7 +38,7 @@ export default function VideoMeetComponent() {
     isVideoOn = true,
     username = "Guest",
     isHost = false,
-    passcode = null // Get passcode from Home (if provided)
+    passcode = null
   } = location.state || {};
 
   const socketRef = useRef(null);
@@ -81,6 +81,13 @@ export default function VideoMeetComponent() {
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState("");
   const [passcodeError, setPasscodeError] = useState(false);
+
+  // --- NEW FEATURES STATE ---
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeEmojis, setActiveEmojis] = useState({});
+
+  const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "👏", "🎉"];
 
   /* --------------------- MEDIA --------------------- */
   const getMedia = async () => {
@@ -142,19 +149,15 @@ export default function VideoMeetComponent() {
 
   /* ------------------ SOCKET ------------------ */
   const connectSocket = () => {
-    // Prevent multiple connections
     if (socketRef.current && socketRef.current.connected) return;
 
     socketRef.current = io(server_url);
 
     socketRef.current.on("connect", () => {
       socketIdRef.current = socketRef.current.id;
-      
-      // Construct Join Payload
       const payload = { 
         path: window.location.href, 
         username: userName,
-        // Use the manual input if available, otherwise use the one from navigation state
         passcode: passcodeInput || passcode 
       };
 
@@ -166,22 +169,26 @@ export default function VideoMeetComponent() {
       }
     });
 
-    // --- PASSCODE EVENT LISTENER ---
     socketRef.current.on("passcode-required", () => {
         setIsInWaitingRoom(false);
         setShowPasscodeModal(true);
         setPasscodeError(true);
-        socketRef.current.disconnect(); // Disconnect to allow retry
+        socketRef.current.disconnect();
     });
 
     socketRef.current.on("admitted", () => {
       setIsInWaitingRoom(false);
-      // Re-emit join call with the correct passcode
       socketRef.current.emit("join-call", { 
           path: window.location.href, 
           username: userName,
           passcode: passcodeInput || passcode 
       });
+    });
+
+    socketRef.current.on("invalid-meeting", () => {
+        alert("Meeting not found! Please check the code or wait for the host to start the meeting.");
+        socketRef.current.disconnect();
+        navigate("/");
     });
 
     socketRef.current.on("update-waiting-list", (users) => { if (isHost) setWaitingUsers(users); });
@@ -194,6 +201,25 @@ export default function VideoMeetComponent() {
       setUserMap(prev => ({ ...prev, [user.socketId]: user }));
       createPeer(user.socketId); 
       initiateOffer(user.socketId);
+    });
+
+    socketRef.current.on("hand-toggled", ({ socketId, isRaised }) => {
+        if (socketId === socketRef.current.id) setIsHandRaised(isRaised);
+        setUserMap(prev => ({
+            ...prev,
+            [socketId]: { ...prev[socketId], isHandRaised: isRaised }
+        }));
+    });
+
+    socketRef.current.on("emoji-received", ({ socketId, emoji }) => {
+        setActiveEmojis(prev => ({ ...prev, [socketId]: emoji }));
+        setTimeout(() => {
+            setActiveEmojis(prev => {
+                const newState = { ...prev };
+                delete newState[socketId];
+                return newState;
+            });
+        }, 3000);
     });
 
     socketRef.current.on("signal", async (fromId, msg) => {
@@ -229,15 +255,28 @@ export default function VideoMeetComponent() {
       const isMe = data.socketId === socketRef.current.id;
       setMessages(prev => [...prev, { ...data, isMe }]);
     });
-
-    socketRef.current.on("invalid-meeting", () => {
-        alert("Meeting not found! Please check the code or wait for the host to start the meeting.");
-        socketRef.current.disconnect();
-        navigate("/"); // Send back to home
-    });
   };
 
-  /* ------------------ CONTROLS ------------------ */
+  /* ------------------ ACTIONS ------------------ */
+  const handleToggleHand = () => {
+      const newState = !isHandRaised;
+      setIsHandRaised(newState);
+      socketRef.current.emit("toggle-hand", { isRaised: newState });
+  };
+
+  const handleSendEmoji = (emoji) => {
+      setShowEmojiPicker(false);
+      setActiveEmojis(prev => ({ ...prev, [socketIdRef.current]: emoji }));
+      setTimeout(() => {
+          setActiveEmojis(prev => {
+              const newState = { ...prev };
+              delete newState[socketIdRef.current];
+              return newState;
+          });
+      }, 3000);
+      socketRef.current.emit("send-emoji", { emoji });
+  };
+
   const handleSendMessage = () => {
     if (!currentMessage.trim() || !socketRef.current) return;
     const msg = { text: currentMessage, sender: userName, socketId: socketRef.current.id, timestamp: new Date().toISOString() };
@@ -246,12 +285,10 @@ export default function VideoMeetComponent() {
     setCurrentMessage("");
   };
 
-  // --- PASSCODE SUBMIT HANDLER ---
   const handleSubmitPasscode = (e) => {
       e.preventDefault();
       if(passcodeInput.trim()) {
          setShowPasscodeModal(false);
-         // Clear error and reconnect
          setPasscodeError(false);
          connectSocket(); 
       }
@@ -342,10 +379,46 @@ export default function VideoMeetComponent() {
     document.addEventListener("mouseup", onUp);
   };
 
+  /* ------------------ RENDER HELPER ------------------ */
+  const renderVideoTile = (socketId, stream, isLocal = false) => {
+    const user = isLocal ? { username: userName, isHandRaised: isHandRaised } : (userMap[socketId] || { username: "Guest" });
+    const emoji = activeEmojis[socketId];
+
+    return (
+      <div 
+        key={socketId} 
+        onClick={() => handleTileClick(socketId === socketRef.current?.id ? "local" : socketId)} 
+        className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 cursor-pointer w-full md:max-w-xl aspect-video transition-all ${user.isHandRaised ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'border-neutral-700'}`}
+      >
+          <video 
+            ref={node => { if(node && stream) node.srcObject = stream }} 
+            autoPlay 
+            muted={isLocal} 
+            playsInline 
+            className={`w-full h-full object-cover ${isLocal && !screen ? "-scale-x-100" : ""}`} 
+          />
+          <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs flex items-center gap-2">
+             <span>{isLocal ? "You" : user.username}</span>
+             {user.isHandRaised && <Hand size={12} className="text-yellow-500" />}
+          </div>
+          {user.isHandRaised && (
+             <div className="absolute top-2 right-2 bg-yellow-500 p-1.5 rounded-full text-black shadow-lg animate-bounce z-10">
+                 <Hand size={16} />
+             </div>
+          )}
+          {emoji && (
+             <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none animate-in zoom-in fade-in duration-300">
+                 <span className="text-6xl filter drop-shadow-lg">{emoji}</span>
+             </div>
+          )}
+      </div>
+    );
+  };
+
+  /* ------------------ MAIN RENDER ------------------ */
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
       
-      {/* --- NEW: PASSCODE MODAL --- */}
       {showPasscodeModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center animate-in zoom-in duration-200">
@@ -353,27 +426,21 @@ export default function VideoMeetComponent() {
                     <Lock size={32} />
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Passcode Required</h2>
-                <p className="text-gray-400 mb-6 text-sm">This meeting is protected. Please enter the passcode to join.</p>
-                
+                <p className="text-gray-400 mb-6 text-sm">This meeting is protected.</p>
                 <form onSubmit={handleSubmitPasscode}>
                     <input 
-                        type="password" 
-                        autoFocus
+                        type="password" autoFocus
                         className={`w-full bg-neutral-900 border ${passcodeError ? 'border-red-500' : 'border-neutral-600'} rounded-lg p-3 text-white outline-none focus:border-blue-500 mb-4 transition-colors`}
                         placeholder="Enter Passcode"
-                        value={passcodeInput}
-                        onChange={e => setPasscodeInput(e.target.value)}
+                        value={passcodeInput} onChange={e => setPasscodeInput(e.target.value)}
                     />
-                    {passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect passcode. Try again.</p>}
-                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold transition-all">
-                        Submit
-                    </button>
+                    {passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect passcode.</p>}
+                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold transition-all">Submit</button>
                 </form>
             </div>
         </div>
       )}
 
-      {/* --- USERNAME LOBBY --- */}
       {askForUsername && !showPasscodeModal && (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
@@ -387,7 +454,6 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
-      {/* --- WAITING ROOM --- */}
       {isInWaitingRoom && !askForUsername && !showPasscodeModal && (
         <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900">
            <div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full text-center">
@@ -398,39 +464,40 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
-      {/* --- MAIN MEETING --- */}
       {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
         <div className="flex flex-col h-screen relative">
           <div className="flex-1 bg-black relative flex overflow-hidden">
+            
+            {/* SPOTLIGHT VIEW */}
             {viewMode === "SPOTLIGHT" && spotlightId && (
               <div className="flex-1 flex items-center justify-center p-4 bg-neutral-900">
-                {spotlightId === "local" ? (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                        <video ref={node => { if(node && localStreamRef.current) node.srcObject = localStreamRef.current }} autoPlay muted playsInline className={`max-w-full max-h-full object-contain ${!screen ? "-scale-x-100" : ""}`} />
-                        <div className="absolute bottom-4 left-4 bg-black/60 px-4 py-2 rounded-full font-bold">You</div>
-                    </div>
-                ) : (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                        <video ref={(ref) => { const v = videos.find(v => v.socketId === spotlightId); if (ref && v?.stream) ref.srcObject = v.stream; }} autoPlay playsInline className="max-w-full max-h-full object-contain" />
-                        <div className="absolute bottom-4 left-4 bg-black/60 px-4 py-2 rounded-full font-bold">{userMap[spotlightId]?.username || "Guest"}</div>
-                    </div>
-                )}
+                  <div className="relative w-full h-full flex items-center justify-center">
+                      <video 
+                        ref={node => { 
+                            if(!node) return;
+                            if(spotlightId === "local" && localStreamRef.current) node.srcObject = localStreamRef.current;
+                            else { const v = videos.find(v => v.socketId === spotlightId); if(v?.stream) node.srcObject = v.stream; }
+                        }} 
+                        autoPlay muted={spotlightId === "local"} playsInline 
+                        className={`max-w-full max-h-full object-contain ${spotlightId === "local" && !screen ? "-scale-x-100" : ""}`} 
+                      />
+                      <div className="absolute bottom-4 left-4 bg-black/60 px-4 py-2 rounded-full font-bold flex items-center gap-2">
+                          <span>{spotlightId === "local" ? "You" : userMap[spotlightId]?.username || "Guest"}</span>
+                          {(spotlightId === "local" ? isHandRaised : userMap[spotlightId]?.isHandRaised) && <Hand size={16} className="text-yellow-500" />}
+                      </div>
+                      {activeEmojis[spotlightId === "local" ? socketIdRef.current : spotlightId] && (
+                        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none animate-in zoom-in fade-in duration-300">
+                            <span className="text-9xl filter drop-shadow-2xl">{activeEmojis[spotlightId === "local" ? socketIdRef.current : spotlightId]}</span>
+                        </div>
+                      )}
+                  </div>
               </div>
             )}
 
+            {/* GRID VIEW */}
             <div className={`${viewMode === "SPOTLIGHT" ? "hidden md:flex w-64 border-l border-neutral-800 flex-col" : "flex-1 flex flex-wrap items-center justify-center"} p-4 gap-4 bg-black overflow-y-auto`}>
-               {spotlightId !== "local" && (
-                   <div onClick={() => handleTileClick("local")} className="relative bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700 w-full md:max-w-xl aspect-video cursor-pointer">
-                       <video ref={node => { if(node && localStreamRef.current) node.srcObject = localStreamRef.current }} autoPlay muted playsInline className={`w-full h-full object-cover ${!screen ? "-scale-x-100" : ""}`} />
-                       <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs">You</div>
-                   </div>
-               )}
-               {videos.map(v => (
-                   <div key={v.socketId} onClick={() => handleTileClick(v.socketId)} className="relative bg-neutral-800 rounded-xl overflow-hidden border border-neutral-700 w-full md:max-w-xl aspect-video cursor-pointer">
-                       <video ref={ref => { if (ref && v.stream) ref.srcObject = v.stream; }} autoPlay playsInline className="w-full h-full object-cover" />
-                       <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs">{userMap[v.socketId]?.username || "Guest"}</div>
-                   </div>
-               ))}
+               {spotlightId !== "local" && renderVideoTile(socketIdRef.current || "local", localStreamRef.current, true)}
+               {videos.map(v => renderVideoTile(v.socketId, v.stream, false))}
             </div>
           </div>
           
@@ -450,23 +517,30 @@ export default function VideoMeetComponent() {
           <div className="h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-center z-20 px-4 gap-4 relative">
              <button onClick={handleAudio} className={`p-4 rounded-full ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</button>
              <button onClick={handleVideo} className={`p-4 rounded-full ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</button>
+             
+             <button onClick={handleToggleHand} className={`p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black hover:bg-yellow-600' : 'bg-neutral-700 hover:bg-neutral-600'}`} title="Raise Hand"><Hand size={24} /></button>
+
+             <div className="relative">
+                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600" title="Reactions"><Smile size={24} /></button>
+                {showEmojiPicker && (
+                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">
+                        {EMOJI_LIST.map(emoji => (
+                            <button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-2xl hover:scale-125 transition-transform p-1">{emoji}</button>
+                        ))}
+                    </div>
+                )}
+             </div>
+
              <button onClick={handleScreen} className={`hidden md:block p-4 rounded-full ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>{screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}</button>
              <button onClick={handleEndCall} className="p-4 rounded-full bg-red-600"><PhoneOff size={24} /></button>
-             
              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-4 rounded-full bg-neutral-700 relative ml-2"><MoreVertical size={24} /></button>
              
              <div className="hidden md:flex absolute right-6 gap-3">
                <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
                <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800"><Users size={24} /></button>
-               
-               {/* CHAT BUTTON WITH BADGE */}
                <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative">
                  <MessageSquare size={24} />
-                 {unreadMessages > 0 && (
-                   <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[18px]">
-                     {unreadMessages}
-                   </span>
-                 )}
+                 {unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}
                </button>
              </div>
              
@@ -474,20 +548,9 @@ export default function VideoMeetComponent() {
                  <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden">
                     <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><ScreenShare size={20} /> Share Screen</button>
                     <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><LayoutDashboard size={20} /> Layout</button>
-                    
-                    {/* MOBILE CHAT BUTTON WITH BADGE */}
                     <button onClick={() => { setShowChat(!showChat); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative">
-                      <div className="relative">
-                        <MessageSquare size={20} />
-                        {unreadMessages > 0 && (
-                          <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                            {unreadMessages}
-                          </span>
-                        )}
-                      </div>
-                      <span>Chat</span>
+                      <div className="relative"><MessageSquare size={20} />{unreadMessages > 0 && <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</div><span>Chat</span>
                     </button>
-                    
                     <button onClick={() => { setShowParticipants(!showParticipants); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><Users size={20} /> Participants</button>
                     <button onClick={() => { setShowInfo(!showInfo); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><Info size={20} /> Info</button>
                  </div>

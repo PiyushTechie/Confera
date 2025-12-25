@@ -106,6 +106,7 @@ io.on("connection", (socket) => {
       socketId: socket.id,
       username: username || "Guest",
       isMuted: false,
+      isHandRaised: false,
     };
 
     rooms[path].users.push(userData);
@@ -160,6 +161,25 @@ io.on("connection", (socket) => {
     const path = socket.roomPath;
     if (path) {
       socket.to(path).emit("receive-message", data);
+    }
+  });
+
+  socket.on("toggle-hand", ({ isRaised }) => {
+    const path = socket.roomPath;
+    if (rooms[path]) {
+      const user = rooms[path].users.find((u) => u.socketId === socket.id);
+      if (user) {
+        user.isHandRaised = isRaised; // Update server state
+        // Broadcast to everyone including sender (to confirm receipt)
+        io.to(path).emit("hand-toggled", { socketId: socket.id, isRaised });
+      }
+    }
+  });
+
+  socket.on("send-emoji", ({ emoji }) => {
+    const path = socket.roomPath;
+    if (path) {
+      io.to(path).emit("emoji-received", { socketId: socket.id, emoji });
     }
   });
 
