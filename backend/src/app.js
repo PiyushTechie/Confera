@@ -46,17 +46,29 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
-// Room structure: { path: { users: [], waiting: [], hostId: string } }
+// Room structure: { path: { users: [], waiting: [], hostId: string, passcode: string | null } }
 const rooms = {};
 
 io.on("connection", (socket) => {
   console.log("SOCKET CONNECTED::", socket.id);
 
   // Guest requests to join
-  socket.on("request-join", ({ path, username }) => {
+  // UPDATED: Destructure 'passcode' from the payload
+  socket.on("request-join", ({ path, username, passcode }) => {
     if (!rooms[path]) {
-      rooms[path] = { users: [], waiting: [], hostId: null };
+      // Create room if it doesn't exist (Guest waiting for Host)
+      rooms[path] = { users: [], waiting: [], hostId: null, passcode: null };
     }
+
+    // --- PASSCODE CHECK START ---
+    const room = rooms[path];
+    // If the room has a passcode set, and the user's passcode doesn't match
+    if (room.passcode && room.passcode !== passcode) {
+      socket.emit("passcode-required");
+      return; // Stop execution here
+    }
+    // --- PASSCODE CHECK END ---
+
     rooms[path].waiting.push({
       socketId: socket.id,
       username: username || "Guest",
@@ -70,11 +82,23 @@ io.on("connection", (socket) => {
   });
 
   // User joins the call (host or admitted guest)
-  socket.on("join-call", ({ path, username }) => {
+  // UPDATED: Destructure 'passcode' to allow Host to set it
+  socket.on("join-call", ({ path, username, passcode }) => {
     if (!rooms[path]) {
-      rooms[path] = { users: [], waiting: [], hostId: socket.id }; 
+      // If Host creates the room, save the passcode
+      rooms[path] = { 
+        users: [], 
+        waiting: [], 
+        hostId: socket.id, 
+        passcode: passcode || null 
+      }; 
     }
-    if (!rooms[path].hostId) rooms[path].hostId = socket.id;
+    
+    // If room exists but no host (Guest joined first), assign host and set passcode
+    if (!rooms[path].hostId) {
+      rooms[path].hostId = socket.id;
+      if (passcode) rooms[path].passcode = passcode;
+    }
 
     rooms[path].waiting = rooms[path].waiting.filter((u) => u.socketId !== socket.id);
 
@@ -131,8 +155,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // --- CRITICAL FIX: Chat Event Name ---
-  // Must match Frontend: "send-message" -> "receive-message"
+  // Chat Event
   socket.on("send-message", (data) => {
     const path = socket.roomPath;
     if (path) {

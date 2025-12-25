@@ -5,6 +5,7 @@ import {
   Mic, MicOff, Video, VideoOff, ScreenShare, MonitorOff,
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
   Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
+  Lock // [Image of Lock Icon]
 } from "lucide-react";
 import server from "../environment";
 
@@ -26,7 +27,6 @@ const peerConfig = {
   ],
 };
 
-
 export default function VideoMeetComponent() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,6 +38,7 @@ export default function VideoMeetComponent() {
     isVideoOn = true,
     username = "Guest",
     isHost = false,
+    passcode = null // Get passcode from Home (if provided)
   } = location.state || {};
 
   const socketRef = useRef(null);
@@ -74,9 +75,12 @@ export default function VideoMeetComponent() {
 
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState("");
-  
-  // --- NEW: Unread Messages State ---
   const [unreadMessages, setUnreadMessages] = useState(0);
+
+  // --- PASSCODE STATE ---
+  const [showPasscodeModal, setShowPasscodeModal] = useState(false);
+  const [passcodeInput, setPasscodeInput] = useState("");
+  const [passcodeError, setPasscodeError] = useState(false);
 
   /* --------------------- MEDIA --------------------- */
   const getMedia = async () => {
@@ -138,17 +142,46 @@ export default function VideoMeetComponent() {
 
   /* ------------------ SOCKET ------------------ */
   const connectSocket = () => {
+    // Prevent multiple connections
+    if (socketRef.current && socketRef.current.connected) return;
+
     socketRef.current = io(server_url);
 
     socketRef.current.on("connect", () => {
       socketIdRef.current = socketRef.current.id;
-      if (isHost) socketRef.current.emit("join-call", { path: window.location.href, username: userName });
-      else { socketRef.current.emit("request-join", { path: window.location.href, username: userName }); setIsInWaitingRoom(true); }
+      
+      // Construct Join Payload
+      const payload = { 
+        path: window.location.href, 
+        username: userName,
+        // Use the manual input if available, otherwise use the one from navigation state
+        passcode: passcodeInput || passcode 
+      };
+
+      if (isHost) {
+        socketRef.current.emit("join-call", payload);
+      } else {
+        socketRef.current.emit("request-join", payload);
+        setIsInWaitingRoom(true);
+      }
+    });
+
+    // --- PASSCODE EVENT LISTENER ---
+    socketRef.current.on("passcode-required", () => {
+        setIsInWaitingRoom(false);
+        setShowPasscodeModal(true);
+        setPasscodeError(true);
+        socketRef.current.disconnect(); // Disconnect to allow retry
     });
 
     socketRef.current.on("admitted", () => {
       setIsInWaitingRoom(false);
-      socketRef.current.emit("join-call", { path: window.location.href, username: userName });
+      // Re-emit join call with the correct passcode
+      socketRef.current.emit("join-call", { 
+          path: window.location.href, 
+          username: userName,
+          passcode: passcodeInput || passcode 
+      });
     });
 
     socketRef.current.on("update-waiting-list", (users) => { if (isHost) setWaitingUsers(users); });
@@ -207,6 +240,17 @@ export default function VideoMeetComponent() {
     setCurrentMessage("");
   };
 
+  // --- PASSCODE SUBMIT HANDLER ---
+  const handleSubmitPasscode = (e) => {
+      e.preventDefault();
+      if(passcodeInput.trim()) {
+         setShowPasscodeModal(false);
+         // Clear error and reconnect
+         setPasscodeError(false);
+         connectSocket(); 
+      }
+  };
+
   const handleScreen = async () => {
     if (isMobile) { alert("Not supported on mobile."); return; }
     if (!screen) {
@@ -256,21 +300,16 @@ export default function VideoMeetComponent() {
     return () => handleEndCall();
   }, []);
 
-  // Auto-scroll chat and handle badge count
   useEffect(() => {
     if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    
-    // --- NEW: Badge Logic ---
-    // If chat is hidden AND we have messages AND the last message wasn't from me
     if (!showChat && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (!lastMsg.isMe) {
         setUnreadMessages(prev => prev + 1);
       }
     }
-  }, [messages]); // Dependency on messages ensures this runs every time a new message comes in
+  }, [messages]);
 
-  // --- NEW: Reset Badge Logic ---
   useEffect(() => {
     if (showChat) {
       setUnreadMessages(0);
@@ -299,7 +338,37 @@ export default function VideoMeetComponent() {
 
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
-      {askForUsername && (
+      
+      {/* --- NEW: PASSCODE MODAL --- */}
+      {showPasscodeModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center animate-in zoom-in duration-200">
+                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
+                    <Lock size={32} />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Passcode Required</h2>
+                <p className="text-gray-400 mb-6 text-sm">This meeting is protected. Please enter the passcode to join.</p>
+                
+                <form onSubmit={handleSubmitPasscode}>
+                    <input 
+                        type="password" 
+                        autoFocus
+                        className={`w-full bg-neutral-900 border ${passcodeError ? 'border-red-500' : 'border-neutral-600'} rounded-lg p-3 text-white outline-none focus:border-blue-500 mb-4 transition-colors`}
+                        placeholder="Enter Passcode"
+                        value={passcodeInput}
+                        onChange={e => setPasscodeInput(e.target.value)}
+                    />
+                    {passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect passcode. Try again.</p>}
+                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold transition-all">
+                        Submit
+                    </button>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* --- USERNAME LOBBY --- */}
+      {askForUsername && !showPasscodeModal && (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
             <h2 className="text-2xl font-bold mb-6 text-center">Join Meeting</h2>
@@ -312,7 +381,8 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
-      {isInWaitingRoom && !askForUsername && (
+      {/* --- WAITING ROOM --- */}
+      {isInWaitingRoom && !askForUsername && !showPasscodeModal && (
         <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900">
            <div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full text-center">
              <ShieldAlert size={40} className="text-yellow-500 mx-auto mb-6" />
@@ -322,7 +392,8 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
-      {!askForUsername && !isInWaitingRoom && (
+      {/* --- MAIN MEETING --- */}
+      {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
         <div className="flex flex-col h-screen relative">
           <div className="flex-1 bg-black relative flex overflow-hidden">
             {viewMode === "SPOTLIGHT" && spotlightId && (
@@ -382,7 +453,7 @@ export default function VideoMeetComponent() {
                <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
                <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800"><Users size={24} /></button>
                
-               {/* --- UPDATED CHAT BUTTON WITH BADGE --- */}
+               {/* CHAT BUTTON WITH BADGE */}
                <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative">
                  <MessageSquare size={24} />
                  {unreadMessages > 0 && (
@@ -398,7 +469,7 @@ export default function VideoMeetComponent() {
                     <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><ScreenShare size={20} /> Share Screen</button>
                     <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><LayoutDashboard size={20} /> Layout</button>
                     
-                    {/* --- UPDATED MOBILE CHAT BUTTON WITH BADGE --- */}
+                    {/* MOBILE CHAT BUTTON WITH BADGE */}
                     <button onClick={() => { setShowChat(!showChat); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative">
                       <div className="relative">
                         <MessageSquare size={20} />
