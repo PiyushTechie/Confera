@@ -165,11 +165,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Chat message
-  socket.on("chat-message", (data, sender) => {
+  // ------------------------------------------
+  // FIXED CHAT SECTION
+  // ------------------------------------------
+  socket.on("send-message", (data) => {
     const path = socket.roomPath;
     if (path) {
-      socket.to(path).emit("chat-message", data, sender, socket.id);
+      // Broadcast to everyone ELSE in the room (sender already updated locally)
+      socket.to(path).emit("receive-message", data);
+      console.log(`Message sent in ${path} by ${socket.id}`);
     }
   });
 
@@ -210,6 +214,8 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+
 
 const start = async () => {
   try {
