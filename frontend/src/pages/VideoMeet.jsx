@@ -1,4 +1,3 @@
-// VideoMeetComponent.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import io from "socket.io-client";
@@ -74,6 +73,7 @@ export default function VideoMeetComponent() {
 
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   /* --------------------- MEDIA --------------------- */
 
@@ -257,22 +257,37 @@ export default function VideoMeetComponent() {
   /* ------------------ CONTROLS ------------------ */
 
   const handleScreen = async () => {
+    if (isMobile) {
+      alert("Screen sharing is not supported on mobile browsers due to current limitations in Chrome and Safari.\n\nPlease use a desktop or laptop computer for screen sharing.");
+      return;
+    }
+
     if (!screen) {
       try {
-        const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const display = await navigator.mediaDevices.getDisplayMedia({ 
+          video: true,
+          audio: false
+        });
         displayStreamRef.current = display;
         const track = display.getVideoTracks()[0];
 
         replaceVideoTrack(track);
 
-        track.onended = () => handleScreen();
+        track.onended = () => {
+          handleScreen(); 
+        };
 
         setScreen(true);
         console.log("Screen sharing started");
       } catch (err) {
-        console.log("Screen share cancelled");
+        if (err.name !== "NotAllowedError") {
+          console.error("Screen share error:", err);
+          alert("Unable to start screen sharing. Please try again or check browser permissions.");
+        }
+        console.log("Screen share cancelled or denied");
       }
     } else {
+      // Stop sharing
       displayStreamRef.current?.getTracks().forEach(t => t.stop());
       displayStreamRef.current = null;
 
@@ -362,353 +377,463 @@ export default function VideoMeetComponent() {
     document.addEventListener("mouseup", onUp);
   };
 
-  return (
-    <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
-      {/* Username Prompt */}
-      {askForUsername && (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
-            <h2 className="text-2xl font-bold mb-6 text-center">Join Meeting</h2>
-            <div className="mb-6">
-              <label className="block mb-2 text-sm font-medium text-gray-300">Display Name</label>
-              <input
-                type="text"
-                className="bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg block w-full p-2.5"
-                placeholder="Enter your name"
-                value={userName}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
-            <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video">
-              <video ref={localGridRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-              <div className="absolute bottom-4 flex gap-4">
-                <button onClick={handleAudio} className={`p-3 rounded-full ${audio ? 'bg-neutral-600' : 'bg-red-500'}`}>
-                  {audio ? <Mic size={20} /> : <MicOff size={20} />}
-                </button>
-                <button onClick={handleVideo} className={`p-3 rounded-full ${video ? 'bg-neutral-600' : 'bg-red-500'}`}>
-                  {video ? <Video size={20} /> : <VideoOff size={20} />}
-                </button>
-              </div>
-            </div>
-            <button onClick={connect} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm px-5 py-3">
-              Join Call
-            </button>
-          </div>
-        </div>
-      )}
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                     'ontouchstart' in window ||
+                     navigator.maxTouchPoints > 0;
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
-      {/* Waiting Room */}
-      {isInWaitingRoom && !askForUsername && (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900 p-4 text-center">
-          <div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full">
-            <div className="w-20 h-20 bg-yellow-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <ShieldAlert size={40} className="text-yellow-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Waiting for Host</h2>
-            <p className="text-gray-400 mb-8">You will join automatically once admitted.</p>
-            <div className="flex justify-center gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-100"></span>
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-200"></span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Meeting UI */}
-      {!askForUsername && !isInWaitingRoom && (
-        <div className="flex flex-col h-screen relative">
-          {/* Video Area */}
-          <div className="flex-1 bg-black relative flex overflow-hidden">
-            {/* Spotlight */}
-            {viewMode === "SPOTLIGHT" && spotlightId && (
-              <div className="flex-1 flex items-center justify-center p-4 bg-neutral-900">
-                {spotlightId === "local" ? (
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    <video
-                      ref={localSpotlightRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      className={`max-w-full max-h-full object-contain ${!screen ? "-scale-x-100" : ""}`}
-                    />
-                    <div className="absolute bottom-4 left-4 bg-black/60 px-4 py-2 rounded-full text-lg font-semibold">
-                      {userName} (You)
-                    </div>
-                  </div>
-                ) : (
-                  videos.find(v => v.socketId === spotlightId) && (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                      <video
-                        ref={(ref) => {
-                          const v = videos.find(v => v.socketId === spotlightId);
-                          if (ref && v?.stream) ref.srcObject = v.stream;
-                        }}
-                        autoPlay
-                        playsInline
-                        className="max-w-full max-h-full object-contain"
-                      />
-                      <div className="absolute bottom-4 left-4 bg-black/60 px-4 py-2 rounded-full text-lg font-semibold">
-                        {userMap[spotlightId]?.username || "Guest"}
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Grid / Sidebar */}
-            <div className={`${viewMode === "SPOTLIGHT" ? "hidden md:flex w-64 border-l border-neutral-800 flex-col overflow-y-auto" : "flex-1 flex flex-wrap items-center justify-center"} p-4 gap-4 bg-black`}>
-              {/* Local */}
-              {spotlightId !== "local" && (
-                <div
-                  onClick={() => handleTileClick("local")}
-                  className={`relative bg-neutral-800 rounded-xl overflow-hidden border cursor-pointer hover:border-blue-500 transition-all ${viewMode === "SPOTLIGHT" ? "w-full aspect-video" : "w-full md:max-w-xl aspect-video"} border-neutral-700`}
-                >
-                  <video
-                    ref={localGridRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className={`w-full h-full object-cover ${!screen ? "-scale-x-100" : ""}`}
-                  />
-                  <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
-                    <span className="text-xs font-semibold text-white">You {isHost && "(Host)"}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Remotes */}
-              {videos.map(v => {
-                if (spotlightId === v.socketId) return null;
-                const user = userMap[v.socketId] || { username: "Guest" };
-                return (
-                  <div
-                    key={v.socketId}
-                    onClick={() => handleTileClick(v.socketId)}
-                    className={`relative bg-neutral-800 rounded-xl overflow-hidden border cursor-pointer hover:border-blue-500 transition-all ${viewMode === "SPOTLIGHT" ? "w-full aspect-video" : "w-full md:max-w-xl aspect-video"} border-neutral-700`}
-                  >
-                    <video
-                      ref={ref => { if (ref && v.stream) ref.srcObject = v.stream; }}
-                      autoPlay
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
-                      <span className="text-xs font-semibold text-white">{user.username}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+ return (
+  <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col overflow-hidden">
+    {/* ===== USERNAME PROMPT ===== */}
+    {askForUsername && (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-neutral-700">
+          <h2 className="text-3xl font-bold mb-8 text-center">Join Meeting</h2>
+          
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Display Name</label>
+            <input
+              type="text"
+              value={userName}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your name"
+              className="w-full px-4 py-3 bg-neutral-700 border border-neutral-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            />
           </div>
 
-          {/* Floating Local Video */}
-          {viewMode === "SPOTLIGHT" && spotlightId === "local" && (
-            <div
-              className="absolute w-32 md:w-48 aspect-video bg-neutral-800 rounded-lg overflow-hidden shadow-2xl border border-neutral-700 z-50 cursor-move"
-              style={{ left: `${position.x}px`, top: `${position.y}px`, transition: isDragging ? 'none' : 'all 0.3s' }}
-              onMouseDown={handleMouseDown}
-            >
-              <video
-                ref={localFloatingRef}
-                autoPlay
-                muted
-                playsInline
-                className={`w-full h-full object-cover pointer-events-none ${!screen ? "-scale-x-100" : ""}`}
-              />
-            </div>
-          )}
-
-          {/* Bottom Bar */}
-          <div className="h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-center z-20 px-4 relative">
-            <div className="flex items-center gap-4">
-              <button onClick={handleAudio} className={`p-4 rounded-full ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>
+          <div className="relative mb-8 rounded-xl overflow-hidden bg-black aspect-video">
+            <video ref={localGridRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4">
+              <button onClick={handleAudio} className={`p-4 rounded-full ${audio ? 'bg-neutral-600' : 'bg-red-600'}`}>
                 {audio ? <Mic size={24} /> : <MicOff size={24} />}
               </button>
-              <button onClick={handleVideo} className={`p-4 rounded-full ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>
+              <button onClick={handleVideo} className={`p-4 rounded-full ${video ? 'bg-neutral-600' : 'bg-red-600'}`}>
                 {video ? <Video size={24} /> : <VideoOff size={24} />}
               </button>
-              <button onClick={handleScreen} className={`hidden md:block p-4 rounded-full ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>
-                {screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}
-              </button>
-              <button onClick={() => setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID")} className="hidden md:block p-4 rounded-full bg-neutral-700 hover:bg-neutral-600">
-                <LayoutDashboard size={24} />
-              </button>
-              <button onClick={handleEndCall} className="p-4 rounded-full bg-red-600 hover:bg-red-700 ml-2">
-                <PhoneOff size={24} />
-              </button>
+            </div>
+          </div>
 
-              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 relative ml-2">
-                <MoreVertical size={24} />
-              </button>
+          <button
+            onClick={connect}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 rounded-xl font-semibold text-lg transition"
+          >
+            Join Call
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* ===== WAITING ROOM ===== */}
+    {isInWaitingRoom && !askForUsername && (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="bg-neutral-800 p-12 rounded-3xl shadow-2xl text-center max-w-md border border-neutral-700">
+          <div className="w-24 h-24 mx-auto mb-8 bg-yellow-600/20 rounded-full flex items-center justify-center">
+            <ShieldAlert size={48} className="text-yellow-500" />
+          </div>
+          <h2 className="text-3xl font-bold mb-4">Waiting for Host</h2>
+          <p className="text-gray-400 mb-10 text-lg">The host will let you in soon.</p>
+          <div className="flex justify-center gap-3">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" />
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce delay-150" />
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce delay-300" />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ===== MAIN MEETING INTERFACE ===== */}
+    {!askForUsername && !isInWaitingRoom && (
+      <div className="flex flex-col h-screen">
+        {/* Video + Panels Container */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Main Video Area */}
+          <div className={`flex-1 bg-black flex flex-col transition-all duration-300 ${showChat || showParticipants ? 'md:mr-80' : ''}`}>
+            {/* Video Grid / Spotlight */}
+            <div className="flex-1 relative overflow-hidden">
+              {viewMode === "SPOTLIGHT" && spotlightId ? (
+                <div className="h-full flex items-center justify-center p-4">
+                  {spotlightId === "local" ? (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <video
+                        ref={localSpotlightRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        className={`max-w-full max-h-full object-contain ${!screen ? "-scale-x-100" : ""}`}
+                      />
+                      <div className="absolute bottom-6 left-6 bg-black/70 px-5 py-3 rounded-full text-xl font-semibold backdrop-blur">
+                        {userName} (You)
+                      </div>
+                    </div>
+                  ) : (
+                    videos.find(v => v.socketId === spotlightId) && (
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        <video
+                          ref={(el) => {
+                            const v = videos.find(v => v.socketId === spotlightId);
+                            if (el && v?.stream) el.srcObject = v.stream;
+                          }}
+                          autoPlay
+                          playsInline
+                          className="max-w-full max-h-full object-contain"
+                        />
+                        <div className="absolute bottom-6 left-6 bg-black/70 px-5 py-3 rounded-full text-xl font-semibold backdrop-blur">
+                          {userMap[spotlightId]?.username || "Guest"}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : (
+                <div className="h-full flex flex-wrap items-center justify-center p-4 gap-6 overflow-y-auto">
+                  {/* Local Video Tile */}
+                  {spotlightId !== "local" && (
+                    <div
+                      onClick={() => handleTileClick("local")}
+                      className="relative bg-neutral-800 rounded-2xl overflow-hidden cursor-pointer hover:ring-4 hover:ring-blue-500 transition-all aspect-video w-full max-w-2xl border border-neutral-700"
+                    >
+                      <video
+                        ref={localGridRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        className={`w-full h-full object-cover ${!screen ? "-scale-x-100" : ""}`}
+                      />
+                      <div className="absolute bottom-3 left-3 bg-black/70 px-4 py-2 rounded-full backdrop-blur">
+                        <span className="text-sm font-semibold">You {isHost && "(Host)"}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Remote Video Tiles */}
+                  {videos.map((v) => {
+                    if (spotlightId === v.socketId) return null;
+                    const user = userMap[v.socketId] || { username: "Guest" };
+                    return (
+                      <div
+                        key={v.socketId}
+                        onClick={() => handleTileClick(v.socketId)}
+                        className="relative bg-neutral-800 rounded-2xl overflow-hidden cursor-pointer hover:ring-4 hover:ring-blue-500 transition-all aspect-video w-full max-w-2xl border border-neutral-700"
+                      >
+                        <video
+                          ref={(el) => el && v.stream && (el.srcObject = v.stream)}
+                          autoPlay
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-3 left-3 bg-black/70 px-4 py-2 rounded-full backdrop-blur">
+                          <span className="text-sm font-semibold">{user.username}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <div className="hidden md:flex absolute right-6 items-center gap-3">
-              <button onClick={() => setShowInfo(!showInfo)} className={`p-3 rounded-xl ${showInfo ? "bg-blue-600" : "bg-neutral-800"}`}>
+            {/* PIP Local Video in Spotlight Mode */}
+            {viewMode === "SPOTLIGHT" && spotlightId === "local" && (
+              <div
+                className="absolute bottom-8 left-8 w-64 aspect-video bg-neutral-800 rounded-2xl overflow-hidden shadow-2xl border border-neutral-600 z-50 cursor-move"
+                style={{ transition: isDragging ? 'none' : 'all 0.3s' }}
+                onMouseDown={handleMouseDown}
+              >
+                <video
+                  ref={localFloatingRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className={`w-full h-full object-cover ${!screen ? "-scale-x-100" : ""}`}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Side Panels (Participants & Chat) */}
+          {(showParticipants || showChat) && (
+            <div className="fixed inset-y-0 right-0 w-full md:w-96 bg-neutral-800 border-l border-neutral-700 z-40 flex flex-col shadow-2xl md:relative">
+              {/* Panel Header */}
+              <div className="p-5 border-b border-neutral-700 flex items-center justify-between bg-neutral-900">
+                <h3 className="text-xl font-bold">
+                  {showParticipants ? `Participants (${Object.values(userMap).length + 1})` : "Chat"}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowParticipants(false);
+                    setShowChat(false);
+                  }}
+                  className="p-2 hover:bg-neutral-700 rounded-lg transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Panel Content */}
+              <div className="flex-1 overflow-y-auto p-5">
+                {showParticipants ? (
+                  <>
+                    {/* Waiting Room */}
+                    {isHost && waitingUsers.length > 0 && (
+                      <div className="mb-6 pb-6 border-b border-neutral-700">
+                        <h4 className="text-sm font-bold text-yellow-500 uppercase mb-4 flex items-center gap-2">
+                          <Gavel size={16} /> Waiting Room
+                        </h4>
+                        {waitingUsers.map((u) => (
+                          <div key={u.socketId} className="flex items-center justify-between p-3 bg-neutral-700/50 rounded-lg mb-3">
+                            <span className="font-medium">{u.username}</span>
+                            <button
+                              onClick={() => handleAdmit(u.socketId)}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium flex items-center gap-2"
+                            >
+                              <UserCheck size={16} /> Admit
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Current Participants */}
+                    <div className="space-y-3">
+                      {/* You */}
+                      <div className="flex items-center justify-between p-3 bg-neutral-700/50 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold">
+                            {userName[0]?.toUpperCase()}
+                          </div>
+                          <span className="font-medium">{userName} (You)</span>
+                        </div>
+                        {audio ? <Mic size={18} className="text-gray-400" /> : <MicOff size={18} className="text-red-500" />}
+                      </div>
+
+                      {/* Others */}
+                      {Object.entries(userMap).map(([id, user]) => (
+                        <div key={id} className="flex items-center justify-between p-3 bg-neutral-700/30 rounded-lg hover:bg-neutral-700 transition">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center font-bold">
+                              {user.username[0]?.toUpperCase()}
+                            </div>
+                            <span className="font-medium">{user.username}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {user.isMuted ? <MicOff size={18} className="text-red-500" /> : <Mic size={18} className="text-gray-400" />}
+                            {isHost && (
+                              <button className="opacity-0 group-hover:opacity-100 transition text-red-400 hover:text-red-300">
+                                <UserMinus size={18} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  // Chat Panel Placeholder (you can expand this later)
+                  <div className="text-center text-gray-500 mt-20">
+                    <MessageSquare size={64} className="mx-auto mb-4 opacity-30" />
+                    <p>Chat coming soon!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Control Bar */}
+        <div className="h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-between px-6 z-30">
+          {/* Left Controls */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleAudio}
+              className={`p-4 rounded-full transition ${audio ? 'bg-neutral-700 hover:bg-neutral-600' : 'bg-red-600'}`}
+            >
+              {audio ? <Mic size={28} /> : <MicOff size={28} />}
+            </button>
+
+            <button
+              onClick={handleVideo}
+              className={`p-4 rounded-full transition ${video ? 'bg-neutral-700 hover:bg-neutral-600' : 'bg-red-600'}`}
+            >
+              {video ? <Video size={28} /> : <VideoOff size={28} />}
+            </button>
+
+            {!isMobile && (
+              <button
+                onClick={handleScreen}
+                className={`p-4 rounded-full transition ${screen ? 'bg-blue-600' : 'bg-neutral-700 hover:bg-neutral-600'}`}
+                title={screen ? "Stop sharing" : "Share screen"}
+              >
+                {screen ? <MonitorOff size={28} /> : <ScreenShare size={28} />}
+              </button>
+            )}
+
+            {!isMobile && (
+              <button
+                onClick={() => setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID")}
+                className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 transition"
+              >
+                <LayoutDashboard size={28} />
+              </button>
+            )}
+          </div>
+
+          {/* Center: Meeting Info (optional) */}
+          <div className="hidden md:block text-sm text-gray-400">
+            Meeting: <span className="font-mono font-bold">{meetingCode}</span>
+          </div>
+
+          {/* Right Controls */}
+          <div className="flex items-center gap-4">
+            <button onClick={handleEndCall} className="p-4 rounded-full bg-red-600 hover:bg-red-700 transition">
+              <PhoneOff size={28} />
+            </button>
+
+            {/* Mobile Menu */}
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="md:hidden p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 transition"
+            >
+              <MoreVertical size={28} />
+            </button>
+
+            {/* Desktop Side Buttons */}
+            <div className="hidden md:flex items-center gap-3">
+              <button
+                onClick={() => setShowInfo(!showInfo)}
+                className={`p-3 rounded-xl transition ${showInfo ? 'bg-blue-600' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+              >
                 <Info size={24} />
               </button>
-              <button onClick={() => setShowParticipants(!showParticipants)} className={`p-3 rounded-xl relative ${showParticipants ? "bg-blue-600" : "bg-neutral-800"}`}>
+              <button
+                onClick={() => setShowParticipants(!showParticipants)}
+                className={`p-3 rounded-xl relative transition ${showParticipants ? 'bg-blue-600' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+              >
                 <Users size={24} />
                 {isHost && waitingUsers.length > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold">
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
                     {waitingUsers.length}
                   </span>
                 )}
               </button>
-              <button onClick={() => setShowChat(!showChat)} className={`p-3 rounded-xl relative ${showChat ? "bg-blue-600" : "bg-neutral-800"}`}>
+              <button
+                onClick={() => setShowChat(!showChat)}
+                className={`p-3 rounded-xl transition ${showChat ? 'bg-blue-600' : 'bg-neutral-800 hover:bg-neutral-700'}`}
+              >
                 <MessageSquare size={24} />
               </button>
             </div>
-
-            {/* Mobile Menu */}
-            {showMobileMenu && (
-              <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden">
-                <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg ${screen ? 'bg-blue-600 text-white' : 'hover:bg-neutral-700 text-gray-200'}`}>
-                  {screen ? <MonitorOff size={20} /> : <ScreenShare size={20} />} <span>Share Screen</span>
-                </button>
-                <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-gray-200">
-                  <LayoutDashboard size={20} /> <span>Switch Layout</span>
-                </button>
-                <div className="h-px bg-neutral-700 my-1"></div>
-                <button onClick={() => { setShowInfo(!showInfo); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg ${showInfo ? "bg-blue-600 text-white" : "hover:bg-neutral-700 text-gray-200"}`}>
-                  <Info size={20} /> <span>Meeting Info</span>
-                </button>
-                <button onClick={() => { setShowParticipants(!showParticipants); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg relative ${showParticipants ? "bg-blue-600 text-white" : "hover:bg-neutral-700 text-gray-200"}`}>
-                  <Users size={20} /> <span>Participants</span>
-                </button>
-                <button onClick={() => { setShowChat(!showChat); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg relative ${showChat ? "bg-blue-600 text-white" : "hover:bg-neutral-700 text-gray-200"}`}>
-                  <MessageSquare size={20} /> <span>Chat</span>
-                </button>
-              </div>
-            )}
           </div>
+        </div>
 
-          {/* Info Panel */}
-          {showInfo && (
-            <div className="absolute bottom-20 md:bottom-24 right-4 md:right-6 w-72 md:w-80 bg-neutral-800 rounded-xl border border-neutral-700 shadow-2xl z-30">
-              <div className="p-4 border-b border-neutral-700 flex justify-between items-center">
-                <h3 className="font-bold">Meeting Details</h3>
-                <button onClick={() => setShowInfo(false)} className="text-gray-400 hover:text-white"><X size={18} /></button>
+        {/* Mobile Menu Overlay */}
+        {showMobileMenu && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center md:hidden">
+            <div className="w-full max-w-md bg-neutral-800 rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom">
+              <div className="w-12 h-1.5 bg-neutral-600 rounded-full mx-auto mb-6" />
+              
+              <div className="space-y-4">
+                <button
+                  onClick={() => { handleScreen(); setShowMobileMenu(false); }}
+                  disabled={isMobile}
+                  className={`w-full flex items-center justify-center gap-4 py-4 rounded-xl transition ${
+                    isMobile 
+                      ? 'bg-neutral-700/50 text-gray-500' 
+                      : screen ? 'bg-blue-600' : 'bg-neutral-700 hover:bg-neutral-600'
+                  }`}
+                >
+                  {screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}
+                  <span className="font-medium">Share Screen {isMobile && "(Not available on mobile)"}</span>
+                </button>
+
+                <button
+                  onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }}
+                  className="w-full flex items-center justify-center gap-4 py-4 bg-neutral-700 hover:bg-neutral-600 rounded-xl transition"
+                >
+                  <LayoutDashboard size={24} />
+                  <span className="font-medium">Switch Layout</span>
+                </button>
+
+                <div className="h-px bg-neutral-700" />
+
+                <button
+                  onClick={() => { setShowInfo(true); setShowMobileMenu(false); }}
+                  className="w-full flex items-center justify-center gap-4 py-4 bg-neutral-700 hover:bg-neutral-600 rounded-xl transition"
+                >
+                  <Info size={24} />
+                  <span className="font-medium">Meeting Info</span>
+                </button>
+
+                <button
+                  onClick={() => { setShowParticipants(true); setShowMobileMenu(false); }}
+                  className="w-full flex items-center justify-center gap-4 py-4 bg-neutral-700 hover:bg-neutral-600 rounded-xl transition"
+                >
+                  <Users size={24} />
+                  <span className="font-medium">Participants</span>
+                </button>
+
+                <button
+                  onClick={() => { setShowChat(true); setShowMobileMenu(false); }}
+                  className="w-full flex items-center justify-center gap-4 py-4 bg-neutral-700 hover:bg-neutral-600 rounded-xl transition"
+                >
+                  <MessageSquare size={24} />
+                  <span className="font-medium">Chat</span>
+                </button>
               </div>
-              <div className="p-4 space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-400">Meeting Code</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-lg font-mono font-bold">{meetingCode}</span>
-                    <button onClick={handleCopyLink} className="text-blue-400">
-                      {copied ? <Check size={16} /> : <Copy size={16} />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-400">Host</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold">
-                      {userName.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="text-sm text-gray-200">{isHost ? `${userName} (You)` : "Unknown Host"}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-400">Invite Link</label>
-                  <div className="mt-1 p-2 bg-neutral-900 rounded-lg text-xs text-gray-400 truncate border border-neutral-700">
-                    {window.location.href}
-                  </div>
-                  <button onClick={handleCopyLink} className="mt-2 w-full flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
-                    <Copy size={16} /> Copy Link
+
+              <button
+                onClick={() => setShowMobileMenu(false)}
+                className="w-full mt-6 py-4 bg-red-600 hover:bg-red-700 rounded-xl font-semibold"
+              >
+                Close Menu
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Meeting Info Panel (Desktop) */}
+        {showInfo && !showMobileMenu && (
+          <div className="fixed bottom-24 right-6 w-80 bg-neutral-800 rounded-2xl border border-neutral-700 shadow-2xl z-40 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Meeting Details</h3>
+              <button onClick={() => setShowInfo(false)} className="p-2 hover:bg-neutral-700 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <p className="text-sm text-gray-400 mb-1">Meeting Code</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-mono font-bold">{meetingCode}</span>
+                  <button onClick={handleCopyLink} className="p-2 text-blue-400 hover:bg-neutral-700 rounded">
+                    {copied ? <Check size={20} /> : <Copy size={20} />}
                   </button>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Participants Panel */}
-          {showParticipants && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col">
-              <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
-                <h3 className="font-bold text-lg">
-                  Participants ({Object.values(userMap).length + 1})
-                </h3>
-                <button onClick={() => setShowParticipants(false)} className="text-gray-400 hover:text-white">
-                  <X size={20} />
+              <div>
+                <p className="text-sm text-gray-400 mb-2">Invite Link</p>
+                <p className="text-xs bg-neutral-900 p-3 rounded border border-neutral-700 truncate mb-3">
+                  {window.location.href}
+                </p>
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium flex items-center justify-center gap-2"
+                >
+                  <Copy size={18} /> Copy Link
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Waiting Room (Host only) */}
-                {isHost && waitingUsers.length > 0 && (
-                  <div className="mb-4 pb-4 border-b border-neutral-700">
-                    <h4 className="text-xs font-bold text-yellow-500 uppercase mb-3 flex items-center gap-2">
-                      <Gavel size={12} /> Waiting Room
-                    </h4>
-                    {waitingUsers.map(u => (
-                      <div key={u.socketId} className="flex items-center justify-between p-2 rounded-lg bg-neutral-700/50 mb-2">
-                        <span className="font-medium text-sm">{u.username}</span>
-                        <button
-                          onClick={() => handleAdmit(u.socketId)}
-                          className="p-1.5 bg-green-600 hover:bg-green-700 rounded text-xs text-white flex items-center gap-1"
-                        >
-                          <UserCheck size={14} /> Admit
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* You */}
-                <div className="flex items-center justify-between p-2 rounded-lg bg-neutral-700/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm">
-                      {userName.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="font-medium text-sm">{userName} (You)</span>
-                  </div>
-                  <div className={!audio ? "text-red-500" : "text-gray-400"}>
-                    {!audio ? <MicOff size={16} /> : <Mic size={16} />}
-                  </div>
-                </div>
-
-                {/* Others */}
-                {Object.entries(userMap).map(([id, user]) => (
-                  <div key={id} className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-700 transition-colors group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold text-sm">
-                        {user.username.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="font-medium text-sm">{user.username}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={user.isMuted ? "text-red-500" : "text-gray-400"}>
-                        {user.isMuted ? <MicOff size={16} /> : <Mic size={16} />}
-                      </div>
-                      {isHost && (
-                        <button className="text-gray-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Remove User">
-                          <UserMinus size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
-          )}
-
-          
-        {showChat && (
-                <div className="absolute right-0 top-0 h-[calc(100vh-5rem)] md:h-[calc(100vh-80px)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
-                    <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold text-lg">In-Call Messages</h3><button onClick={toggleChat} className="text-gray-400 hover:text-white"><X size={20} /></button></div>
-                    <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-neutral-600">
-                        {messages.length === 0 ? <div className="text-center text-neutral-500 text-sm mt-10">No messages yet</div> : messages.map((msg, idx) => (
-                            <div key={idx} className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}><div className={`text-xs text-gray-400 mb-1 ${msg.isMe ? "text-right" : "text-left"}`}>{msg.sender}</div><div className={`px-4 py-2 rounded-lg max-w-[85%] break-words text-sm ${msg.isMe ? "bg-blue-600 text-white" : "bg-neutral-700 text-gray-100"}`}>{msg.text}</div></div>
-                        ))}
-                    </div>
-                    <div className="p-4 border-t border-neutral-700 bg-neutral-900">
-                        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2"><input type="text" className="flex-1 bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Send a message..." value={currentMessage} onChange={(e) => setCurrentMessage(e.target.value)} /><button type="submit" className="p-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-white"><Send size={18} /></button></form>
-                    </div>
-                </div>
-            )}
-        </div>
-      )}
-    </div>
-  );
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+);
 }
