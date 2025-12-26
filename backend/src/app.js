@@ -54,7 +54,6 @@ io.on("connection", (socket) => {
 
   // Guest requests to join
   socket.on("request-join", ({ path, username, passcode }) => {
-    // 1. Check if room exists
     if (!rooms[path]) {
       socket.emit("invalid-meeting");
       return;
@@ -62,13 +61,11 @@ io.on("connection", (socket) => {
 
     const room = rooms[path];
 
-    // 2. Check if Room is LOCKED (NEW FEATURE)
     if (room.isLocked) {
         socket.emit("meeting-locked");
         return;
     }
 
-    // 3. Check Passcode
     if (room.passcode && room.passcode !== passcode) {
       socket.emit("passcode-required");
       return;
@@ -94,7 +91,7 @@ io.on("connection", (socket) => {
         waiting: [], 
         hostId: socket.id, 
         passcode: passcode || null,
-        isLocked: false // <--- NEW: Init lock state
+        isLocked: false
       }; 
     }
     
@@ -108,7 +105,8 @@ io.on("connection", (socket) => {
     const userData = {
       socketId: socket.id,
       username: username || "Guest",
-      isMuted: false,
+      isMuted: false,     // Default: Mic On
+      isVideoOff: false,  // Default: Video On (New)
       isHandRaised: false
     };
 
@@ -134,25 +132,18 @@ io.on("connection", (socket) => {
 
   // --- HOST ADMINISTRATION FEATURES ---
 
-  // 1. Toggle Meeting Lock
   socket.on("toggle-lock", () => {
       const room = rooms[socket.roomPath];
-      // Only allow if requester is the host
       if(room && room.hostId === socket.id) {
           room.isLocked = !room.isLocked;
-          // Notify Host (or everyone) about the status
           io.to(socket.roomPath).emit("lock-update", room.isLocked); 
       }
   });
 
-  // 2. Remove (Kick) User
   socket.on("kick-user", (targetSocketId) => {
       const room = rooms[socket.roomPath];
       if(room && room.hostId === socket.id) {
-          // Tell the specific user they are kicked
           io.to(targetSocketId).emit("kicked");
-          
-          // Remove them from server records immediately so they disappear for others
           const userIndex = room.users.findIndex(u => u.socketId === targetSocketId);
           if (userIndex !== -1) {
               room.users.splice(userIndex, 1);
@@ -161,16 +152,25 @@ io.on("connection", (socket) => {
       }
   });
 
-  // 3. Mute All
+  // Mute All
   socket.on("mute-all", () => {
       const room = rooms[socket.roomPath];
       if(room && room.hostId === socket.id) {
-          // Send "force-mute" to everyone EXCEPT the host
+          // Tell everyone EXCEPT host to mute
           socket.to(socket.roomPath).emit("force-mute");
       }
   });
 
-  // --- EXISTING LISTENERS ---
+  // Stop Video All (New)
+  socket.on("stop-video-all", () => {
+      const room = rooms[socket.roomPath];
+      if(room && room.hostId === socket.id) {
+          // Tell everyone EXCEPT host to stop video
+          socket.to(socket.roomPath).emit("force-stop-video");
+      }
+  });
+
+  // --- STATE SYNC LISTENERS ---
 
   socket.on("admit-user", (targetSocketId) => {
     const room = Object.values(rooms).find((r) => r.waiting.some((u) => u.socketId === targetSocketId));
@@ -192,6 +192,18 @@ io.on("connection", (socket) => {
       if (user) {
         user.isMuted = isMuted;
         socket.to(path).emit("audio-toggled", { socketId: socket.id, isMuted });
+      }
+    }
+  });
+
+  // New: Toggle Video Listener to sync icons
+  socket.on("toggle-video", ({ isVideoOff }) => {
+    const path = socket.roomPath;
+    if (rooms[path]) {
+      const user = rooms[path].users.find((u) => u.socketId === socket.id);
+      if (user) {
+        user.isVideoOff = isVideoOff;
+        socket.to(path).emit("video-toggled", { socketId: socket.id, isVideoOff });
       }
     }
   });
