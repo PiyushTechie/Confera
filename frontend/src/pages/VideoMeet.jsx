@@ -262,10 +262,15 @@ export default function VideoMeetComponent() {
       const newState = !isHandRaised;
       setIsHandRaised(newState);
       socketRef.current.emit("toggle-hand", { isRaised: newState });
+      // Close menu if open on mobile
+      if(isMobile) setShowMobileMenu(false);
   };
 
   const handleSendEmoji = (emoji) => {
       setShowEmojiPicker(false);
+      // Close menu if open on mobile
+      if(isMobile) setShowMobileMenu(false);
+      
       setActiveEmojis(prev => ({ ...prev, [socketIdRef.current]: emoji }));
       setTimeout(() => {
           setActiveEmojis(prev => {
@@ -518,7 +523,7 @@ export default function VideoMeetComponent() {
             </div>
           )}
 
-          {/* --- FOOTER CONTROLS (RESPONSIVE) --- */}
+          {/* --- FOOTER CONTROLS --- */}
           <div className="h-16 md:h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-center z-20 px-2 md:px-4 gap-2 md:gap-4 relative">
              <button onClick={handleAudio} className={`p-3 md:p-4 rounded-full transition-all ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>
                 {audio ? <Mic size={20} className="md:w-6 md:h-6" /> : <MicOff size={20} className="md:w-6 md:h-6" />}
@@ -527,15 +532,15 @@ export default function VideoMeetComponent() {
                 {video ? <Video size={20} className="md:w-6 md:h-6" /> : <VideoOff size={20} className="md:w-6 md:h-6" />}
              </button>
              
-             {/* HAND BUTTON */}
-             <button onClick={handleToggleHand} className={`p-3 md:p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700 text-white'}`}>
-                <Hand size={20} className="md:w-6 md:h-6" />
+             {/* HAND (Desktop Only) */}
+             <button onClick={handleToggleHand} className={`hidden md:block p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black hover:bg-yellow-600' : 'bg-neutral-700 hover:bg-neutral-600'}`} title="Raise Hand">
+                <Hand size={24} />
              </button>
 
-             {/* EMOJI BUTTON */}
-             <div className="relative">
-                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-3 md:p-4 rounded-full bg-neutral-700 text-white">
-                    <Smile size={20} className="md:w-6 md:h-6" />
+             {/* EMOJI (Desktop Only) */}
+             <div className="hidden md:block relative">
+                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600" title="Reactions">
+                    <Smile size={24} />
                 </button>
                 {showEmojiPicker && (
                     <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">
@@ -554,6 +559,7 @@ export default function VideoMeetComponent() {
                 <PhoneOff size={20} className="md:w-6 md:h-6" />
              </button>
              
+             {/* Mobile "More" Menu Button */}
              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-3 rounded-full bg-neutral-700 text-white relative">
                 <MoreVertical size={20} />
              </button>
@@ -561,7 +567,7 @@ export default function VideoMeetComponent() {
              <div className="hidden md:flex absolute right-6 gap-3">
                <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
                
-               {/* PARTICIPANTS (DESKTOP) */}
+               {/* PARTICIPANTS (Desktop) */}
                <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative">
                  <Users size={24} />
                  {isHost && waitingUsers && waitingUsers.length > 0 && (
@@ -571,23 +577,41 @@ export default function VideoMeetComponent() {
                  )}
                </button>
 
-               {/* CHAT (DESKTOP) */}
+               {/* CHAT (Desktop) */}
                <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative">
                  <MessageSquare size={24} />
                  {unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}
                </button>
              </div>
              
+             {/* --- MOBILE DROPDOWN MENU --- */}
              {showMobileMenu && (
-                 <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden">
-                    <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><ScreenShare size={20} /> Share Screen</button>
-                    <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><LayoutDashboard size={20} /> Layout</button>
+                 <div className="absolute bottom-20 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden animate-in slide-in-from-bottom-5">
                     
-                    <button onClick={() => { setShowChat(!showChat); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative">
+                    {/* Raise Hand (Mobile) */}
+                    <button onClick={handleToggleHand} className={`flex items-center gap-3 p-3 rounded-lg ${isHandRaised ? 'bg-yellow-500 text-black' : 'hover:bg-neutral-700 text-white'}`}>
+                        <Hand size={20} /> <span>{isHandRaised ? "Lower Hand" : "Raise Hand"}</span>
+                    </button>
+
+                    {/* Emoji Picker (Mobile) */}
+                    <div className="p-2 bg-neutral-900 rounded-lg flex justify-between">
+                        {EMOJI_LIST.map(emoji => (
+                            <button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-xl p-1 hover:scale-125 transition-transform">
+                                {emoji}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="h-px bg-neutral-700 my-1"></div>
+
+                    <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-white"><ScreenShare size={20} /> Share Screen</button>
+                    <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPOTLIGHT" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-white"><LayoutDashboard size={20} /> Layout</button>
+                    
+                    <button onClick={() => { setShowChat(!showChat); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative text-white">
                       <div className="relative"><MessageSquare size={20} />{unreadMessages > 0 && <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</div><span>Chat</span>
                     </button>
                     
-                    <button onClick={() => { setShowParticipants(!showParticipants); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative">
+                    <button onClick={() => { setShowParticipants(!showParticipants); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative text-white">
                         <div className="relative">
                             <Users size={20} />
                             {isHost && waitingUsers && waitingUsers.length > 0 && (
@@ -597,14 +621,14 @@ export default function VideoMeetComponent() {
                         <span>Participants</span>
                     </button>
                     
-                    <button onClick={() => { setShowInfo(!showInfo); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700"><Info size={20} /> Info</button>
+                    <button onClick={() => { setShowInfo(!showInfo); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-white"><Info size={20} /> Info</button>
                  </div>
              )}
           </div>
 
           {/* --- SIDEBARS --- */}
           {showChat && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col">
+            <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
                <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold">Chat</h3><button onClick={() => setShowChat(false)}><X size={20} /></button></div>
                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                   {messages.map((msg, i) => (
@@ -624,7 +648,7 @@ export default function VideoMeetComponent() {
           )}
 
           {showParticipants && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col">
+            <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
                 <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold">Participants</h3><button onClick={() => setShowParticipants(false)}><X size={20} /></button></div>
                 <div className="flex-1 p-4 space-y-4 overflow-y-auto">
                     {/* SAFE GUARD: Check array length safely */}
