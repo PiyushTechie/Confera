@@ -6,7 +6,7 @@ import {
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
   Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
   Lock, Hand, Smile, Unlock, Trash2, Pin, Settings, Volume2, Power, Crown,
-  ChevronLeft, ChevronRight // Added Arrow Icons
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import server from "../environment";
 
@@ -19,17 +19,36 @@ const peerConfig = {
   ],
 };
 
+// --- FIXED VIDEO PLAYER ---
 const VideoPlayer = ({ stream, isLocal, isMirrored, className, audioOutputId }) => {
   const videoRef = useRef(null);
+
   useEffect(() => {
-    if (videoRef.current && stream) videoRef.current.srcObject = stream;
+    // Determine if we have a valid stream
+    const videoElement = videoRef.current;
+    if (videoElement && stream) {
+        videoElement.srcObject = stream;
+        // Force play to ensure no blank frame
+        videoElement.play().catch(e => console.error("Auto-play failed", e));
+    }
   }, [stream]);
+
   useEffect(() => {
+    // Handle Audio Output Device (Speakers)
     if (videoRef.current && audioOutputId && typeof videoRef.current.setSinkId === 'function') {
         videoRef.current.setSinkId(audioOutputId).catch(err => console.warn("Audio Sink Error:", err));
     }
   }, [audioOutputId]);
-  return <video ref={videoRef} autoPlay muted={isLocal} playsInline className={`${className} ${isMirrored ? "-scale-x-100" : ""}`} />;
+
+  return (
+    <video 
+        ref={videoRef} 
+        autoPlay 
+        muted={isLocal} 
+        playsInline 
+        className={`${className} ${isMirrored ? "-scale-x-100" : ""}`} 
+    />
+  );
 };
 
 export default function VideoMeetComponent() {
@@ -49,13 +68,16 @@ export default function VideoMeetComponent() {
   const socketRef = useRef(null);
   const socketIdRef = useRef(null);
   const connectionsRef = useRef({});
-  const localStreamRef = useRef(null);
+  
+  // --- CRITICAL FIX: Split Logic (Ref) vs Rendering (State) ---
+  const localStreamRef = useRef(null); // For logic/cleanup
+  const [localStream, setLocalStream] = useState(null); // For rendering UI
+  
   const displayStreamRef = useRef(null);
   const chatContainerRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioAnalysersRef = useRef({});
 
-  const [mediaReady, setMediaReady] = useState(false);
   const [askForUsername, setAskForUsername] = useState(false);
   const [userName, setUsername] = useState(username || "Guest");
   const [video, setVideo] = useState(isVideoOn ?? true);
@@ -73,13 +95,12 @@ export default function VideoMeetComponent() {
   const [selectedDevices, setSelectedDevices] = useState({ audioInput: "", videoInput: "", audioOutput: "" });
   const [isAudioConnected, setIsAudioConnected] = useState(true);
 
-  const [viewMode, setViewMode] = useState("GRID"); // Default is now GRID
+  const [viewMode, setViewMode] = useState("GRID");
   const [activeSpeakerId, setActiveSpeakerId] = useState(null);
   const [pinnedUserId, setPinnedUserId] = useState(null);
   
-  // --- NEW: Grid Pagination State ---
   const [gridPage, setGridPage] = useState(0);
-  const GRID_PAGE_SIZE = 4; // Max 4 videos per page
+  const GRID_PAGE_SIZE = 4;
 
   const [showInfo, setShowInfo] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
@@ -101,15 +122,21 @@ export default function VideoMeetComponent() {
   const [activeEmojis, setActiveEmojis] = useState({});
 
   const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "👏", "🎉"];
+  const pendingIce = useRef({});
 
   /* --------------------- MEDIA --------------------- */
   const getMedia = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      
+      // Apply initial state
       if (!video) stream.getVideoTracks().forEach(t => t.enabled = false);
       if (!audio) stream.getAudioTracks().forEach(t => t.enabled = false);
+      
+      // --- FIX: Set BOTH Ref (for logic) and State (for UI) ---
       localStreamRef.current = stream;
-      setMediaReady(true);
+      setLocalStream(stream); 
+
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       await getDeviceList();
     } catch (err) { console.error("Media error:", err); }
@@ -129,10 +156,13 @@ export default function VideoMeetComponent() {
   const handleDeviceChange = async (type, deviceId) => {
       setSelectedDevices(prev => ({ ...prev, [type]: deviceId }));
       if (type === 'audioOutput') return;
+      
       const constraints = {
           audio: type === 'audioInput' ? { deviceId: { exact: deviceId } } : undefined,
           video: type === 'videoInput' ? { deviceId: { exact: deviceId } } : undefined
       };
+      
+      // Keep existing track if switching the other
       if (type === 'audioInput' && video) constraints.video = true;
       if (type === 'videoInput' && isAudioConnected) constraints.audio = true;
 
@@ -140,12 +170,21 @@ export default function VideoMeetComponent() {
           const newStream = await navigator.mediaDevices.getUserMedia(constraints);
           const newTrack = type === 'audioInput' ? newStream.getAudioTracks()[0] : newStream.getVideoTracks()[0];
           const oldTrack = type === 'audioInput' ? localStreamRef.current.getAudioTracks()[0] : localStreamRef.current.getVideoTracks()[0];
-          if(oldTrack) { localStreamRef.current.removeTrack(oldTrack); oldTrack.stop(); }
+          
+          if(oldTrack) { 
+              localStreamRef.current.removeTrack(oldTrack); 
+              oldTrack.stop(); 
+          }
           localStreamRef.current.addTrack(newTrack);
+          
+          // --- FIX: Update UI State to reflect new stream track ---
+          setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+
           Object.values(connectionsRef.current).forEach(pc => {
               const sender = pc.getSenders().find(s => s.track && s.track.kind === (type === 'audioInput' ? 'audio' : 'video'));
               if(sender) sender.replaceTrack(newTrack);
           });
+
           if (type === 'audioInput') newTrack.enabled = audio;
           if (type === 'videoInput') newTrack.enabled = video;
       } catch (err) { console.error("Device switch failed", err); }
@@ -162,6 +201,8 @@ export default function VideoMeetComponent() {
               const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: selectedDevices.audioInput ? { exact: selectedDevices.audioInput } : undefined } });
               const newTrack = stream.getAudioTracks()[0];
               localStreamRef.current.addTrack(newTrack);
+              setLocalStream(new MediaStream(localStreamRef.current.getTracks())); // Update UI
+
               Object.values(connectionsRef.current).forEach(pc => {
                   const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
                   if (sender) sender.replaceTrack(newTrack);
@@ -178,7 +219,7 @@ export default function VideoMeetComponent() {
   useEffect(() => {
     if (!audioContextRef.current) return;
     videos.forEach((v) => {
-      if (v.stream && v.stream.getAudioTracks().length > 0 && !audioAnalysersRef.current[v.socketId]) {
+      if (v.stream && v.stream.active && v.stream.getAudioTracks().length > 0 && !audioAnalysersRef.current[v.socketId]) {
         try {
             const source = audioContextRef.current.createMediaStreamSource(v.stream);
             const analyser = audioContextRef.current.createAnalyser();
@@ -271,18 +312,7 @@ export default function VideoMeetComponent() {
     socketRef.current.on("audio-toggled", ({ socketId, isMuted }) => { setUserMap(prev => ({ ...prev, [socketId]: { ...prev[socketId], isMuted: isMuted } })); });
     socketRef.current.on("video-toggled", ({ socketId, isVideoOff }) => { setUserMap(prev => ({ ...prev, [socketId]: { ...prev[socketId], isVideoOff: isVideoOff } })); });
     socketRef.current.on("emoji-received", ({ socketId, emoji }) => { setActiveEmojis(prev => ({ ...prev, [socketId]: emoji })); setTimeout(() => { setActiveEmojis(prev => { const newState = { ...prev }; delete newState[socketId]; return newState; }); }, 3000); });
-    
-    socketRef.current.on("signal", async (fromId, msg) => {
-      const signal = JSON.parse(msg);
-      let pc = connectionsRef.current[fromId];
-      if (!pc) pc = createPeer(fromId);
-      if (signal.sdp) {
-        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        if (signal.sdp.type === "offer") { const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); socketRef.current.emit("signal", fromId, JSON.stringify({ sdp: pc.localDescription })); }
-        if (pendingIce.current[fromId]) { pendingIce.current[fromId].forEach(c => pc.addIceCandidate(new RTCIceCandidate(c))); delete pendingIce.current[fromId]; }
-      } else if (signal.ice) { if (pc.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(signal.ice)); else { pendingIce.current[fromId] = pendingIce.current[fromId] || []; pendingIce.current[fromId].push(signal.ice); } }
-    });
-    
+    socketRef.current.on("signal", async (fromId, msg) => { const signal = JSON.parse(msg); let pc = connectionsRef.current[fromId]; if (!pc) pc = createPeer(fromId); if (signal.sdp) { await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp)); if (signal.sdp.type === "offer") { const answer = await pc.createAnswer(); await pc.setLocalDescription(answer); socketRef.current.emit("signal", fromId, JSON.stringify({ sdp: pc.localDescription })); } if (pendingIce.current[fromId]) { pendingIce.current[fromId].forEach(c => pc.addIceCandidate(new RTCIceCandidate(c))); delete pendingIce.current[fromId]; } } else if (signal.ice) { if (pc.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(signal.ice)); else { pendingIce.current[fromId] = pendingIce.current[fromId] || []; pendingIce.current[fromId].push(signal.ice); } } });
     socketRef.current.on("user-left", (id) => { connectionsRef.current[id]?.close(); delete connectionsRef.current[id]; setVideos(v => v.filter(x => x.socketId !== id)); setUserMap(prev => { const copy = { ...prev }; delete copy[id]; return copy; }); });
     socketRef.current.on("receive-message", (data) => { const isMe = data.socketId === socketRef.current.id; setMessages(prev => [...prev, { ...data, isMe }]); });
   };
@@ -355,7 +385,7 @@ export default function VideoMeetComponent() {
 
       if(isLocal) { 
           user = { username: userName, isHandRaised: isHandRaised, isVideoOff: !video }; 
-          stream = localStreamRef.current; 
+          stream = localStream; // Use State!
           isCamOff = !video; 
           displayName = `${userName} (You)`; 
           isThisHost = isHost; 
@@ -392,7 +422,7 @@ export default function VideoMeetComponent() {
 
   const renderSideStrip = () => {
       const mainId = getMainSocketId();
-      const allParticipants = [{ socketId: "local", stream: localStreamRef.current, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
+      const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
       const stripParticipants = allParticipants.filter(p => { const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId; const mId = mainId === "local" ? (socketIdRef.current || "local") : mainId; return pId !== mId; });
 
       return stripParticipants.map(p => {
@@ -415,28 +445,18 @@ export default function VideoMeetComponent() {
       });
   };
 
-  // --- NEW: PAGINATED GRID RENDERER ---
   const renderPaginatedGrid = () => {
-      // 1. Combine All Participants (Local + Remote)
-      const allParticipants = [
-          { socketId: "local", stream: localStreamRef.current, isLocal: true },
-          ...videos.map(v => ({ ...v, isLocal: false }))
-      ];
-
-      // 2. Pagination Logic
+      const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
       const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
       const startIndex = gridPage * GRID_PAGE_SIZE;
       const visibleParticipants = allParticipants.slice(startIndex, startIndex + GRID_PAGE_SIZE);
-
-      // 3. Grid CSS Class calculation based on count
       const count = visibleParticipants.length;
-      let gridClass = "grid-cols-1"; // Default 1
+      let gridClass = "grid-cols-1"; 
       if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
       else if (count >= 3) gridClass = "grid-cols-2";
 
       return (
           <div className="relative w-full h-full bg-black p-4 flex flex-col items-center justify-center">
-              {/* Grid Container */}
               <div className={`grid ${gridClass} gap-4 w-full h-full max-w-6xl max-h-full transition-all duration-300`}>
                   {visibleParticipants.map(p => {
                       const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
@@ -467,34 +487,21 @@ export default function VideoMeetComponent() {
                       );
                   })}
               </div>
-
-              {/* Navigation Arrows */}
               {totalPages > 1 && (
                   <>
-                      {gridPage > 0 && (
-                          <button onClick={() => setGridPage(p => p - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20">
-                              <ChevronLeft size={32} />
-                          </button>
-                      )}
-                      {gridPage < totalPages - 1 && (
-                          <button onClick={() => setGridPage(p => p + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20">
-                              <ChevronRight size={32} />
-                          </button>
-                      )}
-                      {/* Page Indicator */}
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">
-                          Page {gridPage + 1} / {totalPages}
-                      </div>
+                      {gridPage > 0 && <button onClick={() => setGridPage(p => p - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronLeft size={32} /></button>}
+                      {gridPage < totalPages - 1 && <button onClick={() => setGridPage(p => p + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronRight size={32} /></button>}
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">Page {gridPage + 1} / {totalPages}</div>
                   </>
               )}
           </div>
       );
   };
 
+  /* ------------------ UI ------------------ */
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
       
-      {/* SETTINGS MODAL */}
       {showSettings && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
               <div className="bg-neutral-800 p-6 rounded-2xl shadow-2xl max-w-md w-full border border-neutral-700">
@@ -523,7 +530,7 @@ export default function VideoMeetComponent() {
           <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
             <h2 className="text-2xl font-bold mb-6 text-center">Join Meeting</h2>
             <input className="bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg block w-full p-2.5 mb-6" placeholder="Enter name" value={userName} onChange={(e) => setUsername(e.target.value)} />
-            <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video"><VideoPlayer stream={localStreamRef.current} isLocal={true} isMirrored={true} className="w-full h-full object-cover" /></div>
+            <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video"><VideoPlayer stream={localStream} isLocal={true} isMirrored={true} className="w-full h-full object-cover" /></div>
             <button onClick={connect} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm px-5 py-3">Join</button>
           </div>
         </div>
@@ -537,10 +544,7 @@ export default function VideoMeetComponent() {
         <div className="flex flex-col h-screen relative">
           
           <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
-            {/* Conditional Rendering Based on View Mode */}
-            {viewMode === "GRID" ? (
-                renderPaginatedGrid()
-            ) : (
+            {viewMode === "GRID" ? renderPaginatedGrid() : (
                 <>
                     <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">{renderMainSpotlight()}</div>
                     <div className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}>{renderSideStrip()}</div>
