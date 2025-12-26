@@ -5,7 +5,7 @@ import {
   Mic, MicOff, Video, VideoOff, ScreenShare, MonitorOff,
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
   Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
-  Lock, Hand, Smile, Unlock, Trash2, Zap // Zap icon for "Auto Spotlight"
+  Lock, Hand, Smile, Unlock, Trash2, Pin, PinOff
 } from "lucide-react";
 import server from "../environment";
 
@@ -18,7 +18,6 @@ const peerConfig = {
   ],
 };
 
-// Stable Video Player
 const VideoPlayer = ({ stream, isLocal, isMirrored, className }) => {
   const videoRef = useRef(null);
   useEffect(() => {
@@ -47,10 +46,8 @@ export default function VideoMeetComponent() {
   const localStreamRef = useRef(null);
   const displayStreamRef = useRef(null);
   const chatContainerRef = useRef(null);
-
-  // Audio Analysis Refs
   const audioContextRef = useRef(null);
-  const audioAnalysersRef = useRef({}); // { socketId: analyserNode }
+  const audioAnalysersRef = useRef({});
 
   const [askForUsername, setAskForUsername] = useState(false);
   const [userName, setUsername] = useState(username || "");
@@ -65,21 +62,16 @@ export default function VideoMeetComponent() {
 
   const pendingIce = useRef({});
 
-  // View States
-  const [viewMode, setViewMode] = useState("GRID");
-  const [spotlightId, setSpotlightId] = useState(null);
-  const [isAutoSpotlight, setIsAutoSpotlight] = useState(true); // <--- NEW: Auto Spotlight Toggle
-  const [activeSpeakerId, setActiveSpeakerId] = useState(null); // <--- NEW: Track who is talking
+  // Layout State
+  const [viewMode, setViewMode] = useState("SPEAKER"); // Default to Speaker View
+  const [activeSpeakerId, setActiveSpeakerId] = useState(null);
+  const [pinnedUserId, setPinnedUserId] = useState(null); // Manual Override
 
   const [showInfo, setShowInfo] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  const [position, setPosition] = useState({ x: 20, y: 20 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
 
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState("");
@@ -104,7 +96,7 @@ export default function VideoMeetComponent() {
       stream.getAudioTracks()[0].enabled = audio;
       localStreamRef.current = stream;
       
-      // Initialize Audio Context for Speaker Detection
+      // Init Audio Context
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
@@ -114,12 +106,10 @@ export default function VideoMeetComponent() {
   };
 
   /* ------------------ ACTIVE SPEAKER LOGIC ------------------ */
-  // 1. Setup Analysers when videos change
   useEffect(() => {
     if (!audioContextRef.current) return;
 
     videos.forEach((v) => {
-      // If we don't have an analyser for this user yet, create one
       if (!audioAnalysersRef.current[v.socketId] && v.stream.getAudioTracks().length > 0) {
         try {
             const source = audioContextRef.current.createMediaStreamSource(v.stream);
@@ -134,7 +124,6 @@ export default function VideoMeetComponent() {
     });
   }, [videos]);
 
-  // 2. Monitoring Loop
   useEffect(() => {
     const interval = setInterval(() => {
         if (!audioContextRef.current) return;
@@ -145,33 +134,23 @@ export default function VideoMeetComponent() {
         Object.entries(audioAnalysersRef.current).forEach(([socketId, analyser]) => {
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
             analyser.getByteFrequencyData(dataArray);
-            
-            // Calculate average volume
             let sum = 0;
             for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
             const volume = sum / dataArray.length;
 
-            // Threshold (adjust 10-30 depending on sensitivity)
             if (volume > 20 && volume > maxVolume) {
                 maxVolume = volume;
                 loudestSpeaker = socketId;
             }
         });
 
-        // Update State if changed
         if (loudestSpeaker && loudestSpeaker !== activeSpeakerId) {
             setActiveSpeakerId(loudestSpeaker);
-            
-            // Auto Switch Spotlight if enabled
-            if (isAutoSpotlight && viewMode === "SPOTLIGHT") {
-                setSpotlightId(loudestSpeaker);
-            }
         }
-    }, 500); // Check every 500ms
+    }, 500);
 
     return () => clearInterval(interval);
-  }, [activeSpeakerId, isAutoSpotlight, viewMode]);
-
+  }, [activeSpeakerId]);
 
   /* ------------------ HELPERS ------------------ */
   const cleanupAndLeave = () => {
@@ -181,6 +160,18 @@ export default function VideoMeetComponent() {
     Object.values(connectionsRef.current).forEach(pc => pc.close());
     if(socketRef.current) socketRef.current.disconnect();
     navigate("/");
+  };
+
+  // Determine who to show in the big window
+  const getMainSocketId = () => {
+      // 1. If user manually pinned someone, show them
+      if (pinnedUserId) return pinnedUserId;
+      // 2. If someone is speaking (and not local user), show them
+      if (activeSpeakerId && activeSpeakerId !== socketIdRef.current) return activeSpeakerId;
+      // 3. Otherwise show the first remote user
+      if (videos.length > 0) return videos[0].socketId;
+      // 4. If alone, show local
+      return "local";
   };
 
   /* ------------------ PEER CONNECTION ------------------ */
@@ -493,11 +484,14 @@ export default function VideoMeetComponent() {
 
   const handleAdmit = (socketId) => socketRef.current.emit("admit-user", socketId);
   
-  // Updated: If user clicks a tile, turn OFF auto-spotlight
+  // Pinning Logic
   const handleTileClick = (id) => { 
-      setSpotlightId(id); 
-      setViewMode("SPOTLIGHT");
-      setIsAutoSpotlight(false); // Manual override
+      // If clicking already pinned user, unpin
+      if (pinnedUserId === id) {
+          setPinnedUserId(null);
+      } else {
+          setPinnedUserId(id);
+      }
   };
   
   const handleCopyLink = () => {
@@ -533,65 +527,115 @@ export default function VideoMeetComponent() {
   }, []);
 
   const connect = () => { setAskForUsername(false); connectSocket(); };
-  
-  const handleMouseDown = (e) => {
-    if (viewMode !== "SPOTLIGHT" || spotlightId !== "local") return;
-    setIsDragging(true);
-    const startX = e.clientX - position.x;
-    const startY = e.clientY - position.y;
-    const onMove = (e) => setPosition({ x: e.clientX - startX, y: e.clientY - startY });
-    const onUp = () => { setIsDragging(false); document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+
+  // --- RENDER HELPERS ---
+
+  // Helper to render Main Window
+  const renderMainSpotlight = () => {
+      const mainId = getMainSocketId();
+      const isLocal = mainId === "local" || mainId === socketIdRef.current;
+      
+      let user, stream, isCamOff;
+
+      if(isLocal) {
+          user = { username: userName, isHandRaised: isHandRaised, isVideoOff: !video };
+          stream = localStreamRef.current;
+          isCamOff = !video;
+      } else {
+          user = userMap[mainId] || { username: "Guest" };
+          const v = videos.find(v => v.socketId === mainId);
+          stream = v?.stream;
+          isCamOff = user.isVideoOff;
+      }
+
+      return (
+          <div className="relative w-full h-full flex items-center justify-center bg-black/90">
+              {isCamOff ? (
+                  <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center text-7xl font-bold text-white shadow-2xl">
+                      {user.username.charAt(0).toUpperCase()}
+                  </div>
+              ) : (
+                  <VideoPlayer 
+                    stream={stream} 
+                    isLocal={isLocal} 
+                    isMirrored={isLocal && !screen} 
+                    className="max-w-full max-h-full object-contain shadow-2xl" 
+                  />
+              )}
+
+              {/* Overlays */}
+              <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3">
+                  <span className="font-bold text-white tracking-wide text-lg">{isLocal ? "You" : user.username}</span>
+                  {user.isHandRaised && <Hand size={20} className="text-yellow-500 animate-pulse" />}
+                  {pinnedUserId === mainId && <Pin size={16} className="text-blue-400 rotate-45" />}
+              </div>
+
+              {activeEmojis[mainId] && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
+                      <span className="text-[12rem] filter drop-shadow-2xl">{activeEmojis[mainId]}</span>
+                  </div>
+              )}
+          </div>
+      );
   };
 
-  /* ------------------ RENDER HELPER ------------------ */
-  const renderVideoTile = (socketId, stream, isLocal = false) => {
-    const user = isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video } : (userMap[socketId] || { username: "Guest" });
-    const emoji = activeEmojis[socketId];
-    const displayName = user?.username || "Guest";
-    const handRaised = user?.isHandRaised || false;
-    const cameraOff = user?.isVideoOff || false;
-    
-    // NEW: Active Speaker Border
-    const isActiveSpeaker = socketId === activeSpeakerId && !isLocal;
+  // Helper to render Side Strip
+  const renderSideStrip = () => {
+      const mainId = getMainSocketId();
+      // List of everyone: Local + Remote
+      const allParticipants = [
+          { socketId: "local", stream: localStreamRef.current, isLocal: true },
+          ...videos.map(v => ({ ...v, isLocal: false }))
+      ];
 
-    return (
-      <div 
-        key={socketId} 
-        onClick={() => handleTileClick(socketId === socketRef.current?.id ? "local" : socketId)} 
-        className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 cursor-pointer w-full md:max-w-xl aspect-video transition-all ${handRaised ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : isActiveSpeaker ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'border-neutral-700'}`}
-      >
-          {cameraOff ? (
-              <div className="w-full h-full flex items-center justify-center bg-neutral-800">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-                      {displayName.charAt(0).toUpperCase()}
+      // Filter out whoever is currently in the main window to avoid duplication
+      const stripParticipants = allParticipants.filter(p => {
+          const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
+          const mId = mainId === "local" ? (socketIdRef.current || "local") : mainId;
+          return pId !== mId;
+      });
+
+      return stripParticipants.map(p => {
+          const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
+          const user = p.isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video } : (userMap[pId] || { username: "Guest" });
+          const isCamOff = user.isVideoOff;
+          
+          return (
+              <div 
+                key={pId}
+                onClick={() => handleTileClick(pId)}
+                className={`relative flex-shrink-0 bg-neutral-800 rounded-xl overflow-hidden cursor-pointer transition-all border-2
+                    ${isMobile ? 'w-28 h-20' : 'w-full h-32'}
+                    ${activeSpeakerId === pId && !p.isLocal ? 'border-green-500' : 'border-transparent hover:border-neutral-500'}
+                `}
+              >
+                  {isCamOff ? (
+                      <div className="w-full h-full flex items-center justify-center bg-neutral-700">
+                          <span className="text-xl font-bold text-gray-300">{user.username.charAt(0).toUpperCase()}</span>
+                      </div>
+                  ) : (
+                      <VideoPlayer stream={p.stream} isLocal={p.isLocal} isMirrored={p.isLocal && !screen} className="w-full h-full object-cover" />
+                  )}
+                  
+                  <div className="absolute bottom-1 left-1 bg-black/60 px-1.5 rounded text-[10px] truncate max-w-[90%]">
+                      {p.isLocal ? "You" : user.username}
                   </div>
+                  {user.isHandRaised && <div className="absolute top-1 right-1 text-yellow-500"><Hand size={14} /></div>}
               </div>
-          ) : (
-              <VideoPlayer stream={stream} isLocal={isLocal} isMirrored={isLocal && !screen} className="w-full h-full object-cover" />
-          )}
-
-          <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs flex items-center gap-2">
-             <span>{isLocal ? "You" : displayName}</span>
-             {handRaised && <Hand size={12} className="text-yellow-500" />}
-          </div>
-          {handRaised && <div className="absolute top-2 right-2 bg-yellow-500 p-1.5 rounded-full text-black shadow-lg animate-bounce z-10"><Hand size={16} /></div>}
-          {emoji && <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none animate-in zoom-in fade-in duration-300"><span className="text-6xl filter drop-shadow-lg">{emoji}</span></div>}
-      </div>
-    );
+          );
+      });
   };
 
   /* ------------------ MAIN RENDER ------------------ */
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
       
+      {/* --- MODALS --- */}
       {showPasscodeModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center animate-in zoom-in duration-200">
+            <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center">
                 <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500"><Lock size={32} /></div>
                 <h2 className="text-2xl font-bold mb-2">Passcode Required</h2>
-                <p className="text-gray-400 mb-6 text-sm">This meeting is protected.</p>
                 <form onSubmit={handleSubmitPasscode}>
                     <input type="password" autoFocus className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-3 text-white mb-4" placeholder="Enter Passcode" value={passcodeInput} onChange={e => setPasscodeInput(e.target.value)} />
                     {passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect passcode.</p>}
@@ -624,68 +668,32 @@ export default function VideoMeetComponent() {
 
       {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
         <div className="flex flex-col h-screen relative">
-          <div className="flex-1 bg-black relative flex overflow-hidden">
-            {viewMode === "SPOTLIGHT" && spotlightId && (
-              <div className="flex-1 flex items-center justify-center p-4 bg-neutral-900">
-                  <div className="relative w-full h-full flex items-center justify-center">
-                      {(spotlightId === "local" ? !video : userMap[spotlightId]?.isVideoOff) ? (
-                          <div className="w-full h-full flex items-center justify-center bg-neutral-800 rounded-xl">
-                              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-6xl font-bold text-white shadow-2xl">
-                                  {(spotlightId === "local" ? userName : userMap[spotlightId]?.username || "Guest").charAt(0).toUpperCase()}
-                              </div>
-                          </div>
-                      ) : (
-                          <VideoPlayer 
-                            stream={spotlightId === "local" ? localStreamRef.current : videos.find(v => v.socketId === spotlightId)?.stream}
-                            isLocal={spotlightId === "local"}
-                            isMirrored={spotlightId === "local" && !screen}
-                            className="max-w-full max-h-full object-contain"
-                          />
-                      )}
-                      
-                      <div className="absolute bottom-4 left-4 bg-black/60 px-4 py-2 rounded-full font-bold flex items-center gap-2">
-                          <span>{spotlightId === "local" ? "You" : userMap[spotlightId]?.username || "Guest"}</span>
-                          {(spotlightId === "local" ? isHandRaised : userMap[spotlightId]?.isHandRaised) && <Hand size={16} className="text-yellow-500" />}
-                      </div>
-                      {activeEmojis[spotlightId === "local" ? socketIdRef.current : spotlightId] && (
-                        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none animate-in zoom-in fade-in duration-300">
-                            <span className="text-9xl filter drop-shadow-2xl">{activeEmojis[spotlightId === "local" ? socketIdRef.current : spotlightId]}</span>
-                        </div>
-                      )}
-                  </div>
-              </div>
-            )}
-
-            <div className={`${viewMode === "SPOTLIGHT" ? "hidden md:flex w-64 border-l border-neutral-800 flex-col" : "flex-1 flex flex-wrap items-center justify-center"} p-4 gap-4 bg-black overflow-y-auto`}>
-               {spotlightId !== "local" && renderVideoTile(socketIdRef.current || "local", localStreamRef.current, true)}
-               {videos.map(v => renderVideoTile(v.socketId, v.stream, false))}
-            </div>
-          </div>
           
-          {/* Spotlight Overlays */}
-          {viewMode === "SPOTLIGHT" && spotlightId !== "local" && (
-            <div className="absolute w-32 md:w-48 aspect-video bg-neutral-800 rounded-lg overflow-hidden shadow-2xl border border-neutral-700 z-50 bottom-24 right-4 md:right-6">
-               <VideoPlayer stream={localStreamRef.current} isLocal={true} isMirrored={!screen} className="w-full h-full object-cover" />
-               <div className="absolute bottom-1 left-1 bg-black/50 px-1 rounded text-[10px]">You</div>
+          {/* --- MAIN VIDEO AREA (Zoom Style) --- */}
+          <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
+            
+            {/* 1. Main Spotlight Area */}
+            <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">
+                {renderMainSpotlight()}
             </div>
-          )}
-          {viewMode === "SPOTLIGHT" && spotlightId === "local" && (
-            <div className="absolute w-32 md:w-48 aspect-video bg-neutral-800 rounded-lg overflow-hidden shadow-2xl border border-neutral-700 z-50 cursor-move" style={{ left: `${position.x}px`, top: `${position.y}px` }} onMouseDown={handleMouseDown}>
-               <VideoPlayer stream={localStreamRef.current} isLocal={true} isMirrored={!screen} className="w-full h-full object-cover pointer-events-none" />
-            </div>
-          )}
 
-          {/* Footer Controls */}
+            {/* 2. Side Strip (Participants) */}
+            <div className={`
+                flex 
+                bg-neutral-900 border-neutral-800
+                md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3
+                flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto
+            `}>
+                {renderSideStrip()}
+            </div>
+
+          </div>
+
+          {/* --- FOOTER CONTROLS --- */}
           <div className="h-16 md:h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-center z-20 px-2 md:px-4 gap-2 md:gap-4 relative">
              <button onClick={handleAudio} className={`p-3 md:p-4 rounded-full transition-all ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={20} className="md:w-6 md:h-6" /> : <MicOff size={20} className="md:w-6 md:h-6" />}</button>
              <button onClick={handleVideo} className={`p-3 md:p-4 rounded-full transition-all ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={20} className="md:w-6 md:h-6" /> : <VideoOff size={20} className="md:w-6 md:h-6" />}</button>
              <button onClick={handleToggleHand} className={`hidden md:block p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700 text-white'}`}><Hand size={24} /></button>
-             
-             {/* NEW: Auto Spotlight Button */}
-             <button onClick={() => { setIsAutoSpotlight(!isAutoSpotlight); setViewMode("SPOTLIGHT"); }} className={`hidden md:block p-4 rounded-full transition-all ${isAutoSpotlight ? 'bg-green-600 text-white' : 'bg-neutral-700 text-gray-400'}`} title={isAutoSpotlight ? "Auto Spotlight ON" : "Auto Spotlight OFF"}>
-                <Zap size={24} />
-             </button>
-
              <div className="hidden md:block relative">
                 <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"><Smile size={24} /></button>
                 {showEmojiPicker && (
@@ -707,7 +715,6 @@ export default function VideoMeetComponent() {
              {showMobileMenu && (
                  <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden">
                     <button onClick={handleToggleHand} className={`flex items-center gap-3 p-3 rounded-lg ${isHandRaised ? 'bg-yellow-500 text-black' : 'hover:bg-neutral-700 text-white'}`}><Hand size={20} /> <span>{isHandRaised ? "Lower Hand" : "Raise Hand"}</span></button>
-                    <button onClick={() => { setIsAutoSpotlight(!isAutoSpotlight); setViewMode("SPOTLIGHT"); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg ${isAutoSpotlight ? 'bg-green-600 text-white' : 'hover:bg-neutral-700 text-gray-400'}`}><Zap size={20} /> Auto Spotlight</button>
                     <div className="p-2 bg-neutral-900 rounded-lg flex justify-between">{EMOJI_LIST.map(emoji => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-xl p-1 hover:scale-125 transition-transform">{emoji}</button>))}</div>
                     <div className="h-px bg-neutral-700 my-1"></div>
                     {isHost && (
@@ -772,6 +779,26 @@ export default function VideoMeetComponent() {
                         </div>
                     ))}
                 </div>
+            </div>
+          )}
+          
+          {showChat && (
+            <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
+               <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold">Chat</h3><button onClick={() => setShowChat(false)}><X size={20} /></button></div>
+               <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {messages.map((msg, i) => (
+                      <div key={i} className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}>
+                          <div className="text-xs text-gray-400 mb-1">{msg.sender}</div>
+                          <div className={`px-4 py-2 rounded-lg text-sm ${msg.isMe ? "bg-blue-600" : "bg-neutral-700"}`}>{msg.text}</div>
+                      </div>
+                  ))}
+               </div>
+               <div className="p-4 bg-neutral-900 border-t border-neutral-700">
+                  <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2">
+                      <input className="flex-1 bg-neutral-700 rounded-lg p-2 text-sm" value={currentMessage} onChange={e => setCurrentMessage(e.target.value)} placeholder="Type..." />
+                      <button type="submit" className="p-2 bg-blue-600 rounded-lg"><Send size={18} /></button>
+                  </form>
+               </div>
             </div>
           )}
           
