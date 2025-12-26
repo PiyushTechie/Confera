@@ -6,7 +6,7 @@ import {
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
   Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
   Lock, Hand, Smile, Unlock, Trash2, Pin, Settings, Volume2, Power, Crown,
-  ChevronLeft, ChevronRight, Loader2 // Added Loader icon
+  ChevronLeft, ChevronRight, Loader2
 } from "lucide-react";
 import server from "../environment";
 
@@ -19,24 +19,18 @@ const peerConfig = {
   ],
 };
 
-// --- STABLE VIDEO COMPONENT (Fixed Blank Screen Issue) ---
+// --- ROBUST VIDEO PLAYER ---
 const VideoPlayer = ({ stream, isLocal, isMirrored, className, audioOutputId }) => {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    const videoEl = videoRef.current;
-    if (videoEl && stream) {
-        // 1. Attach stream
-        videoEl.srcObject = stream;
-        // 2. Force Play (Fixes blank freeze)
-        videoEl.play().catch((e) => {
-            console.error("Autoplay failed:", e);
-            // If failed, user interaction usually required, but muted local video usually passes
-        });
+    if (videoRef.current && stream) {
+        videoRef.current.srcObject = stream;
+        // Force play to ensure no blank frame
+        videoRef.current.play().catch(e => console.warn("Autoplay blocked", e));
     }
   }, [stream]);
 
-  // Handle Speaker Output Change
   useEffect(() => {
     if (videoRef.current && audioOutputId && typeof videoRef.current.setSinkId === 'function') {
         videoRef.current.setSinkId(audioOutputId).catch(err => console.warn("Audio Sink Error:", err));
@@ -44,12 +38,12 @@ const VideoPlayer = ({ stream, isLocal, isMirrored, className, audioOutputId }) 
   }, [audioOutputId]);
 
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      muted={isLocal} // MUST be true for local video to autoplay without user gesture
-      playsInline
-      className={`${className} ${isMirrored ? "-scale-x-100" : ""}`} 
+    <video 
+        ref={videoRef} 
+        autoPlay 
+        muted={isLocal} 
+        playsInline 
+        className={`${className} ${isMirrored ? "-scale-x-100" : ""}`} 
     />
   );
 };
@@ -72,17 +66,14 @@ export default function VideoMeetComponent() {
   const socketIdRef = useRef(null);
   const connectionsRef = useRef({});
   
-  // --- STATE FOR RENDERING (Fixes Blank Screen) ---
+  // --- CRITICAL: State for UI Rendering, Ref for Logic ---
   const [localStream, setLocalStream] = useState(null); 
-  const localStreamRef = useRef(null); // Keep ref for logic usage
+  const localStreamRef = useRef(null);
 
   const displayStreamRef = useRef(null);
   const chatContainerRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioAnalysersRef = useRef({});
-
-  // Loading State
-  const [isConnecting, setIsConnecting] = useState(true);
 
   const [askForUsername, setAskForUsername] = useState(false);
   const [userName, setUsername] = useState(username || "Guest");
@@ -96,16 +87,18 @@ export default function VideoMeetComponent() {
   const [waitingUsers, setWaitingUsers] = useState([]);
   const [roomHostId, setRoomHostId] = useState(null);
 
+  // Settings
   const [showSettings, setShowSettings] = useState(false);
   const [devices, setDevices] = useState({ audioInputs: [], videoInputs: [], audioOutputs: [] });
   const [selectedDevices, setSelectedDevices] = useState({ audioInput: "", videoInput: "", audioOutput: "" });
   const [isAudioConnected, setIsAudioConnected] = useState(true);
 
-  const [viewMode, setViewMode] = useState("SPEAKER");
+  // Layout & Logic
+  const [viewMode, setViewMode] = useState("SPEAKER"); // Default to Speaker (Zoom style)
   const [activeSpeakerId, setActiveSpeakerId] = useState(null);
   const [pinnedUserId, setPinnedUserId] = useState(null);
   const [gridPage, setGridPage] = useState(0);
-  const GRID_PAGE_SIZE = 4;
+  const GRID_PAGE_SIZE = 4; // Max 4 per page
 
   const [showInfo, setShowInfo] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
@@ -132,24 +125,19 @@ export default function VideoMeetComponent() {
   /* --------------------- MEDIA --------------------- */
   const getMedia = async () => {
     try {
-      setIsConnecting(true);
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       
       // Apply initial toggles
       if (!video) stream.getVideoTracks().forEach(t => t.enabled = false);
       if (!audio) stream.getAudioTracks().forEach(t => t.enabled = false);
       
-      // --- CRITICAL: Set BOTH Ref and State ---
+      // Update Ref AND State
       localStreamRef.current = stream;
-      setLocalStream(stream); // Triggers re-render to show video
-      setIsConnecting(false);
+      setLocalStream(stream); 
 
       if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       await getDeviceList();
-    } catch (err) {
-      console.error("Media error:", err);
-      setIsConnecting(false);
-    }
+    } catch (err) { console.error("Media error:", err); }
   };
 
   const getDeviceList = async () => {
@@ -192,9 +180,7 @@ export default function VideoMeetComponent() {
               oldTrack.stop(); 
           }
           localStreamRef.current.addTrack(newTrack);
-          
-          // Update State to refresh UI
-          setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+          setLocalStream(new MediaStream(localStreamRef.current.getTracks())); // Refresh UI
 
           Object.values(connectionsRef.current).forEach(pc => {
               const sender = pc.getSenders().find(s => s.track && s.track.kind === (type === 'audioInput' ? 'audio' : 'video'));
@@ -217,7 +203,7 @@ export default function VideoMeetComponent() {
               const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: selectedDevices.audioInput ? { exact: selectedDevices.audioInput } : undefined } });
               const newTrack = stream.getAudioTracks()[0];
               localStreamRef.current.addTrack(newTrack);
-              setLocalStream(new MediaStream(localStreamRef.current.getTracks())); // Refresh UI
+              setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
 
               Object.values(connectionsRef.current).forEach(pc => {
                   const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
@@ -412,7 +398,7 @@ export default function VideoMeetComponent() {
 
       if(isLocal) { 
           user = { username: userName, isHandRaised: isHandRaised, isVideoOff: !video }; 
-          stream = localStream; // Use State variable
+          stream = localStream; // Use STATE stream
           isCamOff = !video; 
           displayName = `${userName} (You)`; 
           isThisHost = isHost; 
@@ -427,7 +413,6 @@ export default function VideoMeetComponent() {
 
       return (
           <div className="relative w-full h-full flex items-center justify-center bg-black/90">
-              {/* VIDEO */}
               {isCamOff ? (
                   <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center text-7xl font-bold text-white shadow-2xl">
                       {displayName.charAt(0).toUpperCase()}
@@ -435,7 +420,6 @@ export default function VideoMeetComponent() {
               ) : (
                   <VideoPlayer stream={stream} isLocal={isLocal} isMirrored={isLocal && !screen} className="max-w-full max-h-full object-contain shadow-2xl" audioOutputId={selectedDevices.audioOutput} />
               )}
-              {/* OVERLAYS */}
               <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3">
                   <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
                       {displayName}
@@ -560,12 +544,12 @@ export default function VideoMeetComponent() {
             <h2 className="text-2xl font-bold mb-6 text-center">Join Meeting</h2>
             <input className="bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg block w-full p-2.5 mb-6" placeholder="Enter name" value={userName} onChange={(e) => setUsername(e.target.value)} />
             
-            {/* --- FIX: Show Loading Spinner if media isn't ready --- */}
+            {/* --- LOADING STATE HANDLER --- */}
             <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
                 {localStream ? (
                     <VideoPlayer stream={localStream} isLocal={true} isMirrored={true} className="w-full h-full object-cover" />
                 ) : (
-                    <div className="text-gray-400 flex flex-col items-center"><Loader2 size={32} className="animate-spin mb-2"/> Loading Camera...</div>
+                    <div className="text-gray-400 flex flex-col items-center gap-2"><Loader2 size={32} className="animate-spin" /> Starting Camera...</div>
                 )}
             </div>
             
@@ -580,6 +564,7 @@ export default function VideoMeetComponent() {
 
       {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
         <div className="flex flex-col h-screen relative">
+          
           <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
             {viewMode === "GRID" ? renderPaginatedGrid() : (
                 <>
