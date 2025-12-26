@@ -46,28 +46,33 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
-// Room structure: { path: { users: [], waiting: [], hostId: string, passcode: string | null } }
+// Room structure: { path: { users: [], waiting: [], hostId: string, passcode: string, isLocked: boolean } }
 const rooms = {};
 
 io.on("connection", (socket) => {
   console.log("SOCKET CONNECTED::", socket.id);
 
   // Guest requests to join
-  // UPDATED: Destructure 'passcode' from the payload
   socket.on("request-join", ({ path, username, passcode }) => {
+    // 1. Check if room exists
     if (!rooms[path]) {
-      socket.emit("invalid-meeting"); // Tell client the meeting wasn't found
-      return; // Stop execution
+      socket.emit("invalid-meeting");
+      return;
     }
 
-    // --- PASSCODE CHECK START ---
     const room = rooms[path];
-    // If the room has a passcode set, and the user's passcode doesn't match
+
+    // 2. Check if Room is LOCKED (NEW FEATURE)
+    if (room.isLocked) {
+        socket.emit("meeting-locked");
+        return;
+    }
+
+    // 3. Check Passcode
     if (room.passcode && room.passcode !== passcode) {
       socket.emit("passcode-required");
-      return; // Stop execution here
+      return;
     }
-    // --- PASSCODE CHECK END ---
 
     rooms[path].waiting.push({
       socketId: socket.id,
@@ -81,20 +86,18 @@ io.on("connection", (socket) => {
     }
   });
 
-  // User joins the call (host or admitted guest)
-  // UPDATED: Destructure 'passcode' to allow Host to set it
+  // User joins the call
   socket.on("join-call", ({ path, username, passcode }) => {
     if (!rooms[path]) {
-      // If Host creates the room, save the passcode
       rooms[path] = { 
         users: [], 
         waiting: [], 
         hostId: socket.id, 
-        passcode: passcode || null 
+        passcode: passcode || null,
+        isLocked: false // <--- NEW: Init lock state
       }; 
     }
     
-    // If room exists but no host (Guest joined first), assign host and set passcode
     if (!rooms[path].hostId) {
       rooms[path].hostId = socket.id;
       if (passcode) rooms[path].passcode = passcode;
@@ -106,32 +109,71 @@ io.on("connection", (socket) => {
       socketId: socket.id,
       username: username || "Guest",
       isMuted: false,
-      isHandRaised: false,
+      isHandRaised: false
     };
 
     rooms[path].users.push(userData);
     socket.join(path);
     socket.roomPath = path;
 
-    // --- CRITICAL FIX: Prevent Connection Collisions ---
-    // 1. Tell the NEW user about existing users (so they can wait for calls)
+    // Send existing users to new user
     const otherUsers = rooms[path].users.filter(u => u.socketId !== socket.id);
     socket.emit("all-users", otherUsers);
 
-    // 2. Tell EXISTING users about the new user (so they can initiate calls)
+    // Send lock state to host
+    if(rooms[path].hostId === socket.id) {
+        socket.emit("lock-update", rooms[path].isLocked);
+    }
+
     socket.to(path).emit("user-joined", userData);
     
-    // Update host waiting list
     if (rooms[path].hostId === socket.id) {
       socket.emit("update-waiting-list", rooms[path].waiting);
     }
   });
 
-  // Host admits a user
+  // --- HOST ADMINISTRATION FEATURES ---
+
+  // 1. Toggle Meeting Lock
+  socket.on("toggle-lock", () => {
+      const room = rooms[socket.roomPath];
+      // Only allow if requester is the host
+      if(room && room.hostId === socket.id) {
+          room.isLocked = !room.isLocked;
+          // Notify Host (or everyone) about the status
+          io.to(socket.roomPath).emit("lock-update", room.isLocked); 
+      }
+  });
+
+  // 2. Remove (Kick) User
+  socket.on("kick-user", (targetSocketId) => {
+      const room = rooms[socket.roomPath];
+      if(room && room.hostId === socket.id) {
+          // Tell the specific user they are kicked
+          io.to(targetSocketId).emit("kicked");
+          
+          // Remove them from server records immediately so they disappear for others
+          const userIndex = room.users.findIndex(u => u.socketId === targetSocketId);
+          if (userIndex !== -1) {
+              room.users.splice(userIndex, 1);
+              io.to(socket.roomPath).emit("user-left", targetSocketId);
+          }
+      }
+  });
+
+  // 3. Mute All
+  socket.on("mute-all", () => {
+      const room = rooms[socket.roomPath];
+      if(room && room.hostId === socket.id) {
+          // Send "force-mute" to everyone EXCEPT the host
+          socket.to(socket.roomPath).emit("force-mute");
+      }
+  });
+
+  // --- EXISTING LISTENERS ---
+
   socket.on("admit-user", (targetSocketId) => {
-    const room = Object.values(rooms).find((r) =>
-      r.waiting.some((u) => u.socketId === targetSocketId)
-    );
+    const room = Object.values(rooms).find((r) => r.waiting.some((u) => u.socketId === targetSocketId));
     if (room) {
       room.waiting = room.waiting.filter((u) => u.socketId !== targetSocketId);
       io.to(targetSocketId).emit("admitted");
@@ -139,12 +181,10 @@ io.on("connection", (socket) => {
     }
   });
 
-  // WebRTC signaling
   socket.on("signal", (toId, message) => {
     io.to(toId).emit("signal", socket.id, message);
   });
 
-  // Audio toggle
   socket.on("toggle-audio", ({ isMuted }) => {
     const path = socket.roomPath;
     if (rooms[path]) {
@@ -156,34 +196,27 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Chat Event
-  socket.on("send-message", (data) => {
-    const path = socket.roomPath;
-    if (path) {
-      socket.to(path).emit("receive-message", data);
-    }
-  });
-
   socket.on("toggle-hand", ({ isRaised }) => {
     const path = socket.roomPath;
     if (rooms[path]) {
       const user = rooms[path].users.find((u) => u.socketId === socket.id);
       if (user) {
-        user.isHandRaised = isRaised; // Update server state
-        // Broadcast to everyone including sender (to confirm receipt)
+        user.isHandRaised = isRaised;
         io.to(path).emit("hand-toggled", { socketId: socket.id, isRaised });
       }
     }
   });
 
-  socket.on("send-emoji", ({ emoji }) => {
+  socket.on("send-message", (data) => {
     const path = socket.roomPath;
-    if (path) {
-      io.to(path).emit("emoji-received", { socketId: socket.id, emoji });
-    }
+    if (path) socket.to(path).emit("receive-message", data);
   });
 
-  // Disconnect handling
+  socket.on("send-emoji", ({ emoji }) => {
+    const path = socket.roomPath;
+    if (path) io.to(path).emit("emoji-received", { socketId: socket.id, emoji });
+  });
+
   socket.on("disconnect", () => {
     for (const path in rooms) {
       const room = rooms[path];
@@ -191,7 +224,6 @@ io.on("connection", (socket) => {
       
       if (userIndex !== -1) {
         room.users.splice(userIndex, 1);
-        // Only notify others if user was actually in the call
         socket.to(path).emit("user-left", socket.id); 
 
         if (room.hostId === socket.id && room.users.length > 0) {
