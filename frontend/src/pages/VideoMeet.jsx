@@ -6,7 +6,7 @@ import {
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
   Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
   Lock, Hand, Smile, Unlock, Trash2, Pin, Settings, Volume2, Power, Crown,
-  ChevronLeft, ChevronRight, Loader2, UserCog // Added UserCog
+  ChevronLeft, ChevronRight, Loader2, UserCog, MoreHorizontal // Changed MoreVertical to MoreHorizontal
 } from "lucide-react";
 import server from "../environment";
 
@@ -19,7 +19,6 @@ const peerConfig = {
   ],
 };
 
-// Stable Video Component
 const VideoPlayer = ({ stream, isLocal, isMirrored, className, audioOutputId }) => {
   const videoRef = useRef(null);
   useEffect(() => {
@@ -47,7 +46,7 @@ export default function VideoMeetComponent() {
     isAudioOn = true,
     isVideoOn = true,
     username = "Guest",
-    isHost = false, // Initial host state from navigation
+    isHost = false,
     passcode = null 
   } = location.state || {};
 
@@ -55,7 +54,7 @@ export default function VideoMeetComponent() {
   const socketIdRef = useRef(null);
   const connectionsRef = useRef({});
   const localStreamRef = useRef(null);
-  const [localStream, setLocalStream] = useState(null); // Render State
+  const [localStream, setLocalStream] = useState(null);
   
   const displayStreamRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -74,7 +73,6 @@ export default function VideoMeetComponent() {
   const [waitingUsers, setWaitingUsers] = useState([]);
   const [roomHostId, setRoomHostId] = useState(null);
 
-  // Helper to determine if I am the host DYNAMICALLY
   const amIHost = roomHostId && socketIdRef.current ? roomHostId === socketIdRef.current : isHost;
 
   const [showSettings, setShowSettings] = useState(false);
@@ -85,7 +83,6 @@ export default function VideoMeetComponent() {
   const [viewMode, setViewMode] = useState("GRID");
   const [activeSpeakerId, setActiveSpeakerId] = useState(null);
   const [pinnedUserId, setPinnedUserId] = useState(null);
-  
   const [gridPage, setGridPage] = useState(0);
   const GRID_PAGE_SIZE = 4;
 
@@ -133,6 +130,7 @@ export default function VideoMeetComponent() {
               videoInputs: deviceInfos.filter(d => d.kind === 'videoinput'),
               audioOutputs: deviceInfos.filter(d => d.kind === 'audiooutput')
           });
+          // Set initial selection logic here if needed
       } catch (err) { console.error("Error fetching devices:", err); }
   };
 
@@ -272,11 +270,11 @@ export default function VideoMeetComponent() {
     socketRef.current.on("invalid-meeting", () => { alert("Meeting not found!"); cleanupAndLeave(); });
     socketRef.current.on("meeting-ended", () => { if (!amIHost) { alert("The host has ended the meeting."); cleanupAndLeave(); } });
     
-    // --- AUDIO FIX: Ensuring track isn't stopped, just disabled ---
+    // Audio Fix
     socketRef.current.on("force-mute", () => { 
         if (localStreamRef.current) { 
             const t = localStreamRef.current.getAudioTracks()[0]; 
-            if(t) t.enabled = false; // Only disable
+            if(t) t.enabled = false; 
             setAudio(false); 
             socketRef.current.emit("toggle-audio", { isMuted: true }); 
         } 
@@ -315,7 +313,6 @@ export default function VideoMeetComponent() {
   const handleSubmitPasscode = (e) => { e.preventDefault(); if(passcodeInput.trim()) { setShowPasscodeModal(false); setPasscodeError(false); connectSocket(); } };
   const handleToggleLock = () => { socketRef.current.emit("toggle-lock"); if(isMobile) setShowMobileMenu(false); };
   
-  // NEW: Transfer Host Function
   const handleTransferHost = (targetId) => {
       if(window.confirm("Make this user the Host? You will lose admin controls.")) {
           socketRef.current.emit("transfer-host", targetId);
@@ -339,13 +336,11 @@ export default function VideoMeetComponent() {
 
   const handleVideo = () => { const track = localStreamRef.current?.getVideoTracks()[0]; if (track) { track.enabled = !video; setVideo(!video); socketRef.current.emit("toggle-video", { isVideoOff: video }); } };
   
-  // --- AUDIO FIX: FORCE ENABLE ---
   const handleAudio = () => { 
       if (!isAudioConnected) { setShowSettings(true); return; } 
       const track = localStreamRef.current?.getAudioTracks()[0]; 
       if (track) { 
-          // If we are currently muted (audio is false), we want to unmute (true)
-          // We explicitly set track.enabled to the target state
+          // Explicitly set the enabled state based on desired action
           track.enabled = !audio; 
           setAudio(!audio); 
           socketRef.current.emit("toggle-audio", { isMuted: audio }); 
@@ -359,7 +354,7 @@ export default function VideoMeetComponent() {
   useEffect(() => { getMedia().then(() => { if (bypassLobby || (username && username !== "Guest")) connectSocket(); else setAskForUsername(true); }); return () => { if(localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop()); if(socketRef.current) socketRef.current.disconnect(); if(audioContextRef.current) audioContextRef.current.close(); }; }, []);
   useEffect(() => { if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight; if (!showChat && messages.length > 0 && !messages[messages.length - 1].isMe) setUnreadMessages(prev => prev + 1); }, [messages]);
   useEffect(() => { if (showChat) setUnreadMessages(0); }, [showChat]);
-  useEffect(() => { const checkMobile = () => setIsMobile(/Mobi|Android|iPhone/i.test(navigator.userAgent)); checkMobile(); window.addEventListener('resize', checkMobile); return () => window.removeEventListener('resize', checkMobile); }, []);
+  useEffect(() => { const checkMobile = () => setIsMobile(/Mobi|Android|iPhone/i.test(navigator.userAgent) || window.innerWidth < 768); checkMobile(); window.addEventListener('resize', checkMobile); return () => window.removeEventListener('resize', checkMobile); }, []);
   const connect = () => { setAskForUsername(false); connectSocket(); };
   
   const handleMouseDown = (e) => {
@@ -557,33 +552,61 @@ export default function VideoMeetComponent() {
             )}
           </div>
 
-          <div className="h-16 md:h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-center z-20 px-2 md:px-4 gap-2 md:gap-4 relative">
-             <button onClick={() => setShowSettings(true)} className="hidden md:block p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 absolute left-4"><Settings size={24} /></button>
-             <button onClick={handleAudio} className={`p-3 md:p-4 rounded-full transition-all ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={20} className="md:w-6 md:h-6" /> : <MicOff size={20} className="md:w-6 md:h-6" />}</button>
-             <button onClick={handleVideo} className={`p-3 md:p-4 rounded-full transition-all ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={20} className="md:w-6 md:h-6" /> : <VideoOff size={20} className="md:w-6 md:h-6" />}</button>
-             <button onClick={handleToggleHand} className={`hidden md:block p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700 text-white'}`}><Hand size={24} /></button>
-             <div className="hidden md:block relative"><button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"><Smile size={24} /></button>{showEmojiPicker && ( <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">{EMOJI_LIST.map(emoji => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-2xl hover:scale-125 transition-transform p-1">{emoji}</button>))}</div> )}</div>
-             <button onClick={handleScreen} className={`hidden md:block p-3 md:p-4 rounded-full ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>{screen ? <MonitorOff size={20} className="md:w-6 md:h-6" /> : <ScreenShare size={20} className="md:w-6 md:h-6" />}</button>
-             <button onClick={handleEndCall} className="p-3 md:p-4 rounded-full bg-red-600 text-white"><PhoneOff size={20} className="md:w-6 md:h-6" /></button>
-             <button onClick={() => setShowMobileMenu(!showMobileMenu)} className="md:hidden p-3 rounded-full bg-neutral-700 text-white relative"><MoreVertical size={20} /></button>
-             <div className="hidden md:flex absolute right-6 gap-3"><button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button><button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative"><Users size={24} />{amIHost && waitingUsers && waitingUsers.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingUsers.length}</span>}</button><button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</button></div>
-             
-             {showMobileMenu && (
-                 <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden">
-                    <button onClick={() => {setShowSettings(true); setShowMobileMenu(false);}} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-white"><Settings size={20} /> Settings</button>
-                    <div className="h-px bg-neutral-700 my-1"></div>
-                    <button onClick={handleToggleHand} className={`flex items-center gap-3 p-3 rounded-lg ${isHandRaised ? 'bg-yellow-500 text-black' : 'hover:bg-neutral-700 text-white'}`}><Hand size={20} /> <span>{isHandRaised ? "Lower Hand" : "Raise Hand"}</span></button>
-                    <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPEAKER" : "GRID"); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-white"><LayoutDashboard size={20} /> Change Layout</button>
-                    <div className="p-2 bg-neutral-900 rounded-lg flex justify-between">{EMOJI_LIST.map(emoji => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-xl p-1 hover:scale-125 transition-transform">{emoji}</button>))}</div>
-                    <div className="h-px bg-neutral-700 my-1"></div>
-                    {amIHost && (<><button onClick={handleMuteAll} className="flex items-center gap-3 p-3 rounded-lg text-red-400 hover:bg-neutral-700"><MicOff size={20} /> Mute All</button><button onClick={handleStopVideoAll} className="flex items-center gap-3 p-3 rounded-lg text-red-400 hover:bg-neutral-700"><VideoOff size={20} /> Stop Video</button><button onClick={handleToggleLock} className="flex items-center gap-3 p-3 rounded-lg text-white hover:bg-neutral-700">{isMeetingLocked ? <Lock size={20} /> : <Unlock size={20} />} {isMeetingLocked ? "Unlock" : "Lock"}</button><div className="h-px bg-neutral-700 my-1"></div></>)}
-                    <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-white"><ScreenShare size={20} /> Share Screen</button>
-                    <button onClick={() => { setShowChat(!showChat); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative text-white"><div className="relative"><MessageSquare size={20} />{unreadMessages > 0 && <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</div><span>Chat</span></button>
-                    <button onClick={() => { setShowParticipants(!showParticipants); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 relative text-white"><div className="relative"><Users size={20} />{amIHost && waitingUsers && waitingUsers.length > 0 && <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{waitingUsers.length}</span>}</div><span>Participants</span></button>
-                    <button onClick={() => { setShowInfo(!showInfo); setShowMobileMenu(false); }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-700 text-white"><Info size={20} /> Info</button>
-                 </div>
-             )}
+          {/* DESKTOP FOOTER */}
+          <div className="hidden md:flex h-20 bg-neutral-900 border-t border-neutral-800 items-center justify-center z-20 px-4 gap-4 relative">
+             <button onClick={() => setShowSettings(true)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 absolute left-4"><Settings size={24} /></button>
+             <button onClick={handleAudio} className={`p-4 rounded-full transition-all ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</button>
+             <button onClick={handleVideo} className={`p-4 rounded-full transition-all ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</button>
+             <button onClick={handleToggleHand} className={`p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700 text-white'}`}><Hand size={24} /></button>
+             <div className="relative"><button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"><Smile size={24} /></button>{showEmojiPicker && ( <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">{EMOJI_LIST.map(emoji => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-2xl hover:scale-125 transition-transform p-1">{emoji}</button>))}</div> )}</div>
+             <button onClick={handleScreen} className={`p-4 rounded-full ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>{screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}</button>
+             <button onClick={handleEndCall} className="p-4 rounded-full bg-red-600 text-white"><PhoneOff size={24} /></button>
+             <div className="absolute right-6 gap-3 flex">
+               <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
+               <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative"><Users size={24} />{amIHost && waitingUsers && waitingUsers.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingUsers.length}</span>}</button>
+               <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</button>
+             </div>
           </div>
+
+          {/* MOBILE SLIDER (FOOTER) */}
+          <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center overflow-x-auto px-4 gap-4 no-scrollbar z-50">
+             <button onClick={handleAudio} className={`flex-shrink-0 p-4 rounded-full ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</button>
+             <button onClick={handleVideo} className={`flex-shrink-0 p-4 rounded-full ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</button>
+             <button onClick={handleToggleHand} className={`flex-shrink-0 p-4 rounded-full ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700'}`}><Hand size={24} /></button>
+             <button onClick={() => setShowChat(!showChat)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
+             <button onClick={() => setShowParticipants(!showParticipants)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"><Users size={24} />{amIHost && waitingUsers.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
+             
+             {/* Host Controls Inline for Mobile */}
+             {amIHost && (
+                 <>
+                    <button onClick={handleMuteAll} className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"><MicOff size={24} /></button>
+                    <button onClick={handleStopVideoAll} className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"><VideoOff size={24} /></button>
+                    <button onClick={handleToggleLock} className={`flex-shrink-0 p-4 rounded-full ${isMeetingLocked ? 'bg-red-500' : 'bg-neutral-700'}`}>{isMeetingLocked ? <Lock size={24} /> : <Unlock size={24} />}</button>
+                 </>
+             )}
+
+             <button onClick={() => setShowMobileMenu(true)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700"><MoreHorizontal size={24} /></button>
+             <button onClick={handleEndCall} className="flex-shrink-0 p-4 rounded-full bg-red-600 ml-auto"><PhoneOff size={24} /></button>
+          </div>
+             
+          {showMobileMenu && (
+             <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowMobileMenu(false)}>
+                 <div className="bg-neutral-900 w-full rounded-t-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-lg">More Options</h3><button onClick={() => setShowMobileMenu(false)}><X size={24} /></button></div>
+                    <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><ScreenShare size={24} /> Share Screen</button>
+                    <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPEAKER" : "GRID"); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><LayoutDashboard size={24} /> Change Layout</button>
+                    <button onClick={() => { setShowSettings(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Settings size={24} /> Settings</button>
+                    <button onClick={() => { setShowInfo(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Info size={24} /> Meeting Info</button>
+                    
+                    {/* Emoji Bar Mobile */}
+                    <div className="flex justify-between bg-neutral-800 p-4 rounded-xl">
+                        {EMOJI_LIST.map(emoji => (
+                            <button key={emoji} onClick={() => { handleSendEmoji(emoji); setShowMobileMenu(false); }} className="text-3xl hover:scale-125 transition-transform">{emoji}</button>
+                        ))}
+                    </div>
+                 </div>
+             </div>
+          )}
 
           {showParticipants && (
             <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
@@ -601,14 +624,12 @@ export default function VideoMeetComponent() {
                                     <div className={u.isVideoOff ? "text-red-500" : "text-gray-400"}>{u.isVideoOff ? <VideoOff size={14} /> : <Video size={14} />}</div>
                                     <div className={u.isMuted ? "text-red-500" : "text-gray-400"}>{u.isMuted ? <MicOff size={14} /> : <Mic size={14} />}</div>
                                     
-                                    {/* --- NEW: Transfer Host Button --- */}
                                     {amIHost && (
-                                        <button onClick={() => handleTransferHost(u.socketId)} className="text-gray-500 hover:text-blue-500 transition-colors" title="Make Host">
-                                            <UserCog size={14} />
-                                        </button>
+                                        <>
+                                            <button onClick={() => handleTransferHost(u.socketId)} className="text-gray-500 hover:text-blue-500 transition-colors" title="Make Host"><UserCog size={14} /></button>
+                                            <button onClick={() => handleKickUser(u.socketId)} className="text-gray-500 hover:text-red-500 transition-colors" title="Remove"><Trash2 size={14} /></button>
+                                        </>
                                     )}
-
-                                    {amIHost && (<button onClick={() => handleKickUser(u.socketId)} className="text-gray-500 hover:text-red-500 transition-colors" title="Remove"><Trash2 size={14} /></button>)}
                                 </div>
                             </div>
                         );
