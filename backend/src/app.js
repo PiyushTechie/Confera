@@ -156,10 +156,26 @@ io.on("connection", (socket) => {
   socket.on("mute-all", () => {
       const room = rooms[socket.roomPath];
       if(room && room.hostId === socket.id) {
-          // Tell everyone EXCEPT host to mute
           socket.to(socket.roomPath).emit("force-mute");
       }
   });
+
+  socket.on("end-meeting-for-all", () => {
+      const path = socket.roomPath;
+      const room = rooms[path];
+      
+      // Verify it is the host requesting
+      if(room && room.hostId === socket.id) {
+          // Notify everyone in the room (including the host, though host handles it locally)
+          io.to(path).emit("meeting-ended");
+          
+          // clear the room data effectively closing it
+          delete rooms[path];
+          console.log(`Meeting ${path} ended by host`);
+      }
+  });
+
+
 
   // Stop Video All (New)
   socket.on("stop-video-all", () => {
