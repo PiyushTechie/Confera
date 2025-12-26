@@ -5,7 +5,7 @@ import {
   Mic, MicOff, Video, VideoOff, ScreenShare, MonitorOff,
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
   Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
-  Lock, Hand, Smile, Unlock, Trash2
+  Lock, Hand, Smile, Unlock, Trash2, Zap // Zap icon for "Auto Spotlight"
 } from "lucide-react";
 import server from "../environment";
 
@@ -18,6 +18,7 @@ const peerConfig = {
   ],
 };
 
+// Stable Video Player
 const VideoPlayer = ({ stream, isLocal, isMirrored, className }) => {
   const videoRef = useRef(null);
   useEffect(() => {
@@ -47,6 +48,10 @@ export default function VideoMeetComponent() {
   const displayStreamRef = useRef(null);
   const chatContainerRef = useRef(null);
 
+  // Audio Analysis Refs
+  const audioContextRef = useRef(null);
+  const audioAnalysersRef = useRef({}); // { socketId: analyserNode }
+
   const [askForUsername, setAskForUsername] = useState(false);
   const [userName, setUsername] = useState(username || "");
   const [video, setVideo] = useState(isVideoOn ?? true);
@@ -58,8 +63,14 @@ export default function VideoMeetComponent() {
   const [isInWaitingRoom, setIsInWaitingRoom] = useState(false);
   const [waitingUsers, setWaitingUsers] = useState([]);
 
+  const pendingIce = useRef({});
+
+  // View States
   const [viewMode, setViewMode] = useState("GRID");
   const [spotlightId, setSpotlightId] = useState(null);
+  const [isAutoSpotlight, setIsAutoSpotlight] = useState(true); // <--- NEW: Auto Spotlight Toggle
+  const [activeSpeakerId, setActiveSpeakerId] = useState(null); // <--- NEW: Track who is talking
+
   const [showInfo, setShowInfo] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -74,15 +85,11 @@ export default function VideoMeetComponent() {
   const [currentMessage, setCurrentMessage] = useState("");
   const [unreadMessages, setUnreadMessages] = useState(0);
 
-  // Host Controls
   const [isMeetingLocked, setIsMeetingLocked] = useState(false);
-
-  // Passcode
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState("");
   const [passcodeError, setPasscodeError] = useState(false);
 
-  // Features
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojis, setActiveEmojis] = useState({});
@@ -96,15 +103,81 @@ export default function VideoMeetComponent() {
       stream.getVideoTracks()[0].enabled = video;
       stream.getAudioTracks()[0].enabled = audio;
       localStreamRef.current = stream;
+      
+      // Initialize Audio Context for Speaker Detection
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
     } catch (err) {
       console.error("Media error:", err);
     }
   };
 
+  /* ------------------ ACTIVE SPEAKER LOGIC ------------------ */
+  // 1. Setup Analysers when videos change
+  useEffect(() => {
+    if (!audioContextRef.current) return;
+
+    videos.forEach((v) => {
+      // If we don't have an analyser for this user yet, create one
+      if (!audioAnalysersRef.current[v.socketId] && v.stream.getAudioTracks().length > 0) {
+        try {
+            const source = audioContextRef.current.createMediaStreamSource(v.stream);
+            const analyser = audioContextRef.current.createAnalyser();
+            analyser.fftSize = 512;
+            source.connect(analyser);
+            audioAnalysersRef.current[v.socketId] = analyser;
+        } catch (e) {
+            console.error("Audio Context Error:", e);
+        }
+      }
+    });
+  }, [videos]);
+
+  // 2. Monitoring Loop
+  useEffect(() => {
+    const interval = setInterval(() => {
+        if (!audioContextRef.current) return;
+
+        let maxVolume = 0;
+        let loudestSpeaker = null;
+
+        Object.entries(audioAnalysersRef.current).forEach(([socketId, analyser]) => {
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate average volume
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const volume = sum / dataArray.length;
+
+            // Threshold (adjust 10-30 depending on sensitivity)
+            if (volume > 20 && volume > maxVolume) {
+                maxVolume = volume;
+                loudestSpeaker = socketId;
+            }
+        });
+
+        // Update State if changed
+        if (loudestSpeaker && loudestSpeaker !== activeSpeakerId) {
+            setActiveSpeakerId(loudestSpeaker);
+            
+            // Auto Switch Spotlight if enabled
+            if (isAutoSpotlight && viewMode === "SPOTLIGHT") {
+                setSpotlightId(loudestSpeaker);
+            }
+        }
+    }, 500); // Check every 500ms
+
+    return () => clearInterval(interval);
+  }, [activeSpeakerId, isAutoSpotlight, viewMode]);
+
+
   /* ------------------ HELPERS ------------------ */
   const cleanupAndLeave = () => {
     if(localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
     if(displayStreamRef.current) displayStreamRef.current.getTracks().forEach(t => t.stop());
+    if(audioContextRef.current) audioContextRef.current.close();
     Object.values(connectionsRef.current).forEach(pc => pc.close());
     if(socketRef.current) socketRef.current.disconnect();
     navigate("/");
@@ -405,7 +478,7 @@ export default function VideoMeetComponent() {
     if (track) { 
         track.enabled = !video; 
         setVideo(!video);
-        socketRef.current.emit("toggle-video", { isVideoOff: video }); // if video (true), we set off (true)
+        socketRef.current.emit("toggle-video", { isVideoOff: video }); 
     }
   };
 
@@ -419,7 +492,13 @@ export default function VideoMeetComponent() {
   };
 
   const handleAdmit = (socketId) => socketRef.current.emit("admit-user", socketId);
-  const handleTileClick = (id) => { setSpotlightId(id); setViewMode("SPOTLIGHT"); };
+  
+  // Updated: If user clicks a tile, turn OFF auto-spotlight
+  const handleTileClick = (id) => { 
+      setSpotlightId(id); 
+      setViewMode("SPOTLIGHT");
+      setIsAutoSpotlight(false); // Manual override
+  };
   
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -435,24 +514,16 @@ export default function VideoMeetComponent() {
     return () => {
         if(localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
         if(socketRef.current) socketRef.current.disconnect();
+        if(audioContextRef.current) audioContextRef.current.close();
     };
   }, []);
 
   useEffect(() => {
     if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    if (!showChat && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (!lastMsg.isMe) {
-        setUnreadMessages(prev => prev + 1);
-      }
-    }
+    if (!showChat && messages.length > 0 && !messages[messages.length - 1].isMe) setUnreadMessages(prev => prev + 1);
   }, [messages]);
 
-  useEffect(() => {
-    if (showChat) {
-      setUnreadMessages(0);
-    }
-  }, [showChat]);
+  useEffect(() => { if (showChat) setUnreadMessages(0); }, [showChat]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(/Mobi|Android|iPhone/i.test(navigator.userAgent));
@@ -481,27 +552,24 @@ export default function VideoMeetComponent() {
     const displayName = user?.username || "Guest";
     const handRaised = user?.isHandRaised || false;
     const cameraOff = user?.isVideoOff || false;
+    
+    // NEW: Active Speaker Border
+    const isActiveSpeaker = socketId === activeSpeakerId && !isLocal;
 
     return (
       <div 
         key={socketId} 
         onClick={() => handleTileClick(socketId === socketRef.current?.id ? "local" : socketId)} 
-        className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 cursor-pointer w-full md:max-w-xl aspect-video transition-all ${handRaised ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : 'border-neutral-700'}`}
+        className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 cursor-pointer w-full md:max-w-xl aspect-video transition-all ${handRaised ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)]' : isActiveSpeaker ? 'border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'border-neutral-700'}`}
       >
-          {/* --- VIDEO OR AVATAR --- */}
           {cameraOff ? (
-              <div className="w-full h-full flex items-center justify-center bg-neutral-900">
-                  <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
+              <div className="w-full h-full flex items-center justify-center bg-neutral-800">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
                       {displayName.charAt(0).toUpperCase()}
                   </div>
               </div>
           ) : (
-              <VideoPlayer 
-                stream={stream} 
-                isLocal={isLocal} 
-                isMirrored={isLocal && !screen} 
-                className="w-full h-full object-cover" 
-              />
+              <VideoPlayer stream={stream} isLocal={isLocal} isMirrored={isLocal && !screen} className="w-full h-full object-cover" />
           )}
 
           <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs flex items-center gap-2">
@@ -560,10 +628,9 @@ export default function VideoMeetComponent() {
             {viewMode === "SPOTLIGHT" && spotlightId && (
               <div className="flex-1 flex items-center justify-center p-4 bg-neutral-900">
                   <div className="relative w-full h-full flex items-center justify-center">
-                      {/* SPOTLIGHT VIDEO OR AVATAR */}
                       {(spotlightId === "local" ? !video : userMap[spotlightId]?.isVideoOff) ? (
                           <div className="w-full h-full flex items-center justify-center bg-neutral-800 rounded-xl">
-                              <div className="w-32 h-32 rounded-full bg-blue-600 flex items-center justify-center text-6xl font-bold text-white shadow-2xl">
+                              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-6xl font-bold text-white shadow-2xl">
                                   {(spotlightId === "local" ? userName : userMap[spotlightId]?.username || "Guest").charAt(0).toUpperCase()}
                               </div>
                           </div>
@@ -595,11 +662,30 @@ export default function VideoMeetComponent() {
             </div>
           </div>
           
-          {/* Footer Controls (Same as before) */}
+          {/* Spotlight Overlays */}
+          {viewMode === "SPOTLIGHT" && spotlightId !== "local" && (
+            <div className="absolute w-32 md:w-48 aspect-video bg-neutral-800 rounded-lg overflow-hidden shadow-2xl border border-neutral-700 z-50 bottom-24 right-4 md:right-6">
+               <VideoPlayer stream={localStreamRef.current} isLocal={true} isMirrored={!screen} className="w-full h-full object-cover" />
+               <div className="absolute bottom-1 left-1 bg-black/50 px-1 rounded text-[10px]">You</div>
+            </div>
+          )}
+          {viewMode === "SPOTLIGHT" && spotlightId === "local" && (
+            <div className="absolute w-32 md:w-48 aspect-video bg-neutral-800 rounded-lg overflow-hidden shadow-2xl border border-neutral-700 z-50 cursor-move" style={{ left: `${position.x}px`, top: `${position.y}px` }} onMouseDown={handleMouseDown}>
+               <VideoPlayer stream={localStreamRef.current} isLocal={true} isMirrored={!screen} className="w-full h-full object-cover pointer-events-none" />
+            </div>
+          )}
+
+          {/* Footer Controls */}
           <div className="h-16 md:h-20 bg-neutral-900 border-t border-neutral-800 flex items-center justify-center z-20 px-2 md:px-4 gap-2 md:gap-4 relative">
              <button onClick={handleAudio} className={`p-3 md:p-4 rounded-full transition-all ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={20} className="md:w-6 md:h-6" /> : <MicOff size={20} className="md:w-6 md:h-6" />}</button>
              <button onClick={handleVideo} className={`p-3 md:p-4 rounded-full transition-all ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={20} className="md:w-6 md:h-6" /> : <VideoOff size={20} className="md:w-6 md:h-6" />}</button>
              <button onClick={handleToggleHand} className={`hidden md:block p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700 text-white'}`}><Hand size={24} /></button>
+             
+             {/* NEW: Auto Spotlight Button */}
+             <button onClick={() => { setIsAutoSpotlight(!isAutoSpotlight); setViewMode("SPOTLIGHT"); }} className={`hidden md:block p-4 rounded-full transition-all ${isAutoSpotlight ? 'bg-green-600 text-white' : 'bg-neutral-700 text-gray-400'}`} title={isAutoSpotlight ? "Auto Spotlight ON" : "Auto Spotlight OFF"}>
+                <Zap size={24} />
+             </button>
+
              <div className="hidden md:block relative">
                 <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"><Smile size={24} /></button>
                 {showEmojiPicker && (
@@ -621,6 +707,7 @@ export default function VideoMeetComponent() {
              {showMobileMenu && (
                  <div className="absolute bottom-24 right-4 w-64 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl p-2 flex flex-col gap-2 z-40 md:hidden">
                     <button onClick={handleToggleHand} className={`flex items-center gap-3 p-3 rounded-lg ${isHandRaised ? 'bg-yellow-500 text-black' : 'hover:bg-neutral-700 text-white'}`}><Hand size={20} /> <span>{isHandRaised ? "Lower Hand" : "Raise Hand"}</span></button>
+                    <button onClick={() => { setIsAutoSpotlight(!isAutoSpotlight); setViewMode("SPOTLIGHT"); setShowMobileMenu(false); }} className={`flex items-center gap-3 p-3 rounded-lg ${isAutoSpotlight ? 'bg-green-600 text-white' : 'hover:bg-neutral-700 text-gray-400'}`}><Zap size={20} /> Auto Spotlight</button>
                     <div className="p-2 bg-neutral-900 rounded-lg flex justify-between">{EMOJI_LIST.map(emoji => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-xl p-1 hover:scale-125 transition-transform">{emoji}</button>))}</div>
                     <div className="h-px bg-neutral-700 my-1"></div>
                     {isHost && (
@@ -652,6 +739,7 @@ export default function VideoMeetComponent() {
                     <button onClick={() => setShowParticipants(false)}><X size={20} /></button>
                 </div>
                 <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+                    {/* Waiting Room */}
                     {isHost && waitingUsers && waitingUsers.length > 0 && (
                         <div className="pb-4 border-b border-neutral-700">
                             <h4 className="text-xs font-bold text-yellow-500 uppercase mb-3">Waiting</h4>
@@ -687,32 +775,11 @@ export default function VideoMeetComponent() {
             </div>
           )}
           
-          {showChat && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
-               <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold">Chat</h3><button onClick={() => setShowChat(false)}><X size={20} /></button></div>
-               <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map((msg, i) => (
-                      <div key={i} className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}>
-                          <div className="text-xs text-gray-400 mb-1">{msg.sender}</div>
-                          <div className={`px-4 py-2 rounded-lg text-sm ${msg.isMe ? "bg-blue-600" : "bg-neutral-700"}`}>{msg.text}</div>
-                      </div>
-                  ))}
-               </div>
-               <div className="p-4 bg-neutral-900 border-t border-neutral-700">
-                  <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2">
-                      <input className="flex-1 bg-neutral-700 rounded-lg p-2 text-sm" value={currentMessage} onChange={e => setCurrentMessage(e.target.value)} placeholder="Type..." />
-                      <button type="submit" className="p-2 bg-blue-600 rounded-lg"><Send size={18} /></button>
-                  </form>
-               </div>
-            </div>
-          )}
-          
           {showInfo && (
               <div className="absolute bottom-20 right-4 w-72 bg-neutral-800 rounded-xl border border-neutral-700 shadow-2xl z-30 p-4">
                   <div className="flex justify-between items-center mb-4"><h3 className="font-bold">Info</h3><button onClick={() => setShowInfo(false)}><X size={18} /></button></div>
                   <div className="space-y-4">
                       <div><label className="text-xs text-gray-400">Code</label><div className="flex items-center gap-2 font-mono font-bold text-lg">{meetingCode} <button onClick={handleCopyLink} className="text-blue-400"><Copy size={16}/></button></div></div>
-                      
                       {isHost && (
                           <div className="pt-2 border-t border-neutral-700">
                               <button onClick={handleToggleLock} className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium ${isMeetingLocked ? 'bg-red-500/20 text-red-500' : 'bg-neutral-700 text-white'}`}>
@@ -721,7 +788,6 @@ export default function VideoMeetComponent() {
                               </button>
                           </div>
                       )}
-                      
                       <button onClick={handleCopyLink} className="w-full bg-blue-600 py-2 rounded-lg text-sm font-medium">Copy Invite Link</button>
                   </div>
               </div>
