@@ -46,14 +46,15 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
-// Room structure: { path: { users: [], waiting: [], hostId: string, passcode: string, isLocked: boolean } }
+// Room structure
 const rooms = {};
 
 io.on("connection", (socket) => {
   console.log("SOCKET CONNECTED::", socket.id);
 
-  // Guest requests to join
+  // 1. GUEST JOIN REQUEST
   socket.on("request-join", ({ path, username, passcode }) => {
+    // If room doesn't exist, reject
     if (!rooms[path]) {
       socket.emit("invalid-meeting");
       return;
@@ -61,11 +62,13 @@ io.on("connection", (socket) => {
 
     const room = rooms[path];
 
+    // Check Lock Status
     if (room.isLocked) {
         socket.emit("meeting-locked");
         return;
     }
 
+    // Check Passcode
     if (room.passcode && room.passcode !== passcode) {
       socket.emit("passcode-required");
       return;
@@ -83,7 +86,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // User joins the call
+  // 2. JOIN CALL (Host or Admitted Guest)
   socket.on("join-call", ({ path, username, passcode }) => {
     if (!rooms[path]) {
       rooms[path] = { 
@@ -91,7 +94,7 @@ io.on("connection", (socket) => {
         waiting: [], 
         hostId: socket.id, 
         passcode: passcode || null,
-        isLocked: false
+        isLocked: false // Default unlocked
       }; 
     }
     
@@ -105,8 +108,8 @@ io.on("connection", (socket) => {
     const userData = {
       socketId: socket.id,
       username: username || "Guest",
-      isMuted: false,     // Default: Mic On
-      isVideoOff: false,  // Default: Video On (New)
+      isMuted: false,
+      isVideoOff: false,
       isHandRaised: false
     };
 
@@ -114,14 +117,11 @@ io.on("connection", (socket) => {
     socket.join(path);
     socket.roomPath = path;
 
-    // Send existing users to new user
     const otherUsers = rooms[path].users.filter(u => u.socketId !== socket.id);
     socket.emit("all-users", otherUsers);
 
-    // Send lock state to host
-    if(rooms[path].hostId === socket.id) {
-        socket.emit("lock-update", rooms[path].isLocked);
-    }
+    // Sync Lock State with new user (especially if it's the host rejoining)
+    socket.emit("lock-update", rooms[path].isLocked);
 
     socket.to(path).emit("user-joined", userData);
     
@@ -130,13 +130,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  // --- HOST ADMINISTRATION FEATURES ---
+  // --- HOST CONTROLS ---
 
   socket.on("toggle-lock", () => {
       const room = rooms[socket.roomPath];
       if(room && room.hostId === socket.id) {
           room.isLocked = !room.isLocked;
+          // Important: Broadcast to the specific room path
           io.to(socket.roomPath).emit("lock-update", room.isLocked); 
+          console.log(`Room ${socket.roomPath} lock status: ${room.isLocked}`);
       }
   });
 
@@ -152,7 +154,6 @@ io.on("connection", (socket) => {
       }
   });
 
-  // Mute All
   socket.on("mute-all", () => {
       const room = rooms[socket.roomPath];
       if(room && room.hostId === socket.id) {
@@ -160,33 +161,23 @@ io.on("connection", (socket) => {
       }
   });
 
-  socket.on("end-meeting-for-all", () => {
-      const path = socket.roomPath;
-      const room = rooms[path];
-      
-      // Verify it is the host requesting
-      if(room && room.hostId === socket.id) {
-          // Notify everyone in the room (including the host, though host handles it locally)
-          io.to(path).emit("meeting-ended");
-          
-          // clear the room data effectively closing it
-          delete rooms[path];
-          console.log(`Meeting ${path} ended by host`);
-      }
-  });
-
-
-
-  // Stop Video All (New)
   socket.on("stop-video-all", () => {
       const room = rooms[socket.roomPath];
       if(room && room.hostId === socket.id) {
-          // Tell everyone EXCEPT host to stop video
           socket.to(socket.roomPath).emit("force-stop-video");
       }
   });
 
-  // --- STATE SYNC LISTENERS ---
+  socket.on("end-meeting-for-all", () => {
+      const path = socket.roomPath;
+      const room = rooms[path];
+      if(room && room.hostId === socket.id) {
+          io.to(path).emit("meeting-ended");
+          delete rooms[path];
+      }
+  });
+
+  // --- STATE SYNC ---
 
   socket.on("admit-user", (targetSocketId) => {
     const room = Object.values(rooms).find((r) => r.waiting.some((u) => u.socketId === targetSocketId));
@@ -212,7 +203,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // New: Toggle Video Listener to sync icons
   socket.on("toggle-video", ({ isVideoOff }) => {
     const path = socket.roomPath;
     if (rooms[path]) {
