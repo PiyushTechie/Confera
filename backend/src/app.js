@@ -54,7 +54,6 @@ io.on("connection", (socket) => {
 
   // 1. GUEST JOIN REQUEST
   socket.on("request-join", ({ path, username, passcode }) => {
-    // If room doesn't exist, reject
     if (!rooms[path]) {
       socket.emit("invalid-meeting");
       return;
@@ -62,13 +61,11 @@ io.on("connection", (socket) => {
 
     const room = rooms[path];
 
-    // Check Lock Status
     if (room.isLocked) {
         socket.emit("meeting-locked");
         return;
     }
 
-    // Check Passcode
     if (room.passcode && room.passcode !== passcode) {
       socket.emit("passcode-required");
       return;
@@ -86,7 +83,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 2. JOIN CALL (Host or Admitted Guest)
+  // 2. JOIN CALL
   socket.on("join-call", ({ path, username, passcode }) => {
     if (!rooms[path]) {
       rooms[path] = { 
@@ -94,7 +91,7 @@ io.on("connection", (socket) => {
         waiting: [], 
         hostId: socket.id, 
         passcode: passcode || null,
-        isLocked: false // Default unlocked
+        isLocked: false 
       }; 
     }
     
@@ -117,12 +114,12 @@ io.on("connection", (socket) => {
     socket.join(path);
     socket.roomPath = path;
 
+    // Broadcast the hostId so everyone knows who the host is
     io.to(path).emit("update-host-id", rooms[path].hostId);
     
     const otherUsers = rooms[path].users.filter(u => u.socketId !== socket.id);
     socket.emit("all-users", otherUsers);
 
-    // Sync Lock State with new user (especially if it's the host rejoining)
     socket.emit("lock-update", rooms[path].isLocked);
 
     socket.to(path).emit("user-joined", userData);
@@ -138,9 +135,19 @@ io.on("connection", (socket) => {
       const room = rooms[socket.roomPath];
       if(room && room.hostId === socket.id) {
           room.isLocked = !room.isLocked;
-          // Important: Broadcast to the specific room path
           io.to(socket.roomPath).emit("lock-update", room.isLocked); 
-          console.log(`Room ${socket.roomPath} lock status: ${room.isLocked}`);
+      }
+  });
+
+  // NEW: Transfer Host
+  socket.on("transfer-host", (newHostId) => {
+      const room = rooms[socket.roomPath];
+      if(room && room.hostId === socket.id) {
+          room.hostId = newHostId;
+          // Notify everyone who the new host is
+          io.to(socket.roomPath).emit("update-host-id", newHostId);
+          // Update waiting list for the new host
+          io.to(newHostId).emit("update-waiting-list", room.waiting);
       }
   });
 
@@ -246,15 +253,16 @@ io.on("connection", (socket) => {
         room.users.splice(userIndex, 1);
         socket.to(path).emit("user-left", socket.id); 
 
+        // If Host disconnects, assign new host automatically
         if (room.hostId === socket.id && room.users.length > 0) {
           room.hostId = room.users[0].socketId;
-          io.to(room.hostId).emit("update-waiting-list", room.waiting);
+          io.to(room.users[0].socketId).emit("update-waiting-list", room.waiting);
+          io.to(path).emit("update-host-id", room.hostId);
         }
       }
 
       room.waiting = room.waiting.filter((u) => u.socketId !== socket.id);
-      if (room.hostId) io.to(room.hostId).emit("update-waiting-list", room.waiting);
-
+      
       if (room.users.length === 0 && room.waiting.length === 0) {
         delete rooms[path];
       }
