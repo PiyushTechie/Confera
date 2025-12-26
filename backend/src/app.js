@@ -117,6 +117,8 @@ io.on("connection", (socket) => {
     socket.join(path);
     socket.roomPath = path;
 
+    io.to(path).emit("update-host-id", rooms[path].hostId);
+    
     const otherUsers = rooms[path].users.filter(u => u.socketId !== socket.id);
     socket.emit("all-users", otherUsers);
 
