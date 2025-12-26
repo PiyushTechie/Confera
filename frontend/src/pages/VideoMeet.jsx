@@ -4,9 +4,9 @@ import io from "socket.io-client";
 import {
   Mic, MicOff, Video, VideoOff, ScreenShare, MonitorOff,
   MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
-  Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
+  Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreHorizontal,
   Lock, Hand, Smile, Unlock, Trash2, Pin, Settings, Volume2, Power, Crown,
-  ChevronLeft, ChevronRight, Loader2, UserCog, MoreHorizontal // Changed MoreVertical to MoreHorizontal
+  ChevronLeft, ChevronRight, Loader2, UserCog
 } from "lucide-react";
 import server from "../environment";
 
@@ -19,6 +19,7 @@ const peerConfig = {
   ],
 };
 
+// Stable Video Component
 const VideoPlayer = ({ stream, isLocal, isMirrored, className, audioOutputId }) => {
   const videoRef = useRef(null);
   useEffect(() => {
@@ -80,9 +81,10 @@ export default function VideoMeetComponent() {
   const [selectedDevices, setSelectedDevices] = useState({ audioInput: "", videoInput: "", audioOutput: "" });
   const [isAudioConnected, setIsAudioConnected] = useState(true);
 
-  const [viewMode, setViewMode] = useState("GRID");
+  const [viewMode, setViewMode] = useState("SPEAKER");
   const [activeSpeakerId, setActiveSpeakerId] = useState(null);
   const [pinnedUserId, setPinnedUserId] = useState(null);
+  
   const [gridPage, setGridPage] = useState(0);
   const GRID_PAGE_SIZE = 4;
 
@@ -130,7 +132,6 @@ export default function VideoMeetComponent() {
               videoInputs: deviceInfos.filter(d => d.kind === 'videoinput'),
               audioOutputs: deviceInfos.filter(d => d.kind === 'audiooutput')
           });
-          // Set initial selection logic here if needed
       } catch (err) { console.error("Error fetching devices:", err); }
   };
 
@@ -270,7 +271,7 @@ export default function VideoMeetComponent() {
     socketRef.current.on("invalid-meeting", () => { alert("Meeting not found!"); cleanupAndLeave(); });
     socketRef.current.on("meeting-ended", () => { if (!amIHost) { alert("The host has ended the meeting."); cleanupAndLeave(); } });
     
-    // Audio Fix
+    // Fix: Force Enable Audio Logic
     socketRef.current.on("force-mute", () => { 
         if (localStreamRef.current) { 
             const t = localStreamRef.current.getAudioTracks()[0]; 
@@ -313,12 +314,7 @@ export default function VideoMeetComponent() {
   const handleSubmitPasscode = (e) => { e.preventDefault(); if(passcodeInput.trim()) { setShowPasscodeModal(false); setPasscodeError(false); connectSocket(); } };
   const handleToggleLock = () => { socketRef.current.emit("toggle-lock"); if(isMobile) setShowMobileMenu(false); };
   
-  const handleTransferHost = (targetId) => {
-      if(window.confirm("Make this user the Host? You will lose admin controls.")) {
-          socketRef.current.emit("transfer-host", targetId);
-      }
-  };
-
+  const handleTransferHost = (targetId) => { if(window.confirm("Make this user the Host? You will lose admin controls.")) socketRef.current.emit("transfer-host", targetId); };
   const handleKickUser = (targetId) => { if(window.confirm("Remove this participant?")) socketRef.current.emit("kick-user", targetId); };
   const handleMuteAll = () => { if(window.confirm("Mute everyone?")) socketRef.current.emit("mute-all"); };
   const handleStopVideoAll = () => { if(window.confirm("Stop everyone's video?")) socketRef.current.emit("stop-video-all"); };
@@ -340,7 +336,6 @@ export default function VideoMeetComponent() {
       if (!isAudioConnected) { setShowSettings(true); return; } 
       const track = localStreamRef.current?.getAudioTracks()[0]; 
       if (track) { 
-          // Explicitly set the enabled state based on desired action
           track.enabled = !audio; 
           setAudio(!audio); 
           socketRef.current.emit("toggle-audio", { isMuted: audio }); 
@@ -354,7 +349,7 @@ export default function VideoMeetComponent() {
   useEffect(() => { getMedia().then(() => { if (bypassLobby || (username && username !== "Guest")) connectSocket(); else setAskForUsername(true); }); return () => { if(localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop()); if(socketRef.current) socketRef.current.disconnect(); if(audioContextRef.current) audioContextRef.current.close(); }; }, []);
   useEffect(() => { if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight; if (!showChat && messages.length > 0 && !messages[messages.length - 1].isMe) setUnreadMessages(prev => prev + 1); }, [messages]);
   useEffect(() => { if (showChat) setUnreadMessages(0); }, [showChat]);
-  useEffect(() => { const checkMobile = () => setIsMobile(/Mobi|Android|iPhone/i.test(navigator.userAgent) || window.innerWidth < 768); checkMobile(); window.addEventListener('resize', checkMobile); return () => window.removeEventListener('resize', checkMobile); }, []);
+  useEffect(() => { const checkMobile = () => setIsMobile(window.innerWidth < 768); checkMobile(); window.addEventListener('resize', checkMobile); return () => window.removeEventListener('resize', checkMobile); }, []);
   const connect = () => { setAskForUsername(false); connectSocket(); };
   
   const handleMouseDown = (e) => {
@@ -376,14 +371,97 @@ export default function VideoMeetComponent() {
   };
 
   /* ------------------ RENDER HELPERS ------------------ */
+  
+  // NEW: Floating Self View for Mobile
+  const renderFloatingSelfView = () => {
+      if (!isMobile || !localStream) return null;
+      // Only show if user is NOT alone in room (if alone, they are main view)
+      if (videos.length === 0) return null; 
+
+      return (
+          <div className="absolute bottom-32 right-4 w-28 h-40 bg-black rounded-xl border-2 border-neutral-700 overflow-hidden shadow-2xl z-40 drag-handle">
+             <VideoPlayer stream={localStream} isLocal={true} isMirrored={true} className="w-full h-full object-cover" />
+          </div>
+      )
+  };
+
+  const renderPaginatedGrid = () => {
+      // 1. Determine participants list
+      let allParticipants = [];
+      
+      if (isMobile && videos.length > 0) {
+          // Mobile: Local user is floating, Grid only shows remotes
+          allParticipants = videos.map(v => ({ ...v, isLocal: false }));
+      } else {
+          // Desktop OR Alone on Mobile: Show Everyone
+          allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
+      }
+
+      const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
+      const startIndex = gridPage * GRID_PAGE_SIZE;
+      const visibleParticipants = allParticipants.slice(startIndex, startIndex + GRID_PAGE_SIZE);
+      const count = visibleParticipants.length;
+      let gridClass = "grid-cols-1"; 
+      if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
+      else if (count >= 3) gridClass = "grid-cols-2";
+
+      return (
+          <div className="relative w-full h-full bg-black p-4 flex flex-col items-center justify-center">
+              <div className={`grid ${gridClass} gap-4 w-full h-full max-w-6xl max-h-full transition-all duration-300`}>
+                  {visibleParticipants.map(p => {
+                      const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
+                      const user = p.isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video } : (userMap[pId] || { username: "Guest" });
+                      const displayName = p.isLocal ? `${userName} (You)` : user.username;
+                      const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
+                      const isCamOff = user.isVideoOff;
+
+                      return (
+                          <div key={pId} className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 w-full h-full ${activeSpeakerId === pId && !p.isLocal ? 'border-green-500' : 'border-neutral-700'}`}>
+                              {isCamOff ? (
+                                  <div className="w-full h-full flex items-center justify-center bg-neutral-700">
+                                      <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-4xl font-bold text-white shadow-lg">
+                                          {displayName.charAt(0).toUpperCase()}
+                                      </div>
+                                  </div>
+                              ) : (
+                                  <VideoPlayer stream={p.stream} isLocal={p.isLocal} isMirrored={p.isLocal && !screen} className="w-full h-full object-cover" audioOutputId={selectedDevices.audioOutput} />
+                              )}
+                              <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-sm font-medium text-white flex items-center gap-2">
+                                  {displayName}
+                                  {isThisHost && <Crown size={14} className="text-yellow-400 fill-yellow-400" />}
+                              </div>
+                              {user.isHandRaised && <div className="absolute top-3 right-3 bg-yellow-500 p-2 rounded-full text-black shadow-lg animate-bounce"><Hand size={20} /></div>}
+                              {activeEmojis[pId] && <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><span className="text-8xl filter drop-shadow-lg">{activeEmojis[pId]}</span></div>}
+                          </div>
+                      );
+                  })}
+              </div>
+              {totalPages > 1 && (
+                  <>
+                      {gridPage > 0 && <button onClick={() => setGridPage(p => p - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronLeft size={32} /></button>}
+                      {gridPage < totalPages - 1 && <button onClick={() => setGridPage(p => p + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronRight size={32} /></button>}
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">Page {gridPage + 1} / {totalPages}</div>
+                  </>
+              )}
+          </div>
+      );
+  };
+
   const renderMainSpotlight = () => {
+      // On mobile, if we are alone, show local. If not alone, prioritize remote.
+      // But getMainSocketId() already prioritizes active speaker or first remote.
       const mainId = getMainSocketId();
+      
+      // If mobile and mainId is local AND there are remote users, force switch to first remote?
+      // Actually getMainSocketId logic: if pinned, use pinned. if active speaker (remote), use that. if videos.length > 0, use first remote. ELSE use local.
+      // So if videos.length > 0, it won't show local. Correct for mobile.
+      
       const isLocal = mainId === "local" || mainId === socketIdRef.current;
       let user, stream, isCamOff, displayName, isThisHost;
 
       if(isLocal) { 
           user = { username: userName, isHandRaised: isHandRaised, isVideoOff: !video }; 
-          stream = localStream; // Use State
+          stream = localStream; 
           isCamOff = !video; 
           displayName = `${userName} (You)`; 
           isThisHost = amIHost; 
@@ -419,6 +497,14 @@ export default function VideoMeetComponent() {
   };
 
   const renderSideStrip = () => {
+      // On mobile, the side strip is at the bottom (or hidden if we use paginated view usually).
+      // But the layout code has `renderSideStrip` visible.
+      // If we are in SPEAKER view on mobile, we might want to hide the strip or make it very small?
+      // Zoom mobile: You swipe to see grid. Main view is just speaker.
+      // Let's keep the strip for desktop, and for mobile maybe hide it to allow full screen focus?
+      // Or keep it horizontal.
+      // Let's stick to the code structure.
+      
       const mainId = getMainSocketId();
       const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
       const stripParticipants = allParticipants.filter(p => { const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId; const mId = mainId === "local" ? (socketIdRef.current || "local") : mainId; return pId !== mId; });
@@ -441,59 +527,6 @@ export default function VideoMeetComponent() {
               </div>
           );
       });
-  };
-
-  const renderPaginatedGrid = () => {
-      const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
-      const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
-      const startIndex = gridPage * GRID_PAGE_SIZE;
-      const visibleParticipants = allParticipants.slice(startIndex, startIndex + GRID_PAGE_SIZE);
-      const count = visibleParticipants.length;
-      let gridClass = "grid-cols-1"; 
-      if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
-      else if (count >= 3) gridClass = "grid-cols-2";
-
-      return (
-          <div className="relative w-full h-full bg-black p-4 flex flex-col items-center justify-center">
-              <div className={`grid ${gridClass} gap-4 w-full h-full max-w-6xl max-h-full transition-all duration-300`}>
-                  {visibleParticipants.map(p => {
-                      const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
-                      const user = p.isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video } : (userMap[pId] || { username: "Guest" });
-                      const displayName = p.isLocal ? `${userName} (You)` : user.username;
-                      const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
-                      const isCamOff = user.isVideoOff;
-
-                      return (
-                          <div key={pId} className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 w-full h-full ${activeSpeakerId === pId && !p.isLocal ? 'border-green-500' : 'border-neutral-700'}`}>
-                              {isCamOff ? (
-                                  <div className="w-full h-full flex items-center justify-center bg-neutral-700">
-                                      <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-4xl font-bold text-white shadow-lg">
-                                          {displayName.charAt(0).toUpperCase()}
-                                      </div>
-                                  </div>
-                              ) : (
-                                  <VideoPlayer stream={p.stream} isLocal={p.isLocal} isMirrored={p.isLocal && !screen} className="w-full h-full object-cover" audioOutputId={selectedDevices.audioOutput} />
-                              )}
-                              
-                              <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-sm font-medium text-white flex items-center gap-2">
-                                  {displayName}
-                                  {isThisHost && <Crown size={14} className="text-yellow-400 fill-yellow-400" />}
-                              </div>
-                              {user.isHandRaised && <div className="absolute top-3 right-3 bg-yellow-500 p-2 rounded-full text-black shadow-lg animate-bounce"><Hand size={20} /></div>}
-                              {activeEmojis[pId] && <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><span className="text-8xl filter drop-shadow-lg">{activeEmojis[pId]}</span></div>}
-                          </div>
-                      );
-                  })}
-              </div>
-              {totalPages > 1 && (
-                  <>
-                      {gridPage > 0 && <button onClick={() => setGridPage(p => p - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronLeft size={32} /></button>}
-                      {gridPage < totalPages - 1 && <button onClick={() => setGridPage(p => p + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronRight size={32} /></button>}
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">Page {gridPage + 1} / {totalPages}</div>
-                  </>
-              )}
-          </div>
-      );
   };
 
   /* ------------------ UI ------------------ */
@@ -544,12 +577,33 @@ export default function VideoMeetComponent() {
         <div className="flex flex-col h-screen relative">
           
           <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
+            {/* FLOATING SELF VIEW FOR MOBILE */}
+            {renderFloatingSelfView()}
+
             {viewMode === "GRID" ? renderPaginatedGrid() : (
                 <>
                     <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">{renderMainSpotlight()}</div>
                     <div className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}>{renderSideStrip()}</div>
                 </>
             )}
+          </div>
+
+          {/* MOBILE SLIDER (SCROLLABLE FOOTER) */}
+          <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center overflow-x-auto px-4 gap-4 no-scrollbar z-50">
+             {/* 1. Audio */}
+             <button onClick={handleAudio} className={`flex-shrink-0 p-4 min-w-[70px] flex justify-center rounded-full ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={28} /> : <MicOff size={28} />}</button>
+             {/* 2. Video */}
+             <button onClick={handleVideo} className={`flex-shrink-0 p-4 min-w-[70px] flex justify-center rounded-full ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={28} /> : <VideoOff size={28} />}</button>
+             {/* 3. End Call */}
+             <button onClick={handleEndCall} className="flex-shrink-0 p-4 min-w-[70px] flex justify-center rounded-full bg-red-600"><PhoneOff size={28} /></button>
+             {/* 4. Participants */}
+             <button onClick={() => setShowParticipants(!showParticipants)} className="flex-shrink-0 p-4 min-w-[70px] flex justify-center rounded-full bg-neutral-700 relative"><Users size={28} />{amIHost && waitingUsers.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
+             {/* 5. Chat */}
+             <button onClick={() => setShowChat(!showChat)} className="flex-shrink-0 p-4 min-w-[70px] flex justify-center rounded-full bg-neutral-700 relative"><MessageSquare size={28} />{unreadMessages > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
+             {/* 6. Info */}
+             <button onClick={() => setShowInfo(!showInfo)} className="flex-shrink-0 p-4 min-w-[70px] flex justify-center rounded-full bg-neutral-700"><Info size={28} /></button>
+             {/* 7. More */}
+             <button onClick={() => setShowMobileMenu(true)} className="flex-shrink-0 p-4 min-w-[70px] flex justify-center rounded-full bg-neutral-700"><MoreHorizontal size={28} /></button>
           </div>
 
           {/* DESKTOP FOOTER */}
@@ -561,44 +615,31 @@ export default function VideoMeetComponent() {
              <div className="relative"><button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"><Smile size={24} /></button>{showEmojiPicker && ( <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">{EMOJI_LIST.map(emoji => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-2xl hover:scale-125 transition-transform p-1">{emoji}</button>))}</div> )}</div>
              <button onClick={handleScreen} className={`p-4 rounded-full ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>{screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}</button>
              <button onClick={handleEndCall} className="p-4 rounded-full bg-red-600 text-white"><PhoneOff size={24} /></button>
-             <div className="absolute right-6 gap-3 flex">
-               <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
-               <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative"><Users size={24} />{amIHost && waitingUsers && waitingUsers.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingUsers.length}</span>}</button>
-               <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</button>
-             </div>
-          </div>
-
-          {/* MOBILE SLIDER (FOOTER) */}
-          <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center overflow-x-auto px-4 gap-4 no-scrollbar z-50">
-             <button onClick={handleAudio} className={`flex-shrink-0 p-4 rounded-full ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</button>
-             <button onClick={handleVideo} className={`flex-shrink-0 p-4 rounded-full ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</button>
-             <button onClick={handleToggleHand} className={`flex-shrink-0 p-4 rounded-full ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700'}`}><Hand size={24} /></button>
-             <button onClick={() => setShowChat(!showChat)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
-             <button onClick={() => setShowParticipants(!showParticipants)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"><Users size={24} />{amIHost && waitingUsers.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
-             
-             {/* Host Controls Inline for Mobile */}
-             {amIHost && (
-                 <>
-                    <button onClick={handleMuteAll} className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"><MicOff size={24} /></button>
-                    <button onClick={handleStopVideoAll} className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"><VideoOff size={24} /></button>
-                    <button onClick={handleToggleLock} className={`flex-shrink-0 p-4 rounded-full ${isMeetingLocked ? 'bg-red-500' : 'bg-neutral-700'}`}>{isMeetingLocked ? <Lock size={24} /> : <Unlock size={24} />}</button>
-                 </>
-             )}
-
-             <button onClick={() => setShowMobileMenu(true)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700"><MoreHorizontal size={24} /></button>
-             <button onClick={handleEndCall} className="flex-shrink-0 p-4 rounded-full bg-red-600 ml-auto"><PhoneOff size={24} /></button>
+             <div className="absolute right-6 gap-3 flex"><button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button><button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative"><Users size={24} />{amIHost && waitingUsers && waitingUsers.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingUsers.length}</span>}</button><button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</button></div>
           </div>
              
+          {/* MOBILE MORE MENU */}
           {showMobileMenu && (
              <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowMobileMenu(false)}>
                  <div className="bg-neutral-900 w-full rounded-t-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-lg">More Options</h3><button onClick={() => setShowMobileMenu(false)}><X size={24} /></button></div>
+                    
+                    <button onClick={() => { setShowSettings(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Settings size={24} /> Settings</button>
                     <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><ScreenShare size={24} /> Share Screen</button>
                     <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPEAKER" : "GRID"); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><LayoutDashboard size={24} /> Change Layout</button>
-                    <button onClick={() => { setShowSettings(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Settings size={24} /> Settings</button>
-                    <button onClick={() => { setShowInfo(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Info size={24} /> Meeting Info</button>
+                    <button onClick={handleToggleHand} className={`w-full flex items-center gap-4 p-4 rounded-xl ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-800'}`}><Hand size={24} /> <span>{isHandRaised ? "Lower Hand" : "Raise Hand"}</span></button>
+
+                    {amIHost && (
+                        <div className="p-4 bg-neutral-800 rounded-xl space-y-3">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase">Host Controls</h4>
+                            <div className="flex gap-2">
+                                <button onClick={handleMuteAll} className="flex-1 flex items-center justify-center gap-2 p-3 rounded-lg bg-red-500/20 text-red-500"><MicOff size={20} /> Mute All</button>
+                                <button onClick={handleStopVideoAll} className="flex-1 flex items-center justify-center gap-2 p-3 rounded-lg bg-red-500/20 text-red-500"><VideoOff size={20} /> Stop Video</button>
+                            </div>
+                            <button onClick={handleToggleLock} className={`w-full flex items-center justify-center gap-2 p-3 rounded-lg ${isMeetingLocked ? 'bg-red-500 text-white' : 'bg-neutral-700 text-white'}`}>{isMeetingLocked ? <Lock size={20} /> : <Unlock size={20} />} {isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}</button>
+                        </div>
+                    )}
                     
-                    {/* Emoji Bar Mobile */}
                     <div className="flex justify-between bg-neutral-800 p-4 rounded-xl">
                         {EMOJI_LIST.map(emoji => (
                             <button key={emoji} onClick={() => { handleSendEmoji(emoji); setShowMobileMenu(false); }} className="text-3xl hover:scale-125 transition-transform">{emoji}</button>
@@ -623,13 +664,7 @@ export default function VideoMeetComponent() {
                                 <div className="flex items-center gap-2">
                                     <div className={u.isVideoOff ? "text-red-500" : "text-gray-400"}>{u.isVideoOff ? <VideoOff size={14} /> : <Video size={14} />}</div>
                                     <div className={u.isMuted ? "text-red-500" : "text-gray-400"}>{u.isMuted ? <MicOff size={14} /> : <Mic size={14} />}</div>
-                                    
-                                    {amIHost && (
-                                        <>
-                                            <button onClick={() => handleTransferHost(u.socketId)} className="text-gray-500 hover:text-blue-500 transition-colors" title="Make Host"><UserCog size={14} /></button>
-                                            <button onClick={() => handleKickUser(u.socketId)} className="text-gray-500 hover:text-red-500 transition-colors" title="Remove"><Trash2 size={14} /></button>
-                                        </>
-                                    )}
+                                    {amIHost && (<><button onClick={() => handleTransferHost(u.socketId)} className="text-gray-500 hover:text-blue-500 transition-colors" title="Make Host"><UserCog size={14} /></button><button onClick={() => handleKickUser(u.socketId)} className="text-gray-500 hover:text-red-500 transition-colors" title="Remove"><Trash2 size={14} /></button></>)}
                                 </div>
                             </div>
                         );
