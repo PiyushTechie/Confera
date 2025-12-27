@@ -231,6 +231,22 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("toggle-hand", ({ isRaised }) => {
+    const path = socket.roomPath;
+    if (rooms[path]) {
+      const user = rooms[path].users.find((u) => u.socketId === socket.id);
+      if (user) {
+        user.isHandRaised = isRaised;
+        
+        // 🛠 FIX: Send 'username' so frontend can show a notification
+        io.to(path).emit("hand-toggled", { 
+            socketId: socket.id, 
+            isRaised,
+            username: user.username 
+        });
+      }
+    }
+
   socket.on("transfer-host", (newHostId) => {
     if (isAuthorizedHost()) {
       const room = rooms[socket.roomPath];
