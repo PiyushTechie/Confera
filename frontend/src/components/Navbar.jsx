@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { Video, Menu, X } from 'lucide-react'; // Added Menu and X icons
+import { Menu, X } from 'lucide-react'; 
 import { Link } from 'react-router-dom';
+// 1. Import the logo
+import brandLogo from '../assets/BrandLogo.png'; 
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -9,21 +11,21 @@ const Navbar = () => {
   const toggleMenu = () => setIsOpen(!isOpen);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-3 max-w-7xl mx-auto mt-4">
+    <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-2 max-w-7xl mx-auto">
       {/* Glassmorphism Background (Main Bar) */}
       <div className="absolute inset-0 bg-white/70 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm z-0" />
 
       {/* Navbar Content */}
       <div className="relative z-10 flex items-center justify-between w-full px-4 py-2">
         
-        {/* Logo Section */}
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center transform group-hover:scale-105 transition-transform shadow-indigo-200 shadow-lg">
-            <Video className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
-            Cenfora
-          </span>
+        {/* Logo Section - Modified to use Image */}
+        <Link to="/" className="flex items-center gap-2 group">
+           <img 
+              src={brandLogo} 
+              alt="Cenfora Logo" 
+              // Responsive height: h-16 (64px) mobile, h-20 (80px) desktop
+              className="h-16 md:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+           />
         </Link>
 
         {/* --- DESKTOP MENU (Hidden on Mobile) --- */}
@@ -60,14 +62,13 @@ const Navbar = () => {
         {/* --- MOBILE HAMBURGER BUTTON --- */}
         <button 
           onClick={toggleMenu} 
-          className="md:hidden text-slate-700 hover:text-indigo-600 focus:outline-none transition-colors"
+          className="md:hidden text-slate-700 hover:text-indigo-600 focus:outline-none transition-colors p-2"
         >
           {isOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
       </div>
 
       {/* --- MOBILE DROPDOWN MENU --- */}
-      {/* conditionally rendered based on isOpen state */}
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 mx-2 p-6 bg-white/95 backdrop-blur-xl rounded-2xl border border-white/40 shadow-xl flex flex-col items-center gap-6 md:hidden animate-in slide-in-from-top-2 fade-in duration-200 z-50">
           
@@ -106,7 +107,7 @@ const Navbar = () => {
   );
 };
 
-// --- STYLED COMPONENTS (Unchanged logic, just ensure they render block in mobile) ---
+// --- STYLED COMPONENTS ---
 const UnderlineButtonStyle = styled.div`
   button {
     color: #64748b;
@@ -120,7 +121,7 @@ const UnderlineButtonStyle = styled.div`
     padding: 5px 0;
     transition: color 0.3s ease;
     position: relative;
-    display: inline-block; /* Ensures consistent width handling */
+    display: inline-block;
   }
 
   button::before {

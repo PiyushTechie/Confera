@@ -204,28 +204,28 @@ function HomeComponent() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 w-full max-w-4xl">
-                    <button onClick={handleNewMeeting} className="group relative flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 rounded-3xl shadow-xl shadow-orange-500/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl">
+                    <button onClick={handleNewMeeting} className="group relative flex flex-col items-center cursor-pointer justify-center gap-3 p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 rounded-3xl shadow-xl shadow-orange-500/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl">
                         <div className="p-3 sm:p-4 bg-white/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
                             <Video size={28} className="text-white sm:w-8 sm:h-8" />
                         </div>
                         <span className="text-sm sm:text-lg font-bold text-white">New Meeting</span>
                     </button>
 
-                    <button onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
+                    <button onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} className="group cursor-pointer flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <Plus size={28} className="sm:w-8 sm:h-8" />
                         </div>
                         <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Join</span>
                     </button>
 
-                    <button className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
+                    <button className="group flex flex-col cursor-pointer items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <Calendar size={28} className="sm:w-8 sm:h-8" />
                         </div>
                         <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Schedule</span>
                     </button>
 
-                    <button className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
+                    <button className="group flex flex-col items-center cursor-pointer justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <ScreenShare size={28} className="sm:w-8 sm:h-8" />
                         </div>
