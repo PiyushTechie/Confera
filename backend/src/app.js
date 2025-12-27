@@ -8,7 +8,7 @@ import passport from "passport";
 import helmet from "helmet";
 
 // 1. Import User Model for Hex Token Validation
-import { User } from "./models/user.model.js"; 
+import { User } from "./models/user.js"; 
 
 import { authLimiter, apiLimiter } from "./middlewares/limiters.js";
 import "./config/passportConfig.js";
