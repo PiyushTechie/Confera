@@ -195,9 +195,6 @@ function HomeComponent() {
 
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto px-4 sm:px-6 -mt-10">
                 <div className="text-center mb-8 sm:mb-20">
-                    <div className="inline-block px-3 py-1 sm:px-4 sm:py-1 mb-4 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-[10px] sm:text-xs font-bold tracking-wider uppercase">
-                        Secure Video Conferencing
-                    </div>
                     <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold text-slate-800 mb-2 tracking-tight">
                         {formatTime(date)}
                     </h1>
@@ -207,7 +204,6 @@ function HomeComponent() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 w-full max-w-4xl">
-                    {/* NEW MEETING */}
                     <button onClick={handleNewMeeting} className="group relative flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 rounded-3xl shadow-xl shadow-orange-500/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl">
                         <div className="p-3 sm:p-4 bg-white/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
                             <Video size={28} className="text-white sm:w-8 sm:h-8" />
@@ -215,7 +211,6 @@ function HomeComponent() {
                         <span className="text-sm sm:text-lg font-bold text-white">New Meeting</span>
                     </button>
 
-                    {/* JOIN */}
                     <button onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <Plus size={28} className="sm:w-8 sm:h-8" />
@@ -223,7 +218,6 @@ function HomeComponent() {
                         <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Join</span>
                     </button>
 
-                    {/* SCHEDULE */}
                     <button className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <Calendar size={28} className="sm:w-8 sm:h-8" />
@@ -231,7 +225,6 @@ function HomeComponent() {
                         <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Schedule</span>
                     </button>
 
-                    {/* SHARE SCREEN */}
                     <button className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <ScreenShare size={28} className="sm:w-8 sm:h-8" />
@@ -241,7 +234,6 @@ function HomeComponent() {
                 </div>
             </div>
 
-            {/* JOIN MODAL */}
             {showJoinInputModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto">
                     <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 my-auto">
@@ -273,7 +265,7 @@ function HomeComponent() {
                 </div>
             )}
 
-            {/* PREVIEW MODAL (LOBBY) - FIXED Z-INDEX ISSUES */}
+            {/* PREVIEW MODAL */}
             {showPreviewModal && (
                 <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-md">
                     <div className="flex min-h-full items-center justify-center p-4">
@@ -284,10 +276,12 @@ function HomeComponent() {
                             </button>
 
                             {/* LEFT: Video Preview Area */}
-                            <div className="w-full md:w-2/3 bg-black relative flex flex-col justify-center p-4 min-h-[350px] md:min-h-full">
-                                <div className="relative w-full h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center isolate">
+                            {/* FIXED: Removed min-h from parent to prevent confusion */}
+                            <div className="w-full md:w-2/3 bg-black relative flex flex-col justify-center p-4">
+                                
+                                {/* FIXED: Added h-[400px] explicitly for mobile so it doesn't collapse */}
+                                <div className="relative w-full h-[400px] md:h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center isolate">
                                     
-                                    {/* 1. Video Layer (z-0) */}
                                     <video 
                                         ref={localVideoRef} 
                                         autoPlay 
@@ -295,7 +289,6 @@ function HomeComponent() {
                                         className={`w-full h-full object-cover -scale-x-100 z-0 ${!isVideoOn ? "hidden" : ""}`}
                                     ></video>
                                     
-                                    {/* 2. Placeholder Layer (z-10) - Ensures background doesn't cover buttons */}
                                     {!isVideoOn && (
                                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-800">
                                             <div className="relative">
@@ -308,7 +301,6 @@ function HomeComponent() {
                                         </div>
                                     )}
 
-                                    {/* 3. Meeting ID Overlay (z-20) */}
                                     <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 border border-white/10 z-20">
                                         <span className="text-xs text-white/70">ID:</span>
                                         <span className="text-sm font-mono font-bold text-white tracking-wider">{generatedMeetingId}</span>
@@ -317,7 +309,6 @@ function HomeComponent() {
                                         </button>
                                     </div>
                                     
-                                    {/* 4. Controls Layer (z-30) - Highest z-index to ensure visibility */}
                                     <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 z-30">
                                         <button 
                                             onClick={togglePreviewAudio} 
@@ -344,7 +335,6 @@ function HomeComponent() {
                                 </div>
                             </div>
 
-                            {/* RIGHT: Settings & Actions */}
                             <div className="w-full md:w-1/3 bg-white p-6 sm:p-8 flex flex-col">
                                 <div className="flex justify-between items-center mb-6 md:mb-8">
                                     <h2 className="text-xl sm:text-2xl font-bold text-slate-800">

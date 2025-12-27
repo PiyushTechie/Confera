@@ -119,7 +119,7 @@ function History() {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header Section */}
-                <div className="mb-8 md:flex md:items-end md:justify-between">
+                <div className="mb-8 mt-4 md:flex md:items-end md:justify-between">
                     <div className="flex items-center gap-3 mb-4 md:mb-0">
                         <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
                              <HistoryIcon size={24} className="text-indigo-600" />
