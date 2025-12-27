@@ -4,6 +4,8 @@ import jwt from "jsonwebtoken";
 import {
   addToHistory,
   getUserHistory,
+  login,
+  register,
 } from "../controllers/authentication.js";
 
 const router = Router();
@@ -31,6 +33,8 @@ const verifyToken = (req, res, next) => {
 /* ======================
    USER ACTIVITY
 ====================== */
+router.post("/login", login); 
+router.post("/register", register); // Optional: if your frontend calls this too
 
 router.post("/activity", verifyToken, addToHistory);
 router.get("/activity", verifyToken, getUserHistory);

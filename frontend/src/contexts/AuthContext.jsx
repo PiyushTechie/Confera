@@ -122,7 +122,7 @@ export const AuthProvider = ({ children }) => {
     const getHistoryOfUser = async () => {
         try {
             const token = localStorage.getItem("token");
-            let response = await client.get("/get_all_activity", { 
+            let response = await client.get("/activity", { 
             params: { token: token } 
         });
             return response.data;
