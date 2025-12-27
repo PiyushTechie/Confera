@@ -6,7 +6,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import passport from "passport";
 import helmet from "helmet";
-import jwt from "jsonwebtoken"; // 🔐 NEW
+
+// 1. Import User Model for Hex Token Validation
+import { User } from "./models/user.model.js"; 
 
 import { authLimiter, apiLimiter } from "./middlewares/limiters.js";
 import "./config/passportConfig.js";
@@ -50,18 +52,38 @@ app.get("/health", (req, res) => {
 
 /* ================= SOCKET SECURITY ================= */
 
-// 🔐 NEW: Socket JWT auth (guest + logged-in users)
-io.use((socket, next) => {
+// 🔐 UPDATED: Auth for Crypto Hex Tokens (Database Lookup)
+io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("Socket token missing"));
 
-    const payload = jwt.verify(token, process.env.SOCKET_SECRET);
-    socket.user = payload; // { role, userId?, roomId?, username? }
+    // 1. If NO token, allow them as a Guest
+    if (!token) {
+      socket.user = { role: "guest", username: "Guest" };
+      return next();
+    }
 
-    next();
-  } catch {
-    next(new Error("Invalid or expired socket token"));
+    // 2. If Token exists, search MongoDB
+    // We look for a user who has this specific token string
+    const user = await User.findOne({ token: token });
+
+    if (user) {
+      // ✅ Found valid user
+      socket.user = { 
+        username: user.name, // Using 'name' from your schema
+        userId: user._id, 
+        role: "user" 
+      };
+      return next();
+    } else {
+      // ❌ Token sent, but not found in DB (Old/Invalid)
+      // We reject to force the frontend to clear the bad token
+      return next(new Error("Invalid authentication token"));
+    }
+
+  } catch (err) {
+    console.error("Socket Auth Error:", err);
+    return next(new Error("Internal Server Error"));
   }
 });
 
@@ -70,7 +92,6 @@ io.engine.use(helmet());
 
 /* ================= SOCKET RATE LIMITING ================= */
 
-// 🚦 NEW
 const RATE_LIMIT = { windowMs: 10_000, max: 20 };
 const socketRateMap = new Map();
 
@@ -100,7 +121,7 @@ const rateLimitSocket = (socket, event) => {
 
 const rooms = {};
 
-/* ================= SOCKET LOGIC (UNCHANGED) ================= */
+/* ================= SOCKET LOGIC ================= */
 
 io.on("connection", (socket) => {
   console.log("SOCKET CONNECTED::", socket.id);
@@ -112,7 +133,7 @@ io.on("connection", (socket) => {
 
   /* -------- 1. GUEST JOIN REQUEST -------- */
   socket.on("request-join", ({ path, username, passcode }) => {
-    if (!rateLimitSocket(socket, "request-join")) return; // 🚦 NEW
+    if (!rateLimitSocket(socket, "request-join")) return;
 
     if (!rooms[path]) {
       socket.emit("invalid-meeting");
@@ -131,9 +152,12 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // Use name from DB if logged in, otherwise use passed username or "Guest"
+    const finalName = socket.user?.role === "user" ? socket.user.username : (username || "Guest");
+
     room.waiting.push({
       socketId: socket.id,
-      username: username || socket.user?.username || "Guest",
+      username: finalName,
     });
 
     socket.join(path);
@@ -146,7 +170,7 @@ io.on("connection", (socket) => {
 
   /* -------- 2. JOIN CALL -------- */
   socket.on("join-call", ({ path, username, passcode }) => {
-    if (!rateLimitSocket(socket, "join-call")) return; // 🚦 NEW
+    if (!rateLimitSocket(socket, "join-call")) return;
 
     if (!rooms[path]) {
       rooms[path] = {
@@ -169,9 +193,11 @@ io.on("connection", (socket) => {
       (u) => u.socketId !== socket.id
     );
 
+    const finalName = socket.user?.role === "user" ? socket.user.username : (username || "Guest");
+
     const userData = {
       socketId: socket.id,
-      username: username || socket.user?.username || "Guest",
+      username: finalName,
       isMuted: false,
       isVideoOff: false,
       isHandRaised: false,
@@ -265,13 +291,15 @@ io.on("connection", (socket) => {
   /* -------- STATE SYNC -------- */
 
   socket.on("signal", (toId, message) => {
-    if (!rateLimitSocket(socket, "signal")) return; // 🚦 NEW
+    if (!rateLimitSocket(socket, "signal")) return;
     io.to(toId).emit("signal", socket.id, message);
   });
 
+  // 📝 CAPTIONS (Your Logic Added Here)
   socket.on("send-caption", ({ roomId, caption, username }) => {
-    if (!rateLimitSocket(socket, "send-caption")) return; 
-
+    if (!rateLimitSocket(socket, "send-caption")) return;
+    
+    // Broadcast to everyone ELSE in room
     socket.to(roomId).emit("receive-caption", {
       caption,
       username: username || "Speaker"
@@ -279,7 +307,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send-message", (data) => {
-    if (!rateLimitSocket(socket, "send-message")) return; // 🚦 NEW
+    if (!rateLimitSocket(socket, "send-message")) return;
     if (socket.roomPath)
       socket.to(socket.roomPath).emit("receive-message", data);
   });
