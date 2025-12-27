@@ -246,6 +246,7 @@ io.on("connection", (socket) => {
         });
       }
     }
+  });
 
   socket.on("transfer-host", (newHostId) => {
     if (isAuthorizedHost()) {
