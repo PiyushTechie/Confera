@@ -28,13 +28,11 @@ const Navbar = ({ navigate, handleLogout }) => {
     return (
         <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-2">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
-                {/* Brand Logo Section - Made Larger */}
                 <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => navigate("/home")}>
                     <img
                         src={brandLogoSrc}
                         alt="Brand Logo"
-                        // UPDATED: h-16 for mobile, h-20 for desktop
-                        className="h-16 md:h-16 w-auto object-contain transition-all"
+                        className="h-16 md:h-20 w-auto object-contain transition-all"
                         onError={(e) => {
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'block';
@@ -42,7 +40,6 @@ const Navbar = ({ navigate, handleLogout }) => {
                     />
                 </div>
 
-                {/* Right Side Actions */}
                 <div className="flex items-center gap-2 md:gap-3">
                     <button 
                         onClick={() => navigate("/history")} 
@@ -196,12 +193,11 @@ function HomeComponent() {
         <div className="min-h-screen w-full bg-slate-50 flex flex-col font-sans text-slate-800">
             <Navbar navigate={navigate} handleLogout={handleLogout} />
 
-            {/* Main Hero Content */}
             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto px-4 sm:px-6 -mt-10">
-                
-                {/* Clock Section */}
                 <div className="text-center mb-8 sm:mb-20">
-                    {/* UPDATED: text size small on mobile, large on desktop */}
+                    <div className="inline-block px-3 py-1 sm:px-4 sm:py-1 mb-4 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-[10px] sm:text-xs font-bold tracking-wider uppercase">
+                        Secure Video Conferencing
+                    </div>
                     <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold text-slate-800 mb-2 tracking-tight">
                         {formatTime(date)}
                     </h1>
@@ -210,13 +206,9 @@ function HomeComponent() {
                     </p>
                 </div>
 
-                {/* Action Grid - Adjusted padding for mobile */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 w-full max-w-4xl">
                     {/* NEW MEETING */}
-                    <button
-                        onClick={handleNewMeeting}
-                        className="group relative flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 rounded-3xl shadow-xl shadow-orange-500/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl"
-                    >
+                    <button onClick={handleNewMeeting} className="group relative flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 rounded-3xl shadow-xl shadow-orange-500/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl">
                         <div className="p-3 sm:p-4 bg-white/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
                             <Video size={28} className="text-white sm:w-8 sm:h-8" />
                         </div>
@@ -224,10 +216,7 @@ function HomeComponent() {
                     </button>
 
                     {/* JOIN */}
-                    <button
-                        onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }}
-                        className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg"
-                    >
+                    <button onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} className="group flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <Plus size={28} className="sm:w-8 sm:h-8" />
                         </div>
@@ -252,9 +241,7 @@ function HomeComponent() {
                 </div>
             </div>
 
-            {/* ====================================
-                JOIN INPUT MODAL (Responsive)
-            ==================================== */}
+            {/* JOIN MODAL */}
             {showJoinInputModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto">
                     <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 my-auto">
@@ -264,47 +251,21 @@ function HomeComponent() {
                                 <X size={20} />
                             </button>
                         </div>
-
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Meeting ID</label>
                                 <div className="relative">
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. 123-456-789"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono"
-                                        value={meetingCode}
-                                        onChange={(e) => setMeetingCode(e.target.value)}
-                                        autoFocus
-                                    />
+                                    <input type="text" placeholder="e.g. 123-456-789" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono" value={meetingCode} onChange={(e) => setMeetingCode(e.target.value)} autoFocus />
                                 </div>
                             </div>
-
                             <div className="space-y-2">
                                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Passcode (Optional)</label>
                                 <div className="relative">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                                        <Lock size={18} />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        placeholder="Host provided passcode"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                                        value={passcode}
-                                        onChange={(e) => setPasscode(e.target.value)}
-                                    />
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Lock size={18} /></div>
+                                    <input type="text" placeholder="Host provided passcode" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" value={passcode} onChange={(e) => setPasscode(e.target.value)} />
                                 </div>
                             </div>
-
-                            <button
-                                onClick={handleJoinVideoCall}
-                                disabled={!meetingCode.trim()}
-                                className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all mt-4 ${
-                                    meetingCode.trim()
-                                        ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transform hover:-translate-y-0.5"
-                                        : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                                }`}
-                            >
+                            <button onClick={handleJoinVideoCall} disabled={!meetingCode.trim()} className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all mt-4 ${meetingCode.trim() ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transform hover:-translate-y-0.5" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
                                 Join Now <ArrowRight size={20} />
                             </button>
                         </div>
@@ -312,34 +273,31 @@ function HomeComponent() {
                 </div>
             )}
 
-            {/* ====================================
-                PREVIEW MODAL (LOBBY - SCROLLABLE FOR MOBILE)
-            ==================================== */}
+            {/* PREVIEW MODAL (LOBBY) - FIXED Z-INDEX ISSUES */}
             {showPreviewModal && (
                 <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-md">
                     <div className="flex min-h-full items-center justify-center p-4">
                         <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px] border border-white/10 relative">
                             
-                            {/* Close Button Mobile */}
                             <button onClick={stopPreviewCamera} className="absolute top-4 right-4 z-50 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white md:hidden">
                                 <X size={20} />
                             </button>
 
                             {/* LEFT: Video Preview Area */}
-                            <div className="w-full md:w-2/3 bg-black relative flex flex-col justify-center p-4 min-h-[300px] md:min-h-full">
-                                <div className="relative w-full h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center">
+                            <div className="w-full md:w-2/3 bg-black relative flex flex-col justify-center p-4 min-h-[350px] md:min-h-full">
+                                <div className="relative w-full h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center isolate">
                                     
-                                    {/* Video Element */}
+                                    {/* 1. Video Layer (z-0) */}
                                     <video 
                                         ref={localVideoRef} 
                                         autoPlay 
                                         muted 
-                                        className={`w-full h-full object-cover -scale-x-100 ${!isVideoOn ? "hidden" : ""}`}
+                                        className={`w-full h-full object-cover -scale-x-100 z-0 ${!isVideoOn ? "hidden" : ""}`}
                                     ></video>
                                     
-                                    {/* UPDATED: Better Placeholder when Camera is Off */}
+                                    {/* 2. Placeholder Layer (z-10) - Ensures background doesn't cover buttons */}
                                     {!isVideoOn && (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-800">
+                                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-800">
                                             <div className="relative">
                                                 <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
                                                 <div className="relative w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg border-4 border-neutral-700">
@@ -350,8 +308,8 @@ function HomeComponent() {
                                         </div>
                                     )}
 
-                                    {/* Meeting ID Overlay */}
-                                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 border border-white/10 z-10">
+                                    {/* 3. Meeting ID Overlay (z-20) */}
+                                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 border border-white/10 z-20">
                                         <span className="text-xs text-white/70">ID:</span>
                                         <span className="text-sm font-mono font-bold text-white tracking-wider">{generatedMeetingId}</span>
                                         <button onClick={copyToClipboard} className="text-white/70 hover:text-white ml-2 transition-colors">
@@ -359,28 +317,28 @@ function HomeComponent() {
                                         </button>
                                     </div>
                                     
-                                    {/* Controls */}
-                                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 z-20">
+                                    {/* 4. Controls Layer (z-30) - Highest z-index to ensure visibility */}
+                                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 z-30">
                                         <button 
                                             onClick={togglePreviewAudio} 
-                                            className={`p-4 rounded-full transition-all duration-300 border ${
+                                            className={`p-4 rounded-full transition-all duration-300 border shadow-lg ${
                                                 isAudioOn 
                                                 ? "bg-white/20 hover:bg-white/30 text-white border-white/10 backdrop-blur-md" 
-                                                : "bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-500/40"
+                                                : "bg-rose-500 text-white border-rose-500 shadow-rose-500/40"
                                             }`}
                                         >
-                                            {isAudioOn ? <Mic size={20} /> : <MicOff size={20} />}
+                                            {isAudioOn ? <Mic size={24} /> : <MicOff size={24} />}
                                         </button>
                                         
                                         <button 
                                             onClick={togglePreviewVideo} 
-                                            className={`p-4 rounded-full transition-all duration-300 border ${
+                                            className={`p-4 rounded-full transition-all duration-300 border shadow-lg ${
                                                 isVideoOn 
                                                 ? "bg-white/20 hover:bg-white/30 text-white border-white/10 backdrop-blur-md" 
-                                                : "bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-500/40"
+                                                : "bg-rose-500 text-white border-rose-500 shadow-rose-500/40"
                                             }`}
                                         >
-                                            {isVideoOn ? <Video size={20} /> : <VideoOff size={20} />}
+                                            {isVideoOn ? <Video size={24} /> : <VideoOff size={24} />}
                                         </button>
                                     </div>
                                 </div>
@@ -398,34 +356,19 @@ function HomeComponent() {
                                 </div>
 
                                 <div className="flex-1 space-y-6">
-                                    {/* Name Input */}
                                     <div className="space-y-2">
                                         <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Display Name</label>
                                         <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
                                             <User size={20} className="text-slate-400" />
-                                            <input 
-                                                type="text" 
-                                                value={participantName} 
-                                                onChange={(e) => setParticipantName(e.target.value)} 
-                                                className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" 
-                                                placeholder="Enter your name" 
-                                            />
+                                            <input type="text" value={participantName} onChange={(e) => setParticipantName(e.target.value)} className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" placeholder="Enter your name" />
                                         </div>
                                     </div>
-
-                                    {/* Passcode Input (Host Creating) */}
                                     {!isJoining && (
                                         <div className="space-y-2">
                                             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Set Passcode (Optional)</label>
                                             <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
                                                 <Lock size={20} className="text-slate-400" />
-                                                <input 
-                                                    type="text" 
-                                                    value={passcode} 
-                                                    onChange={(e) => setPasscode(e.target.value)} 
-                                                    className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" 
-                                                    placeholder="No passcode" 
-                                                />
+                                                <input type="text" value={passcode} onChange={(e) => setPasscode(e.target.value)} className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" placeholder="No passcode" />
                                             </div>
                                             <p className="text-xs text-slate-400 px-1">Share this code with your guests.</p>
                                         </div>
@@ -433,15 +376,7 @@ function HomeComponent() {
                                 </div>
 
                                 <div className="mt-8 mb-4 md:mb-0">
-                                    <button 
-                                        onClick={startMeeting} 
-                                        disabled={!participantName.trim()} 
-                                        className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:-translate-y-0.5 ${
-                                            participantName.trim() 
-                                            ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30" 
-                                            : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
-                                        }`}
-                                    >
+                                    <button onClick={startMeeting} disabled={!participantName.trim()} className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:-translate-y-0.5 ${participantName.trim() ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30" : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"}`}>
                                         {isJoining ? "Join Now" : "Start Meeting"}
                                     </button>
                                 </div>
