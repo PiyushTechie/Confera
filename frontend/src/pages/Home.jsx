@@ -26,7 +26,7 @@ const Navbar = ({ navigate, handleLogout }) => {
     const brandLogoSrc = brandLogo;
 
     return (
-        <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-3">
+        <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-2">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 {/* Brand Logo Section - Made Larger */}
                 <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => navigate("/home")}>
@@ -34,15 +34,12 @@ const Navbar = ({ navigate, handleLogout }) => {
                         src={brandLogoSrc}
                         alt="Brand Logo"
                         // UPDATED: h-16 for mobile, h-20 for desktop
-                        className="h-16 md:h-20 w-auto object-contain transition-all"
+                        className="h-16 md:h-16 w-auto object-contain transition-all"
                         onError={(e) => {
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'block';
                         }}
                     />
-                    <span className="hidden md:block text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent ml-2">
-                        VideoMeet
-                    </span>
                 </div>
 
                 {/* Right Side Actions */}
@@ -204,9 +201,6 @@ function HomeComponent() {
                 
                 {/* Clock Section */}
                 <div className="text-center mb-8 sm:mb-20">
-                    <div className="inline-block px-3 py-1 sm:px-4 sm:py-1 mb-4 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-[10px] sm:text-xs font-bold tracking-wider uppercase">
-                        Secure Video Conferencing
-                    </div>
                     {/* UPDATED: text size small on mobile, large on desktop */}
                     <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold text-slate-800 mb-2 tracking-tight">
                         {formatTime(date)}
