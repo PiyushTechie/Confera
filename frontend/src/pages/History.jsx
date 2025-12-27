@@ -25,8 +25,7 @@ const Navbar = () => {
                     <img
                         src={brandLogoSrc}
                         alt="Brand Logo"
-                        className="h-10 w-auto object-contain"
-                        // Fallback if image fails to load so it doesn't look broken
+                        className="h-12 w-auto object-contain"
                         onError={(e) => {
                             e.target.onerror = null;
                             e.target.style.display = 'none';
