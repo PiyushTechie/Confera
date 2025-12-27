@@ -33,7 +33,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ limit: "10kb", extended: true }));
-app.use(mongoSanitize());
+app.use(
+  mongoSanitize({
+    replaceWith: "_",
+  })
+);
+
 app.use(passport.initialize());
 
 const io = new Server(server, { cors: corsOptions });
