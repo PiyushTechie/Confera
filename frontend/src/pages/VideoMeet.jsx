@@ -4,13 +4,13 @@ import io from "socket.io-client";
 import {
     Mic, MicOff, Video, VideoOff, ScreenShare, MonitorOff,
     MessageSquare, PhoneOff, Info, X, Send, Copy, Check,
-    Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck, Gavel, MoreVertical,
+    Users, LayoutDashboard, ShieldAlert, UserMinus, UserCheck,
     Lock, Hand, Smile, Unlock, Trash2, Pin, Settings, Volume2, Power, Crown,
     ChevronLeft, ChevronRight, Loader2, UserCog, MoreHorizontal,
-    Captions, Disc, AlertCircle // New Icons
+    Captions, Disc, AlertCircle
 } from "lucide-react";
 import server from "../environment";
-import useSpeechRecognition from "../hooks/useSpeechRecognition"; // New Hook
+import useSpeechRecognition from "../hooks/useSpeechRecognition";
 
 const server_url = server;
 
@@ -56,8 +56,10 @@ export default function VideoMeetComponent() {
     const socketIdRef = useRef(null);
     const connectionsRef = useRef({});
     const localStreamRef = useRef(null);
+    
+    // --- STATE ---
     const [localStream, setLocalStream] = useState(null);
-
+    const [socketInstance, setSocketInstance] = useState(null); // Fix for Hooks
     const displayStreamRef = useRef(null);
     const chatContainerRef = useRef(null);
     const audioContextRef = useRef(null);
@@ -75,6 +77,7 @@ export default function VideoMeetComponent() {
     const [waitingUsers, setWaitingUsers] = useState([]);
     const [roomHostId, setRoomHostId] = useState(null);
 
+    // Host Logic: If I am the assigned host OR I created the room (isHost true initially)
     const amIHost = roomHostId && socketIdRef.current ? roomHostId === socketIdRef.current : isHost;
 
     const [showSettings, setShowSettings] = useState(false);
@@ -108,7 +111,7 @@ export default function VideoMeetComponent() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [activeEmojis, setActiveEmojis] = useState({});
 
-    // --- NEW FEATURES STATES ---
+    // --- NEW FEATURES ---
     const [showCaptions, setShowCaptions] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef(null);
@@ -116,18 +119,20 @@ export default function VideoMeetComponent() {
     const [toasts, setToasts] = useState([]);
     const [remoteCaption, setRemoteCaption] = useState(null);
 
-    const { startListening, stopListening, captions: localCaption } = useSpeechRecognition(socketRef.current, meetingCode, userName);
+    // Use socketInstance state instead of Ref so Hook updates correctly
+    const { startListening, stopListening, captions: localCaption } = useSpeechRecognition(socketInstance, meetingCode, userName);
 
     const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "👏", "🎉"];
     const pendingIce = useRef({});
 
-    /* --------------------- HELPERS (TOAST & RECORDING) --------------------- */
+    /* --------------------- TOAST SYSTEM --------------------- */
     const addToast = (msg, type = "info") => {
         const id = Date.now();
         setToasts(prev => [...prev, { id, msg, type }]);
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
     };
 
+    /* --------------------- RECORDING --------------------- */
     const handleToggleRecord = () => {
         if (isRecording) {
             mediaRecorderRef.current.stop();
@@ -185,7 +190,7 @@ export default function VideoMeetComponent() {
             setLocalStream(stream);
             if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             await getDeviceList();
-        } catch (err) { console.error("Media error:", err); addToast("Camera/Mic blocked", "error"); }
+        } catch (err) { console.error("Media error:", err); addToast("Camera/Mic access denied", "error"); }
     };
 
     const getDeviceList = async () => {
@@ -260,7 +265,7 @@ export default function VideoMeetComponent() {
                     analyser.fftSize = 512;
                     source.connect(analyser);
                     audioAnalysersRef.current[v.socketId] = analyser;
-                } catch (e) { console.error("Audio Context Error:", e); }
+                } catch (e) { }
             }
         });
         const currentSocketIds = videos.map(v => v.socketId);
@@ -315,13 +320,40 @@ export default function VideoMeetComponent() {
 
     const connectSocket = () => {
         if (socketRef.current && socketRef.current.connected) return;
-        socketRef.current = io(server_url);
+        
+        const token = localStorage.getItem("token");
+        // FIX: Pass token in auth for security, but allow guest (null)
+        socketRef.current = io(server_url, {
+            auth: { token: token },
+            transports: ["websocket", "polling"]
+        });
 
         socketRef.current.on("connect", () => {
+            setSocketInstance(socketRef.current); // Update state for hooks
             socketIdRef.current = socketRef.current.id;
-            const payload = { path: window.location.href, username: userName, passcode: passcodeInput || passcode };
-            if (isHost) socketRef.current.emit("join-call", payload);
-            else { socketRef.current.emit("request-join", payload); setIsInWaitingRoom(true); }
+            
+            const payload = { 
+                path: window.location.href, 
+                username: userName, 
+                passcode: passcodeInput || passcode 
+            };
+
+            if (isHost) {
+                socketRef.current.emit("join-call", payload);
+            } else {
+                socketRef.current.emit("request-join", payload);
+                setIsInWaitingRoom(true); 
+            }
+        });
+
+        socketRef.current.on("connect_error", (err) => {
+            console.error("Socket Connection Error:", err.message);
+            // If error is due to auth, prompt user
+            if(err.message === "Socket token missing" || err.message === "Invalid or expired socket token") {
+               // We can attempt to reconnect without token if guest logic permitted
+               // or just show error
+               addToast("Connection refused: " + err.message, "error");
+            }
         });
 
         socketRef.current.on("passcode-required", () => { setIsInWaitingRoom(false); setShowPasscodeModal(true); setPasscodeError(true); socketRef.current.disconnect(); });
@@ -340,8 +372,15 @@ export default function VideoMeetComponent() {
 
         socketRef.current.on("force-stop-video", () => { if (localStreamRef.current) { const t = localStreamRef.current.getVideoTracks()[0]; if (t) t.enabled = false; setVideo(false); socketRef.current.emit("toggle-video", { isVideoOff: true }); } addToast("Host stopped all video", "info"); });
         socketRef.current.on("update-host-id", (hostId) => setRoomHostId(hostId));
-        socketRef.current.on("lock-update", (isLocked) => setIsMeetingLocked(isLocked));
-        socketRef.current.on("admitted", () => { setIsInWaitingRoom(false); socketRef.current.emit("join-call", { path: window.location.href, username: userName, passcode: passcodeInput || passcode }); });
+        socketRef.current.on("lock-update", (isLocked) => {
+    setIsMeetingLocked(isLocked);
+    // 1. Show Toast to EVERYONE
+    addToast(isLocked ? "Meeting is now Locked 🔒" : "Meeting is now Unlocked 🔓", "info");
+    
+    // 2. Trigger a vibration/sound if you want (optional)
+    if (navigator.vibrate) navigator.vibrate(200); 
+});
+        socketRef.current.on("admitted", () => { setIsInWaitingRoom(false); socketRef.current.emit("join-call", { path: window.location.href, username: userName, passcode: passcodeInput || passcode }); addToast("You have been admitted!", "success"); });
         socketRef.current.on("update-waiting-list", (users) => { if (amIHost) setWaitingUsers(users); });
         socketRef.current.on("all-users", (users) => { users.forEach(u => setUserMap(prev => ({ ...prev, [u.socketId]: u }))); });
         socketRef.current.on("user-joined", (user) => { setUserMap(prev => ({ ...prev, [user.socketId]: user })); createPeer(user.socketId); initiateOffer(user.socketId); addToast(`${user.username} joined`, "info"); });
@@ -350,7 +389,6 @@ export default function VideoMeetComponent() {
         socketRef.current.on("video-toggled", ({ socketId, isVideoOff }) => { setUserMap(prev => ({ ...prev, [socketId]: { ...prev[socketId], isVideoOff: isVideoOff } })); });
         socketRef.current.on("emoji-received", ({ socketId, emoji }) => { setActiveEmojis(prev => ({ ...prev, [socketId]: emoji })); setTimeout(() => { setActiveEmojis(prev => { const newState = { ...prev }; delete newState[socketId]; return newState; }); }, 3000); });
         
-        // NEW: CAPTIONS
         socketRef.current.on("receive-caption", (data) => {
             if(showCaptions) {
                 setRemoteCaption(data);
@@ -377,7 +415,13 @@ export default function VideoMeetComponent() {
     const handleSendEmoji = (emoji) => { setShowEmojiPicker(false); if (isMobile) setShowMobileMenu(false); setActiveEmojis(prev => ({ ...prev, [socketIdRef.current]: emoji })); setTimeout(() => { setActiveEmojis(prev => { const newState = { ...prev }; delete newState[socketIdRef.current]; return newState; }); }, 3000); socketRef.current.emit("send-emoji", { emoji }); };
     const handleSendMessage = () => { if (!currentMessage.trim() || !socketRef.current) return; const msg = { text: currentMessage, sender: userName, socketId: socketRef.current.id, timestamp: new Date().toISOString() }; socketRef.current.emit("send-message", msg); setMessages(prev => [...prev, { ...msg, isMe: true }]); setCurrentMessage(""); };
     const handleSubmitPasscode = (e) => { e.preventDefault(); if (passcodeInput.trim()) { setShowPasscodeModal(false); setPasscodeError(false); connectSocket(); } };
-    const handleToggleLock = () => { socketRef.current.emit("toggle-lock"); if (isMobile) setShowMobileMenu(false); addToast(isMeetingLocked ? "Meeting unlocked" : "Meeting locked", "success"); };
+
+    const handleToggleLock = () => {
+    // Just emit the event. The socket listener above handles the UI/Toast.
+    socketRef.current.emit("toggle-lock"); 
+    if (isMobile) setShowMobileMenu(false);
+};
+
 
     const handleTransferHost = (targetId) => {
         if (window.confirm("Make this user the Host? You will lose admin controls.")) {
@@ -440,6 +484,10 @@ export default function VideoMeetComponent() {
     const renderMainSpotlight = () => {
         const mainId = getMainSocketId();
         const isLocal = mainId === "local" || mainId === socketIdRef.current;
+        
+        // Logic to find the emoji: Check specific ID, or fallback to socketRef if local
+        const emojiToShow = activeEmojis[mainId] || (isLocal && activeEmojis[socketIdRef.current]);
+
         let user, stream, isCamOff, displayName, isThisHost;
 
         if (isLocal) {
@@ -459,6 +507,7 @@ export default function VideoMeetComponent() {
 
         return (
             <div className="relative w-full h-full flex items-center justify-center bg-black/90">
+                {/* Video or Avatar */}
                 {isCamOff ? (
                     <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center text-7xl font-bold text-white shadow-2xl">
                         {displayName.charAt(0).toUpperCase()}
@@ -467,9 +516,9 @@ export default function VideoMeetComponent() {
                     <VideoPlayer stream={stream} isLocal={isLocal} isMirrored={isLocal && !screen} className="max-w-full max-h-full object-contain shadow-2xl" audioOutputId={selectedDevices.audioOutput} />
                 )}
                 
-                {/* CAPTIONS OVERLAY */}
+                {/* CAPTIONS OVERLAY (z-40 to sit above video but below emojis) */}
                 {showCaptions && (remoteCaption || localCaption) && (
-                    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-20">
+                    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-40">
                         <p className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">
                             {remoteCaption ? remoteCaption.username : "You"}
                         </p>
@@ -479,7 +528,8 @@ export default function VideoMeetComponent() {
                     </div>
                 )}
 
-                <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3">
+                {/* Name Tag & Status Icons */}
+                <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
                     <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
                         {displayName}
                         {isThisHost && <Crown size={16} className="text-yellow-400 fill-yellow-400" />}
@@ -487,11 +537,19 @@ export default function VideoMeetComponent() {
                     {user.isHandRaised && <Hand size={20} className="text-yellow-500 animate-pulse" />}
                     {pinnedUserId === mainId && <Pin size={16} className="text-blue-400 rotate-45" />}
                 </div>
-                {activeEmojis[mainId] && <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><span className="text-[12rem] filter drop-shadow-2xl">{activeEmojis[mainId]}</span></div>}
+
+                {/* EMOJI OVERLAY (z-50 to sit on top of everything) */}
+                {emojiToShow && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
+                        <span className="text-[12rem] filter drop-shadow-2xl leading-none">
+                            {emojiToShow}
+                        </span>
+                    </div>
+                )}
             </div>
         );
     };
-
+    
     const renderSideStrip = () => {
         const mainId = getMainSocketId();
         const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
@@ -537,6 +595,10 @@ export default function VideoMeetComponent() {
                         const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
                         const isCamOff = user.isVideoOff;
 
+                        // FIX: Check specific socket ID, OR if it's local, check the ref ID
+                        // This solves the issue where "local" !== "socket-123"
+                        const emojiToShow = activeEmojis[p.socketId] || (p.isLocal && activeEmojis[socketIdRef.current]);
+
                         return (
                             <div key={pId} className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 w-full h-full ${activeSpeakerId === pId && !p.isLocal ? 'border-green-500' : 'border-neutral-700'}`}>
                                 {isCamOff ? (
@@ -553,8 +615,15 @@ export default function VideoMeetComponent() {
                                     {displayName}
                                     {isThisHost && <Crown size={14} className="text-yellow-400 fill-yellow-400" />}
                                 </div>
+                                
                                 {user.isHandRaised && <div className="absolute top-3 right-3 bg-yellow-500 p-2 rounded-full text-black shadow-lg animate-bounce"><Hand size={20} /></div>}
-                                {activeEmojis[pId] && <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><span className="text-8xl filter drop-shadow-lg">{activeEmojis[pId]}</span></div>}
+                                
+                                {/* FIX: Updated Emoji Overlay with z-50 and used calculated variable */}
+                                {emojiToShow && (
+                                    <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
+                                        <span className="text-8xl filter drop-shadow-lg leading-none">{emojiToShow}</span>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -572,180 +641,796 @@ export default function VideoMeetComponent() {
 
     /* ------------------ UI ------------------ */
     return (
-        <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
-            
-            {/* TOAST NOTIFICATIONS */}
-            <div className="fixed top-20 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
-                {toasts.map(t => (
-                    <div key={t.id} className={`bg-neutral-800 border-l-4 ${t.type === 'error' ? 'border-red-500' : (t.type === 'success' ? 'border-green-500' : 'border-blue-500')} p-4 rounded shadow-2xl flex items-center gap-3 animate-in slide-in-from-right fade-in duration-300 pointer-events-auto min-w-[200px]`}>
-                        {t.type === 'error' ? <ShieldAlert size={20} className="text-red-500"/> : (t.type === 'success' ? <Check size={20} className="text-green-500"/> : <Info size={20} className="text-blue-500"/>)}
-                        <span className="text-sm font-medium text-white">{t.msg}</span>
-                    </div>
-                ))}
+      <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
+        {/* TOAST NOTIFICATIONS */}
+        <div className="fixed top-20 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className={`bg-neutral-800 border-l-4 ${
+                t.type === "error"
+                  ? "border-red-500"
+                  : t.type === "success"
+                  ? "border-green-500"
+                  : "border-blue-500"
+              } p-4 rounded shadow-2xl flex items-center gap-3 animate-in slide-in-from-right fade-in duration-300 pointer-events-auto min-w-[200px]`}
+            >
+              {t.type === "error" ? (
+                <ShieldAlert size={20} className="text-red-500" />
+              ) : t.type === "success" ? (
+                <Check size={20} className="text-green-500" />
+              ) : (
+                <Info size={20} className="text-blue-500" />
+              )}
+              <span className="text-sm font-medium text-white">{t.msg}</span>
+            </div>
+          ))}
+        </div>
+
+        {showSettings && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-neutral-800 p-6 rounded-2xl shadow-2xl max-w-md w-full border border-neutral-700">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Settings size={20} /> Audio & Video Settings
+                </h2>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">
+                    Microphone
+                  </label>
+                  <select
+                    className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none"
+                    value={selectedDevices.audioInput}
+                    onChange={(e) =>
+                      handleDeviceChange("audioInput", e.target.value)
+                    }
+                  >
+                    {devices.audioInputs.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Mic ${d.deviceId}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">
+                    Camera
+                  </label>
+                  <select
+                    className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none"
+                    value={selectedDevices.videoInput}
+                    onChange={(e) =>
+                      handleDeviceChange("videoInput", e.target.value)
+                    }
+                  >
+                    {devices.videoInputs.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Cam ${d.deviceId}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">
+                    Speaker
+                  </label>
+                  <select
+                    className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none"
+                    value={selectedDevices.audioOutput}
+                    onChange={(e) =>
+                      handleDeviceChange("audioOutput", e.target.value)
+                    }
+                    disabled={!devices.audioOutputs.length}
+                  >
+                    {devices.audioOutputs.length > 0 ? (
+                      devices.audioOutputs.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label || `Speaker ${d.deviceId}`}
+                        </option>
+                      ))
+                    ) : (
+                      <option>Default</option>
+                    )}
+                  </select>
+                </div>
+                <div className="pt-4 border-t border-neutral-700">
+                  <button
+                    onClick={toggleAudioConnection}
+                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
+                      isAudioConnected
+                        ? "bg-red-500/20 text-red-500"
+                        : "bg-green-600 text-white"
+                    }`}
+                  >
+                    {isAudioConnected ? (
+                      <>
+                        <Power size={18} /> Leave Audio
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 size={18} /> Join Audio
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showPasscodeModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
+                <Lock size={32} />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Passcode Required</h2>
+              <form onSubmit={handleSubmitPasscode}>
+                <input
+                  type="password"
+                  autoFocus
+                  className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-3 text-white mb-4"
+                  placeholder="Enter Passcode"
+                  value={passcodeInput}
+                  onChange={(e) => setPasscodeInput(e.target.value)}
+                />
+                {passcodeError && (
+                  <p className="text-red-500 text-xs mb-3 text-left">
+                    Incorrect.
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold"
+                >
+                  Submit
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {askForUsername && !showPasscodeModal && (
+          <div className="flex flex-col items-center justify-center min-h-screen p-4">
+            <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
+              <h2 className="text-2xl font-bold mb-6 text-center">
+                Join Meeting
+              </h2>
+              <input
+                className="bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg block w-full p-2.5 mb-6"
+                placeholder="Enter name"
+                value={userName}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+              <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
+                {localStream ? (
+                  <VideoPlayer
+                    stream={localStream}
+                    isLocal={true}
+                    isMirrored={true}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-gray-400 flex flex-col items-center">
+                    <Loader2 size={32} className="animate-spin mb-2" /> Loading
+                    Camera...
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={connect}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm px-5 py-3"
+              >
+                Join
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isInWaitingRoom && !askForUsername && !showPasscodeModal && (
+          <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900">
+            <div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full text-center">
+              <ShieldAlert size={40} className="text-yellow-500 mx-auto mb-6" />
+              <h2 className="text-2xl font-bold mb-2">Waiting for Host</h2>
+              <div className="flex justify-center gap-2 mt-4">
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-100"></span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-200"></span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
+          <div className="flex flex-col h-screen relative">
+            <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
+              {viewMode === "GRID" ? (
+                renderPaginatedGrid()
+              ) : (
+                <>
+                  <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">
+                    {renderMainSpotlight()}
+                  </div>
+                  <div
+                    className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}
+                  >
+                    {renderSideStrip()}
+                  </div>
+                </>
+              )}
             </div>
 
-            {showSettings && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-neutral-800 p-6 rounded-2xl shadow-2xl max-w-md w-full border border-neutral-700">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold flex items-center gap-2"><Settings size={20} /> Audio & Video Settings</h2>
-                            <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-white"><X size={20} /></button>
-                        </div>
-                        <div className="space-y-4">
-                            <div><label className="block text-sm text-gray-400 mb-1">Microphone</label><select className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none" value={selectedDevices.audioInput} onChange={(e) => handleDeviceChange('audioInput', e.target.value)}>{devices.audioInputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId}`}</option>)}</select></div>
-                            <div><label className="block text-sm text-gray-400 mb-1">Camera</label><select className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none" value={selectedDevices.videoInput} onChange={(e) => handleDeviceChange('videoInput', e.target.value)}>{devices.videoInputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Cam ${d.deviceId}`}</option>)}</select></div>
-                            <div><label className="block text-sm text-gray-400 mb-1">Speaker</label><select className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none" value={selectedDevices.audioOutput} onChange={(e) => handleDeviceChange('audioOutput', e.target.value)} disabled={!devices.audioOutputs.length}>{devices.audioOutputs.length > 0 ? devices.audioOutputs.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Speaker ${d.deviceId}`}</option>) : <option>Default</option>}</select></div>
-                            <div className="pt-4 border-t border-neutral-700"><button onClick={toggleAudioConnection} className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${isAudioConnected ? 'bg-red-500/20 text-red-500' : 'bg-green-600 text-white'}`}>{isAudioConnected ? <><Power size={18} /> Leave Audio</> : <><Volume2 size={18} /> Join Audio</>}</button></div>
-                        </div>
-                    </div>
+            {/* DESKTOP FOOTER */}
+            <div className="hidden md:flex h-20 bg-neutral-900 border-t border-neutral-800 items-center justify-center z-20 px-4 gap-4 relative">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 absolute left-4"
+              >
+                <Settings size={24} />
+              </button>
+              <button
+                onClick={handleAudio}
+                className={`p-4 rounded-full transition-all ${
+                  audio ? "bg-neutral-700" : "bg-red-500"
+                }`}
+              >
+                {audio ? <Mic size={24} /> : <MicOff size={24} />}
+              </button>
+              <button
+                onClick={handleVideo}
+                className={`p-4 rounded-full transition-all ${
+                  video ? "bg-neutral-700" : "bg-red-500"
+                }`}
+              >
+                {video ? <Video size={24} /> : <VideoOff size={24} />}
+              </button>
+              <button
+                onClick={handleToggleHand}
+                className={`p-4 rounded-full transition-all ${
+                  isHandRaised
+                    ? "bg-yellow-500 text-black"
+                    : "bg-neutral-700 text-white"
+                }`}
+              >
+                <Hand size={24} />
+              </button>
+
+              {/* Emoji Picker */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"
+                >
+                  <Smile size={24} />
+                </button>
+                {showEmojiPicker && (
+                  <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">
+                    {EMOJI_LIST.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => handleSendEmoji(emoji)}
+                        className="text-2xl hover:scale-125 transition-transform p-1"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleScreen}
+                className={`p-4 rounded-full ${
+                  screen ? "bg-blue-600" : "bg-neutral-700"
+                }`}
+              >
+                {screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}
+              </button>
+
+              {/* NEW: CAPTION & RECORD BUTTONS */}
+              <button
+                onClick={toggleCaptions}
+                className={`p-4 rounded-full transition-all ${
+                  showCaptions
+                    ? "bg-indigo-600 text-white"
+                    : "bg-neutral-700 text-white"
+                }`}
+                title="Captions"
+              >
+                <Captions size={24} />
+              </button>
+              <button
+                onClick={handleToggleRecord}
+                className={`p-4 rounded-full transition-all ${
+                  isRecording
+                    ? "bg-red-600 animate-pulse text-white"
+                    : "bg-neutral-700 text-white"
+                }`}
+                title="Record"
+              >
+                <Disc size={24} />
+              </button>
+
+              <button
+                onClick={handleEndCall}
+                className="p-4 rounded-full bg-red-600 text-white"
+              >
+                <PhoneOff size={24} />
+              </button>
+
+              <div className="absolute right-6 gap-3 flex">
+                <button
+                  onClick={() => setShowInfo(!showInfo)}
+                  className="p-3 rounded-xl bg-neutral-800"
+                >
+                  <Info size={24} />
+                </button>
+                <button
+                  onClick={() => setShowParticipants(!showParticipants)}
+                  className="p-3 rounded-xl bg-neutral-800 relative"
+                >
+                  <Users size={24} />
+                  {amIHost && waitingUsers && waitingUsers.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {waitingUsers.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowChat(!showChat)}
+                  className="p-3 rounded-xl bg-neutral-800 relative"
+                >
+                  <MessageSquare size={24} />
+                  {unreadMessages > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {unreadMessages}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* MOBILE SLIDER (FOOTER) */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center overflow-x-auto px-4 gap-4 no-scrollbar z-50">
+              <button
+                onClick={handleAudio}
+                className={`flex-shrink-0 p-4 rounded-full ${
+                  audio ? "bg-neutral-700" : "bg-red-500"
+                }`}
+              >
+                {audio ? <Mic size={24} /> : <MicOff size={24} />}
+              </button>
+              <button
+                onClick={handleVideo}
+                className={`flex-shrink-0 p-4 rounded-full ${
+                  video ? "bg-neutral-700" : "bg-red-500"
+                }`}
+              >
+                {video ? <Video size={24} /> : <VideoOff size={24} />}
+              </button>
+              <button
+                onClick={handleToggleHand}
+                className={`flex-shrink-0 p-4 rounded-full ${
+                  isHandRaised ? "bg-yellow-500 text-black" : "bg-neutral-700"
+                }`}
+              >
+                <Hand size={24} />
+              </button>
+              <button
+                onClick={() => setShowChat(!showChat)}
+                className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"
+              >
+                <MessageSquare size={24} />
+                {unreadMessages > 0 && (
+                  <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>
+                )}
+              </button>
+              <button
+                onClick={() => setShowParticipants(!showParticipants)}
+                className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"
+              >
+                <Users size={24} />
+                {amIHost && waitingUsers.length > 0 && (
+                  <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>
+                )}
+              </button>
+
+              {/* Host Controls Inline for Mobile */}
+              {amIHost && (
+                <>
+                  <button
+                    onClick={handleMuteAll}
+                    className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"
+                  >
+                    <MicOff size={24} />
+                  </button>
+                  <button
+                    onClick={handleStopVideoAll}
+                    className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"
+                  >
+                    <VideoOff size={24} />
+                  </button>
+                  <button
+                    onClick={handleToggleLock}
+                    className={`flex-shrink-0 p-4 rounded-full transition-all duration-300 ${
+                      isMeetingLocked
+                        ? "bg-red-600 text-white shadow-lg scale-105"
+                        : "bg-neutral-700"
+                    }`}
+                  >
+                    {isMeetingLocked ? (
+                      <Lock size={24} />
+                    ) : (
+                      <Unlock size={24} />
+                    )}
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={() => setShowMobileMenu(true)}
+                className="flex-shrink-0 p-4 rounded-full bg-neutral-700"
+              >
+                <MoreHorizontal size={24} />
+              </button>
+              <button
+                onClick={handleEndCall}
+                className="flex-shrink-0 p-4 rounded-full bg-red-600 ml-auto"
+              >
+                <PhoneOff size={24} />
+              </button>
+            </div>
+
+            {showMobileMenu && (
+              <div
+                className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end justify-center"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <div
+                  className="bg-neutral-900 w-full rounded-t-2xl p-6 space-y-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold text-lg">More Options</h3>
+                    <button onClick={() => setShowMobileMenu(false)}>
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleScreen();
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
+                  >
+                    <ScreenShare size={24} /> Share Screen
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode(viewMode === "GRID" ? "SPEAKER" : "GRID");
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
+                  >
+                    <LayoutDashboard size={24} /> Change Layout
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettings(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
+                  >
+                    <Settings size={24} /> Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowInfo(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
+                  >
+                    <Info size={24} /> Meeting Info
+                  </button>
+
+                  {/* New Mobile Controls */}
+                  <button
+                    onClick={() => {
+                      toggleCaptions();
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
+                  >
+                    <Captions size={24} />{" "}
+                    {showCaptions ? "Hide Captions" : "Show Captions"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleToggleRecord();
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
+                  >
+                    <Disc
+                      size={24}
+                      className={
+                        isRecording ? "text-red-500 animate-pulse" : ""
+                      }
+                    />{" "}
+                    {isRecording ? "Stop Recording" : "Record Meeting"}
+                  </button>
+
+                  {/* Emoji Bar Mobile */}
+                  <div className="flex justify-between bg-neutral-800 p-4 rounded-xl">
+                    {EMOJI_LIST.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => {
+                          handleSendEmoji(emoji);
+                          setShowMobileMenu(false);
+                        }}
+                        className="text-3xl hover:scale-125 transition-transform"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+              </div>
             )}
 
-            {showPasscodeModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center"><div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500"><Lock size={32} /></div><h2 className="text-2xl font-bold mb-2">Passcode Required</h2><form onSubmit={handleSubmitPasscode}><input type="password" autoFocus className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-3 text-white mb-4" placeholder="Enter Passcode" value={passcodeInput} onChange={e => setPasscodeInput(e.target.value)} />{passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect.</p>}<button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold">Submit</button></form></div>
+            {showParticipants && (
+              <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
+                <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
+                  <h3 className="font-bold">Participants</h3>
+                  {amIHost && Object.keys(userMap).length > 0 && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleMuteAll}
+                        className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded hover:bg-red-500/30"
+                      >
+                        Mute All
+                      </button>
+                      <button
+                        onClick={handleStopVideoAll}
+                        className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded hover:bg-red-500/30"
+                      >
+                        Stop Video
+                      </button>
+                    </div>
+                  )}
+                  <button onClick={() => setShowParticipants(false)}>
+                    <X size={20} />
+                  </button>
                 </div>
-            )}
-
-            {askForUsername && !showPasscodeModal && (
-                <div className="flex flex-col items-center justify-center min-h-screen p-4">
-                    <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
-                        <h2 className="text-2xl font-bold mb-6 text-center">Join Meeting</h2>
-                        <input className="bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg block w-full p-2.5 mb-6" placeholder="Enter name" value={userName} onChange={(e) => setUsername(e.target.value)} />
-                        <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
-                            {localStream ? <VideoPlayer stream={localStream} isLocal={true} isMirrored={true} className="w-full h-full object-cover" /> : <div className="text-gray-400 flex flex-col items-center"><Loader2 size={32} className="animate-spin mb-2"/> Loading Camera...</div>}
+                <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+                  {amIHost && waitingUsers && waitingUsers.length > 0 && (
+                    <div className="pb-4 border-b border-neutral-700">
+                      <h4 className="text-xs font-bold text-yellow-500 uppercase mb-3">
+                        Waiting
+                      </h4>
+                      {waitingUsers.map((u) => (
+                        <div
+                          key={u.socketId}
+                          className="flex justify-between items-center bg-neutral-700/50 p-2 rounded mb-2"
+                        >
+                          <span className="text-sm">
+                            {u.username || "Guest"}
+                          </span>
+                          <button
+                            onClick={() => handleAdmit(u.socketId)}
+                            className="p-1 bg-green-600 rounded text-xs"
+                          >
+                            <UserCheck size={14} />
+                          </button>
                         </div>
-                        <button onClick={connect} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm px-5 py-3">Join</button>
+                      ))}
                     </div>
-                </div>
-            )}
-
-            {isInWaitingRoom && !askForUsername && !showPasscodeModal && (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900"><div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full text-center"><ShieldAlert size={40} className="text-yellow-500 mx-auto mb-6" /><h2 className="text-2xl font-bold mb-2">Waiting for Host</h2><div className="flex justify-center gap-2 mt-4"><span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-100"></span><span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-200"></span></div></div></div>
-            )}
-
-            {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
-                <div className="flex flex-col h-screen relative">
-                    
-                    <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
-                        {viewMode === "GRID" ? renderPaginatedGrid() : (
-                            <>
-                                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">{renderMainSpotlight()}</div>
-                                <div className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}>{renderSideStrip()}</div>
-                            </>
-                        )}
-                    </div>
-
-                    {/* DESKTOP FOOTER */}
-                    <div className="hidden md:flex h-20 bg-neutral-900 border-t border-neutral-800 items-center justify-center z-20 px-4 gap-4 relative">
-                        <button onClick={() => setShowSettings(true)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 absolute left-4"><Settings size={24} /></button>
-                        <button onClick={handleAudio} className={`p-4 rounded-full transition-all ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</button>
-                        <button onClick={handleVideo} className={`p-4 rounded-full transition-all ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</button>
-                        <button onClick={handleToggleHand} className={`p-4 rounded-full transition-all ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700 text-white'}`}><Hand size={24} /></button>
-                        
-                        {/* Emoji Picker */}
-                        <div className="relative"><button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"><Smile size={24} /></button>{showEmojiPicker && ( <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">{EMOJI_LIST.map(emoji => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-2xl hover:scale-125 transition-transform p-1">{emoji}</button>))}</div> )}</div>
-                        
-                        <button onClick={handleScreen} className={`p-4 rounded-full ${screen ? 'bg-blue-600' : 'bg-neutral-700'}`}>{screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}</button>
-                        
-                        {/* NEW: CAPTION & RECORD BUTTONS */}
-                        <button onClick={toggleCaptions} className={`p-4 rounded-full transition-all ${showCaptions ? 'bg-indigo-600 text-white' : 'bg-neutral-700 text-white'}`} title="Captions"><Captions size={24} /></button>
-                        <button onClick={handleToggleRecord} className={`p-4 rounded-full transition-all ${isRecording ? 'bg-red-600 animate-pulse text-white' : 'bg-neutral-700 text-white'}`} title="Record"><Disc size={24} /></button>
-
-                        <button onClick={handleEndCall} className="p-4 rounded-full bg-red-600 text-white"><PhoneOff size={24} /></button>
-                        
-                        <div className="absolute right-6 gap-3 flex">
-                            <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
-                            <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative"><Users size={24} />{amIHost && waitingUsers && waitingUsers.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingUsers.length}</span>}</button>
-                            <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</button>
-                        </div>
-                    </div>
-
-                    {/* MOBILE SLIDER (FOOTER) */}
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center overflow-x-auto px-4 gap-4 no-scrollbar z-50">
-                        <button onClick={handleAudio} className={`flex-shrink-0 p-4 rounded-full ${audio ? 'bg-neutral-700' : 'bg-red-500'}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</button>
-                        <button onClick={handleVideo} className={`flex-shrink-0 p-4 rounded-full ${video ? 'bg-neutral-700' : 'bg-red-500'}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</button>
-                        <button onClick={handleToggleHand} className={`flex-shrink-0 p-4 rounded-full ${isHandRaised ? 'bg-yellow-500 text-black' : 'bg-neutral-700'}`}><Hand size={24} /></button>
-                        <button onClick={() => setShowChat(!showChat)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
-                        <button onClick={() => setShowParticipants(!showParticipants)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700 relative"><Users size={24} />{amIHost && waitingUsers.length > 0 && <span className="absolute top-0 right-0 w-3 h-3 bg-red-600 rounded-full"></span>}</button>
-                        
-                        {/* Host Controls Inline for Mobile */}
+                  )}
+                  <div className="flex justify-between items-center bg-neutral-700/50 p-2 rounded">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs">
+                        {(userName || "G").charAt(0)}
+                      </div>
+                      <span className="text-sm">
+                        {userName} (You){" "}
                         {amIHost && (
-                            <>
-                                <button onClick={handleMuteAll} className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"><MicOff size={24} /></button>
-                                <button onClick={handleStopVideoAll} className="flex-shrink-0 p-4 rounded-full bg-red-500/20 text-red-500"><VideoOff size={24} /></button>
-                                <button onClick={handleToggleLock} className={`flex-shrink-0 p-4 rounded-full ${isMeetingLocked ? 'bg-red-500' : 'bg-neutral-700'}`}>{isMeetingLocked ? <Lock size={24} /> : <Unlock size={24} />}</button>
-                            </>
+                          <Crown
+                            size={12}
+                            className="text-yellow-400 fill-yellow-400 inline ml-1"
+                          />
                         )}
-
-                        <button onClick={() => setShowMobileMenu(true)} className="flex-shrink-0 p-4 rounded-full bg-neutral-700"><MoreHorizontal size={24} /></button>
-                        <button onClick={handleEndCall} className="flex-shrink-0 p-4 rounded-full bg-red-600 ml-auto"><PhoneOff size={24} /></button>
+                      </span>
                     </div>
-                        
-                    {showMobileMenu && (
-                        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowMobileMenu(false)}>
-                            <div className="bg-neutral-900 w-full rounded-t-2xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-lg">More Options</h3><button onClick={() => setShowMobileMenu(false)}><X size={24} /></button></div>
-                                <button onClick={() => { handleScreen(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><ScreenShare size={24} /> Share Screen</button>
-                                <button onClick={() => { setViewMode(viewMode === "GRID" ? "SPEAKER" : "GRID"); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><LayoutDashboard size={24} /> Change Layout</button>
-                                <button onClick={() => { setShowSettings(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Settings size={24} /> Settings</button>
-                                <button onClick={() => { setShowInfo(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Info size={24} /> Meeting Info</button>
-                                
-                                {/* New Mobile Controls */}
-                                <button onClick={() => { toggleCaptions(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Captions size={24} /> {showCaptions ? "Hide Captions" : "Show Captions"}</button>
-                                <button onClick={() => { handleToggleRecord(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Disc size={24} className={isRecording ? 'text-red-500 animate-pulse' : ''} /> {isRecording ? "Stop Recording" : "Record Meeting"}</button>
-
-                                {/* Emoji Bar Mobile */}
-                                <div className="flex justify-between bg-neutral-800 p-4 rounded-xl">
-                                    {EMOJI_LIST.map(emoji => (
-                                        <button key={emoji} onClick={() => { handleSendEmoji(emoji); setShowMobileMenu(false); }} className="text-3xl hover:scale-125 transition-transform">{emoji}</button>
-                                    ))}
-                                </div>
+                  </div>
+                  {userMap &&
+                    Object.values(userMap).map((u) => {
+                      const isUserHost = u.socketId === roomHostId;
+                      return (
+                        <div
+                          key={u.socketId}
+                          className="flex justify-between items-center bg-neutral-700/50 p-2 rounded group"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-xs">
+                              {(u.username || "G").charAt(0)}
                             </div>
-                        </div>
-                    )}
-
-                    {showParticipants && (
-                        <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
-                            <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
-                                <h3 className="font-bold">Participants</h3>{amIHost && Object.keys(userMap).length > 0 && (<div className="flex gap-2"><button onClick={handleMuteAll} className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded hover:bg-red-500/30">Mute All</button><button onClick={handleStopVideoAll} className="text-xs bg-red-500/20 text-red-500 px-2 py-1 rounded hover:bg-red-500/30">Stop Video</button></div>)}<button onClick={() => setShowParticipants(false)}><X size={20} /></button></div>
-                            <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-                                {amIHost && waitingUsers && waitingUsers.length > 0 && (<div className="pb-4 border-b border-neutral-700"><h4 className="text-xs font-bold text-yellow-500 uppercase mb-3">Waiting</h4>{waitingUsers.map(u => (<div key={u.socketId} className="flex justify-between items-center bg-neutral-700/50 p-2 rounded mb-2"><span className="text-sm">{u.username || "Guest"}</span><button onClick={() => handleAdmit(u.socketId)} className="p-1 bg-green-600 rounded text-xs"><UserCheck size={14}/></button></div>))}</div>)}
-                                <div className="flex justify-between items-center bg-neutral-700/50 p-2 rounded"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs">{(userName || "G").charAt(0)}</div><span className="text-sm">{userName} (You) {amIHost && <Crown size={12} className="text-yellow-400 fill-yellow-400 inline ml-1" />}</span></div></div>
-                                {userMap && Object.values(userMap).map(u => {
-                                    const isUserHost = u.socketId === roomHostId;
-                                    return (
-                                        <div key={u.socketId} className="flex justify-between items-center bg-neutral-700/50 p-2 rounded group">
-                                            <div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-xs">{(u.username || "G").charAt(0)}</div><span className="text-sm">{u.username || "Guest"} {isUserHost && <Crown size={12} className="text-yellow-400 fill-yellow-400 inline ml-1" />}</span></div>
-                                            <div className="flex items-center gap-2">
-                                                <div className={u.isVideoOff ? "text-red-500" : "text-gray-400"}>{u.isVideoOff ? <VideoOff size={14} /> : <Video size={14} />}</div>
-                                                <div className={u.isMuted ? "text-red-500" : "text-gray-400"}>{u.isMuted ? <MicOff size={14} /> : <Mic size={14} />}</div>
-                                                
-                                                {amIHost && (
-                                                    <>
-                                                        <button onClick={() => handleTransferHost(u.socketId)} className="text-gray-500 hover:text-blue-500 transition-colors" title="Make Host"><UserCog size={14} /></button>
-                                                        <button onClick={() => handleKickUser(u.socketId)} className="text-gray-500 hover:text-red-500 transition-colors" title="Remove"><Trash2 size={14} /></button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                            <span className="text-sm">
+                              {u.username || "Guest"}{" "}
+                              {isUserHost && (
+                                <Crown
+                                  size={12}
+                                  className="text-yellow-400 fill-yellow-400 inline ml-1"
+                                />
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={
+                                u.isVideoOff ? "text-red-500" : "text-gray-400"
+                              }
+                            >
+                              {u.isVideoOff ? (
+                                <VideoOff size={14} />
+                              ) : (
+                                <Video size={14} />
+                              )}
                             </div>
+                            <div
+                              className={
+                                u.isMuted ? "text-red-500" : "text-gray-400"
+                              }
+                            >
+                              {u.isMuted ? (
+                                <MicOff size={14} />
+                              ) : (
+                                <Mic size={14} />
+                              )}
+                            </div>
+
+                            {amIHost && (
+                              <>
+                                <button
+                                  onClick={() => handleTransferHost(u.socketId)}
+                                  className="text-gray-500 hover:text-blue-500 transition-colors"
+                                  title="Make Host"
+                                >
+                                  <UserCog size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleKickUser(u.socketId)}
+                                  className="text-gray-500 hover:text-red-500 transition-colors"
+                                  title="Remove"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                    )}
-                    
-                    {showChat && (
-                        <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
-                            <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900"><h3 className="font-bold">Chat</h3><button onClick={() => setShowChat(false)}><X size={20} /></button></div>
-                            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">{messages.map((msg, i) => (<div key={i} className={`flex flex-col ${msg.isMe ? "items-end" : "items-start"}`}><div className="text-xs text-gray-400 mb-1">{msg.sender}</div><div className={`px-4 py-2 rounded-lg text-sm ${msg.isMe ? "bg-blue-600" : "bg-neutral-700"}`}>{msg.text}</div></div>))}</div>
-                            <div className="p-4 bg-neutral-900 border-t border-neutral-700"><form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2"><input className="flex-1 bg-neutral-700 rounded-lg p-2 text-sm" value={currentMessage} onChange={e => setCurrentMessage(e.target.value)} placeholder="Type..." /><button type="submit" className="p-2 bg-blue-600 rounded-lg"><Send size={18} /></button></form></div>
-                        </div>
-                    )}
-                    
-                    {showInfo && (<div className="absolute bottom-20 right-4 w-72 bg-neutral-800 rounded-xl border border-neutral-700 shadow-2xl z-30 p-4"><div className="flex justify-between items-center mb-4"><h3 className="font-bold">Info</h3><button onClick={() => setShowInfo(false)}><X size={18} /></button></div><div className="space-y-4"><div><label className="text-xs text-gray-400">Code</label><div className="flex items-center gap-2 font-mono font-bold text-lg">{meetingCode} <button onClick={handleCopyLink} className="text-blue-400"><Copy size={16}/></button></div></div>{amIHost && (<div className="pt-2 border-t border-neutral-700"><button onClick={handleToggleLock} className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium ${isMeetingLocked ? 'bg-red-500/20 text-red-500' : 'bg-neutral-700 text-white'}`}>{isMeetingLocked ? <Lock size={16} /> : <Unlock size={16} />} {isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}</button></div>)}<button onClick={handleCopyLink} className="w-full bg-blue-600 py-2 rounded-lg text-sm font-medium">Copy Invite Link</button></div></div>)}
+                      );
+                    })}
                 </div>
+              </div>
             )}
-        </div>
+
+            {showChat && (
+              <div className="absolute right-0 top-0 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
+                <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
+                  <h3 className="font-bold">Chat</h3>
+                  <button onClick={() => setShowChat(false)}>
+                    <X size={20} />
+                  </button>
+                </div>
+                <div
+                  ref={chatContainerRef}
+                  className="flex-1 overflow-y-auto p-4 space-y-4"
+                >
+                  {messages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex flex-col ${
+                        msg.isMe ? "items-end" : "items-start"
+                      }`}
+                    >
+                      <div className="text-xs text-gray-400 mb-1">
+                        {msg.sender}
+                      </div>
+                      <div
+                        className={`px-4 py-2 rounded-lg text-sm ${
+                          msg.isMe ? "bg-blue-600" : "bg-neutral-700"
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-4 bg-neutral-900 border-t border-neutral-700">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      className="flex-1 bg-neutral-700 rounded-lg p-2 text-sm"
+                      value={currentMessage}
+                      onChange={(e) => setCurrentMessage(e.target.value)}
+                      placeholder="Type..."
+                    />
+                    <button
+                      type="submit"
+                      className="p-2 bg-blue-600 rounded-lg"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {showInfo && (
+              <div className="absolute bottom-20 right-4 w-72 bg-neutral-800 rounded-xl border border-neutral-700 shadow-2xl z-30 p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold">Info</h3>
+                  <button onClick={() => setShowInfo(false)}>
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-gray-400">Code</label>
+                    <div className="flex items-center gap-2 font-mono font-bold text-lg">
+                      {meetingCode}{" "}
+                      <button
+                        onClick={handleCopyLink}
+                        className="text-blue-400"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  {amIHost && (
+                    <div className="pt-2 border-t border-neutral-700">
+                      <button 
+    onClick={handleToggleLock} 
+    className={`p-4 rounded-full transition-all duration-300 transform ${
+        isMeetingLocked 
+        ? 'bg-red-600 text-white scale-110 shadow-[0_0_15px_rgba(220,38,38,0.5)]' // Glowing Red + Bigger
+        : 'bg-neutral-700 text-white hover:bg-neutral-600'
+    }`}
+    title={isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}
+>
+    {isMeetingLocked ? (
+        <Lock size={24} className="animate-in zoom-in duration-300" /> 
+    ) : (
+        <Unlock size={24} className="animate-in zoom-in duration-300" />
+    )}
+</button>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full bg-blue-600 py-2 rounded-lg text-sm font-medium"
+                  >
+                    Copy Invite Link
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     );
 }
