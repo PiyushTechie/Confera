@@ -6,7 +6,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import passport from "passport";
 import helmet from "helmet";
-import mongoSanitize from "express-mongo-sanitize";
 import jwt from "jsonwebtoken"; // 🔐 NEW
 
 import { authLimiter, apiLimiter } from "./middlewares/limiters.js";
@@ -33,12 +32,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ limit: "10kb", extended: true }));
-app.use(
-  mongoSanitize({
-    replaceWith: "_",
-  })
-);
-
+mongoose.set("sanitizeFilter", true);
 app.use(passport.initialize());
 
 const io = new Server(server, { cors: corsOptions });
