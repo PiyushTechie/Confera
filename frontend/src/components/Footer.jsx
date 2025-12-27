@@ -19,7 +19,7 @@ const Footer = () => {
               <img 
                 src={brandLogo} 
                 alt="Cenfora Logo" 
-                className="h-10 w-auto object-contain"
+                className="h-16 w-auto object-contain"
                 onError={(e) => {
                     e.target.style.display = 'none';
                 }}

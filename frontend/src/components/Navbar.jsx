@@ -11,12 +11,12 @@ const Navbar = () => {
   const toggleMenu = () => setIsOpen(!isOpen);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-2 max-w-7xl mx-auto">
+    <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-2 max-w-7xl mx-auto mt-2">
       {/* Glassmorphism Background (Main Bar) */}
       <div className="absolute inset-0 bg-white/70 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm z-0" />
 
       {/* Navbar Content */}
-      <div className="relative z-10 flex items-center justify-between w-full px-4 py-2">
+      <div className="relative z-10 flex items-center justify-between w-full px-2 py-2">
         
         {/* Logo Section - Modified to use Image */}
         <Link to="/" className="flex items-center gap-2 group">
