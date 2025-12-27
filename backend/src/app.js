@@ -269,6 +269,15 @@ io.on("connection", (socket) => {
     io.to(toId).emit("signal", socket.id, message);
   });
 
+  socket.on("send-caption", ({ roomId, caption, username }) => {
+    if (!rateLimitSocket(socket, "send-caption")) return; 
+
+    socket.to(roomId).emit("receive-caption", {
+      caption,
+      username: username || "Speaker"
+    });
+  });
+
   socket.on("send-message", (data) => {
     if (!rateLimitSocket(socket, "send-message")) return; // 🚦 NEW
     if (socket.roomPath)
