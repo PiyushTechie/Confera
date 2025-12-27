@@ -18,14 +18,14 @@ const Navbar = () => {
     const brandLogoSrc = brandLogo;
 
     return (
-        <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-4 mb-8">
+        <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-2">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 {/* Brand Logo Section */}
                 <div className="flex-shrink-0 flex items-center">
                     <img
                         src={brandLogoSrc}
                         alt="Brand Logo"
-                        className="h-12 w-auto object-contain"
+                        className="h-16 md:h-16 w-auto object-contain transition-all"
                         onError={(e) => {
                             e.target.onerror = null;
                             e.target.style.display = 'none';
