@@ -942,10 +942,15 @@ export default function VideoMeetComponent() {
     return (
       <div className="relative w-full h-full flex items-center justify-center bg-black/90">
         {isCamOff ? (
-          <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center text-7xl font-bold text-white shadow-2xl">
+        <div className="w-full h-full bg-neutral-900 flex flex-col items-center justify-center gap-6">
+          <div className="w-48 h-48 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-8xl font-bold text-white shadow-2xl">
             {displayName.charAt(0).toUpperCase()}
           </div>
-        ) : (
+          <span className="text-white text-2xl font-medium">
+            {displayName}
+          </span>
+        </div>
+      ) : (
           <VideoPlayer
             stream={stream}
             isLocal={isLocal}
@@ -1074,8 +1079,8 @@ export default function VideoMeetComponent() {
   if (!isMobile && count > 4) gridClass = "grid-cols-2 lg:grid-cols-3";
 
   return (
-    <div className="relative w-full h-full bg-black p-4 md:p-8 flex items-center justify-center">
-      <div className={`grid ${gridClass} gap-4 md:gap-6 w-full h-full max-w-5xl`}>
+    <div className="relative w-full h-full bg-black p-2 flex items-center justify-center">
+  <div className={`grid ${gridClass} gap-2 w-full h-full`}>
         {visibleParticipants.map((p) => {
           const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
           const user = p.isLocal
@@ -1373,18 +1378,20 @@ export default function VideoMeetComponent() {
       {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
         <div className="flex flex-col h-screen relative">
           <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
-            {viewMode === "GRID" || isMobile ? (
-  renderPaginatedGrid()  // We'll update this function next
-) : (
-  <>
-    <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">
-      {renderMainSpotlight()}
-    </div>
-    <div className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}>
-      {renderSideStrip()}
-    </div>
-  </>
-)}
+            {isMobile ? (
+              renderPaginatedGrid()  // Always grid on mobile, even for 1 participant
+            ) : viewMode === "GRID" ? (
+              renderPaginatedGrid()
+            ) : (
+              <>
+                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+                  {renderMainSpotlight()}
+                </div>
+                <div className={`flex bg-neutral-900 ...`}>
+                  {renderSideStrip()}
+                </div>
+              </>
+            )}
           </div>
 
           {/* DESKTOP FOOTER */}
