@@ -665,15 +665,27 @@ export default function VideoMeetComponent() {
   };
 
   const cleanupAndLeave = () => {
-    if (localStreamRef.current)
-      localStreamRef.current.getTracks().forEach((t) => t.stop());
-    if (displayStreamRef.current)
-      displayStreamRef.current.getTracks().forEach((t) => t.stop());
-    if (audioContextRef.current) audioContextRef.current.close();
-    Object.values(connectionsRef.current).forEach((pc) => pc.close());
-    if (socketRef.current) socketRef.current.disconnect();
-    navigate("/");
-  };
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(t => t.stop());
+        }
+        if (displayStreamRef.current) {
+            displayStreamRef.current.getTracks().forEach(t => t.stop());
+        }
+        
+        // 🛠 FIX: Check state before closing
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            audioContextRef.current.close();
+        }
+        audioContextRef.current = null; // Clear it so useEffect doesn't try again
+
+        Object.values(connectionsRef.current).forEach(pc => pc.close());
+        
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+        }
+        
+        navigate("/");
+    };
 
   /* ------------------ ACTIONS ------------------ */
   const handleToggleHand = () => {
@@ -835,17 +847,29 @@ export default function VideoMeetComponent() {
   };
 
   useEffect(() => {
-    getMedia().then(() => {
-      if (bypassLobby || (username && username !== "Guest")) connectSocket();
-      else setAskForUsername(true);
-    });
-    return () => {
-      if (localStreamRef.current)
-        localStreamRef.current.getTracks().forEach((t) => t.stop());
-      if (socketRef.current) socketRef.current.disconnect();
-      if (audioContextRef.current) audioContextRef.current.close();
-    };
-  }, []);
+        getMedia().then(() => {
+            if (bypassLobby || (username && username !== "Guest")) {
+                connectSocket();
+            } else {
+                setAskForUsername(true);
+            }
+        });
+
+        return () => {
+            if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach(t => t.stop());
+            }
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+            }
+            
+            // 🛠 FIX: Check state before closing
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close();
+            }
+        };
+    }, []);
+
   useEffect(() => {
     if (chatContainerRef.current)
       chatContainerRef.current.scrollTop =
