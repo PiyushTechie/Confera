@@ -1027,118 +1027,78 @@ export default function VideoMeetComponent() {
   };
 
   const renderPaginatedGrid = () => {
-    const allParticipants = [
-      { socketId: "local", stream: localStream, isLocal: true },
-      ...videos.map((v) => ({ ...v, isLocal: false })),
-    ];
-    const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
-    const startIndex = gridPage * GRID_PAGE_SIZE;
-    const visibleParticipants = allParticipants.slice(
-      startIndex,
-      startIndex + GRID_PAGE_SIZE
-    );
-    const count = visibleParticipants.length;
-    let gridClass = "grid-cols-1";
-    if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
-    else if (count >= 3) gridClass = "grid-cols-2";
+        const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
+        const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
+        const startIndex = gridPage * GRID_PAGE_SIZE;
+        const visibleParticipants = allParticipants.slice(startIndex, startIndex + GRID_PAGE_SIZE);
+        const count = visibleParticipants.length;
+        let gridClass = "grid-cols-1";
+        if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
+        else if (count >= 3) gridClass = "grid-cols-2";
 
-    return (
-      <div className="relative w-full h-full bg-black p-4 flex flex-col items-center justify-center">
-        <div
-          className={`grid ${gridClass} gap-4 w-full h-full max-w-6xl max-h-full transition-all duration-300`}
-        >
-          {visibleParticipants.map((p) => {
-            const pId = p.isLocal ? socketIdRef.current || "local" : p.socketId;
-            const user = p.isLocal
-              ? {
-                  username: userName,
-                  isHandRaised: isHandRaised,
-                  isVideoOff: !video,
-                }
-              : userMap[pId] || { username: "Guest" };
-            const displayName = p.isLocal ? `${userName} (You)` : user.username;
-            const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
-            const isCamOff = user.isVideoOff;
-            const emojiToShow =
-              activeEmojis[p.socketId] ||
-              (p.isLocal && activeEmojis[socketIdRef.current]);
+        return (
+            <div className="relative w-full h-full bg-black p-4 flex flex-col items-center justify-center">
+                <div className={`grid ${gridClass} gap-4 w-full h-full max-w-6xl max-h-full transition-all duration-300`}>
+                    {visibleParticipants.map(p => {
+                        const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
+                        const user = p.isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video } : (userMap[pId] || { username: "Guest" });
+                        const displayName = p.isLocal ? `${userName} (You)` : user.username;
+                        const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
+                        const isCamOff = user.isVideoOff;
+                        const emojiToShow = activeEmojis[p.socketId] || (p.isLocal && activeEmojis[socketIdRef.current]);
+                        
+                        // 1. Determine if THIS tile should show a caption
+                        // Show if: Captions are enabled AND (It's me + localCaption exists OR It's remote + matching remoteCaption exists)
+                        const showCaptionOnThisTile = showCaptions && (
+                            (p.isLocal && localCaption) || 
+                            (!p.isLocal && remoteCaption && remoteCaption.username === user.username)
+                        );
+                        
+                        // NOTE: The remote check above relies on username matching. 
+                        // For more precision, you'd ideally pass socketId in the caption payload, 
+                        // but username works for this simple setup.
 
-            return (
-              <div
-                key={pId}
-                className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 w-full h-full ${
-                  activeSpeakerId === pId && !p.isLocal
-                    ? "border-green-500"
-                    : "border-neutral-700"
-                }`}
-              >
-                {isCamOff ? (
-                  <div className="w-full h-full flex items-center justify-center bg-neutral-700">
-                    <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-4xl font-bold text-white shadow-lg">
-                      {displayName.charAt(0).toUpperCase()}
-                    </div>
-                  </div>
-                ) : (
-                  <VideoPlayer
-                    stream={p.stream}
-                    isLocal={p.isLocal}
-                    isMirrored={p.isLocal && !screen}
-                    className="w-full h-full object-cover"
-                    audioOutputId={selectedDevices.audioOutput}
-                  />
-                )}
+                        return (
+                            <div key={pId} className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 w-full h-full ${activeSpeakerId === pId && !p.isLocal ? 'border-green-500' : 'border-neutral-700'}`}>
+                                {isCamOff ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-neutral-700">
+                                        <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-4xl font-bold text-white shadow-lg">
+                                            {displayName.charAt(0).toUpperCase()}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <VideoPlayer stream={p.stream} isLocal={p.isLocal} isMirrored={p.isLocal && !screen} className="w-full h-full object-cover" audioOutputId={selectedDevices.audioOutput} />
+                                )}
 
-                <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-sm font-medium text-white flex items-center gap-2">
-                  {displayName}
-                  {isThisHost && (
-                    <Crown
-                      size={14}
-                      className="text-yellow-400 fill-yellow-400"
-                    />
-                  )}
+                                {/* --- NEW CAPTION OVERLAY FOR GRID --- */}
+                                {showCaptionOnThisTile && (
+                                    <div className="absolute bottom-16 left-2 right-2 bg-black/70 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-center transition-all animate-in slide-in-from-bottom-2 z-40">
+                                        <p className="text-white text-sm font-medium leading-tight">
+                                            {p.isLocal ? localCaption : remoteCaption.caption}
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-sm font-medium text-white flex items-center gap-2 z-30">
+                                    {displayName}
+                                    {isThisHost && <Crown size={14} className="text-yellow-400 fill-yellow-400" />}
+                                </div>
+                                {user.isHandRaised && <div className="absolute top-3 right-3 bg-yellow-500 p-2 rounded-full text-black shadow-lg animate-bounce"><Hand size={20} /></div>}
+                                {emojiToShow && <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><span className="text-8xl filter drop-shadow-lg leading-none">{emojiToShow}</span></div>}
+                            </div>
+                        );
+                    })}
                 </div>
-                {user.isHandRaised && (
-                  <div className="absolute top-3 right-3 bg-yellow-500 p-2 rounded-full text-black shadow-lg animate-bounce">
-                    <Hand size={20} />
-                  </div>
+                {totalPages > 1 && (
+                    <>
+                        {gridPage > 0 && <button onClick={() => setGridPage(p => p - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronLeft size={32} /></button>}
+                        {gridPage < totalPages - 1 && <button onClick={() => setGridPage(p => p + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronRight size={32} /></button>}
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">Page {gridPage + 1} / {totalPages}</div>
+                    </>
                 )}
-                {emojiToShow && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
-                    <span className="text-8xl filter drop-shadow-lg leading-none">
-                      {emojiToShow}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {totalPages > 1 && (
-          <>
-            {gridPage > 0 && (
-              <button
-                onClick={() => setGridPage((p) => p - 1)}
-                className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"
-              >
-                <ChevronLeft size={32} />
-              </button>
-            )}
-            {gridPage < totalPages - 1 && (
-              <button
-                onClick={() => setGridPage((p) => p + 1)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"
-              >
-                <ChevronRight size={32} />
-              </button>
-            )}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">
-              Page {gridPage + 1} / {totalPages}
             </div>
-          </>
-        )}
-      </div>
-    );
-  };
+        );
+    };
 
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
