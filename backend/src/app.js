@@ -339,38 +339,57 @@ io.on("connection", (socket) => {
 
   /* -------- DISCONNECT -------- */
 
-  socket.on("disconnect", () => {
-    for (const path in rooms) {
-      const room = rooms[path];
+  /* -------- DISCONNECT & LEAVE LOGIC (FIXED) -------- */
 
-      const userIndex = room.users.findIndex(
-        (u) => u.socketId === socket.id
-      );
+  const handleUserLeave = () => {
+    // 1. Optimization: Use the saved room path instead of looping through all rooms
+    const path = socket.roomPath; 
+    
+    if (!path || !rooms[path]) return;
 
-      if (userIndex !== -1) {
-        room.users.splice(userIndex, 1);
-        socket.to(path).emit("user-left", socket.id);
+    const room = rooms[path];
+    const userIndex = room.users.findIndex((u) => u.socketId === socket.id);
 
-        if (room.hostId === socket.id && room.users.length > 0) {
-          room.hostId = room.users[0].socketId;
-          io.to(room.hostId).emit(
-            "update-waiting-list",
-            room.waiting
-          );
+    if (userIndex !== -1) {
+      // Remove user from the list
+      room.users.splice(userIndex, 1);
+      
+      // Notify everyone else that this user is gone
+      // Using io.to ensure delivery even if socket is unstable
+      io.to(path).emit("user-left", socket.id);
+
+      // 2. Host Migration Logic
+      // If the person leaving was the HOST, assign a new host automatically
+      if (room.hostId === socket.id) {
+        if (room.users.length > 0) {
+          const newHost = room.users[0]; // Pick the next person
+          room.hostId = newHost.socketId;
+          
+          // Notify the room of the new host
           io.to(path).emit("update-host-id", room.hostId);
+          io.to(room.hostId).emit("update-waiting-list", room.waiting);
         }
       }
-
-      room.waiting = room.waiting.filter(
-        (u) => u.socketId !== socket.id
-      );
-
-      if (room.users.length === 0 && room.waiting.length === 0) {
-        delete rooms[path];
-      }
     }
+
+    // Clean up waiting list
+    room.waiting = room.waiting.filter((u) => u.socketId !== socket.id);
+
+    // 3. Delete Room if empty
+    if (room.users.length === 0 && room.waiting.length === 0) {
+      delete rooms[path];
+    }
+  };
+
+  // Case A: Browser closed or Internet lost
+  socket.on("disconnect", () => {
+    handleUserLeave();
   });
-});
+
+  // Case B: User clicked "End Call" button (Instant removal)
+  socket.on("leave-room", () => {
+    handleUserLeave();
+  });
 
 /* ================= START SERVER ================= */
 

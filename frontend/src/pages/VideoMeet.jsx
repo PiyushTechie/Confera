@@ -1056,78 +1056,110 @@ export default function VideoMeetComponent() {
   };
 
   const renderPaginatedGrid = () => {
-        const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map(v => ({ ...v, isLocal: false }))];
-        const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
-        const startIndex = gridPage * GRID_PAGE_SIZE;
-        const visibleParticipants = allParticipants.slice(startIndex, startIndex + GRID_PAGE_SIZE);
-        const count = visibleParticipants.length;
-        let gridClass = "grid-cols-1";
-        if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
-        else if (count >= 3) gridClass = "grid-cols-2";
+  const allParticipants = [
+    { socketId: "local", stream: localStream, isLocal: true },
+    ...videos.map((v) => ({ ...v, isLocal: false })),
+  ];
 
-        return (
-            <div className="relative w-full h-full bg-black p-4 flex flex-col items-center justify-center">
-                <div className={`grid ${gridClass} gap-4 w-full h-full max-w-6xl max-h-full transition-all duration-300`}>
-                    {visibleParticipants.map(p => {
-                        const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
-                        const user = p.isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video } : (userMap[pId] || { username: "Guest" });
-                        const displayName = p.isLocal ? `${userName} (You)` : user.username;
-                        const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
-                        const isCamOff = user.isVideoOff;
-                        const emojiToShow = activeEmojis[p.socketId] || (p.isLocal && activeEmojis[socketIdRef.current]);
-                        
-                        // 1. Determine if THIS tile should show a caption
-                        // Show if: Captions are enabled AND (It's me + localCaption exists OR It's remote + matching remoteCaption exists)
-                        const showCaptionOnThisTile = showCaptions && (
-                            (p.isLocal && localCaption) || 
-                            (!p.isLocal && remoteCaption && remoteCaption.username === user.username)
-                        );
-                        
-                        // NOTE: The remote check above relies on username matching. 
-                        // For more precision, you'd ideally pass socketId in the caption payload, 
-                        // but username works for this simple setup.
+  // Mobile: max 4 tiles, no pagination needed
+  // Desktop: keep pagination if >4
+  const visibleParticipants = isMobile 
+    ? allParticipants.slice(0, 4) 
+    : allParticipants;
 
-                        return (
-                            <div key={pId} className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 w-full h-full ${activeSpeakerId === pId && !p.isLocal ? 'border-green-500' : 'border-neutral-700'}`}>
-                                {isCamOff ? (
-                                    <div className="w-full h-full flex items-center justify-center bg-neutral-700">
-                                        <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-4xl font-bold text-white shadow-lg">
-                                            {displayName.charAt(0).toUpperCase()}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <VideoPlayer stream={p.stream} isLocal={p.isLocal} isMirrored={p.isLocal && !screen} className="w-full h-full object-cover" audioOutputId={selectedDevices.audioOutput} />
-                                )}
+  const count = visibleParticipants.length;
 
-                                {/* --- NEW CAPTION OVERLAY FOR GRID --- */}
-                                {showCaptionOnThisTile && (
-                                    <div className="absolute bottom-16 left-2 right-2 bg-black/70 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-center transition-all animate-in slide-in-from-bottom-2 z-40">
-                                        <p className="text-white text-sm font-medium leading-tight">
-                                            {p.isLocal ? localCaption : remoteCaption.caption}
-                                        </p>
-                                    </div>
-                                )}
+  // Responsive grid: 1-2 cols on small, up to 2x2 on mobile, more on large screens
+  let gridClass = "grid-cols-1 sm:grid-cols-2";
+  if (!isMobile && count > 4) gridClass = "grid-cols-2 lg:grid-cols-3";
 
-                                <div className="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-sm font-medium text-white flex items-center gap-2 z-30">
-                                    {displayName}
-                                    {isThisHost && <Crown size={14} className="text-yellow-400 fill-yellow-400" />}
-                                </div>
-                                {user.isHandRaised && <div className="absolute top-3 right-3 bg-yellow-500 p-2 rounded-full text-black shadow-lg animate-bounce"><Hand size={20} /></div>}
-                                {emojiToShow && <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300"><span className="text-8xl filter drop-shadow-lg leading-none">{emojiToShow}</span></div>}
-                            </div>
-                        );
-                    })}
+  return (
+    <div className="relative w-full h-full bg-black p-4 md:p-8 flex items-center justify-center">
+      <div className={`grid ${gridClass} gap-4 md:gap-6 w-full h-full max-w-5xl`}>
+        {visibleParticipants.map((p) => {
+          const pId = p.isLocal ? (socketIdRef.current || "local") : p.socketId;
+          const user = p.isLocal
+            ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video }
+            : userMap[pId] || { username: "Guest" };
+          const displayName = p.isLocal ? `${userName} (You)` : user.username;
+          const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
+          const isCamOff = p.isLocal ? !video : user.isVideoOff;
+          const emojiToShow = activeEmojis[pId] || (p.isLocal && activeEmojis[socketIdRef.current]);
+
+          const showCaptionOnThisTile = showCaptions && (
+            (p.isLocal && localCaption) ||
+            (!p.isLocal && remoteCaption && remoteCaption.username === user.username)
+          );
+
+          return (
+            <div
+              key={pId}
+              className={`relative rounded-2xl overflow-hidden border-2 transition-all ${
+                activeSpeakerId === pId && !p.isLocal
+                  ? "border-green-500 shadow-2xl shadow-green-500/30"
+                  : "border-neutral-800"
+              }`}
+            >
+              {isCamOff ? (
+                // Black background with large avatar when camera off
+                <div className="w-full h-full bg-neutral-900 flex flex-col items-center justify-center gap-4">
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-6xl md:text-7xl font-bold text-white shadow-2xl">
+                    {displayName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-white text-lg md:text-xl font-medium opacity-80">
+                    {displayName}
+                  </span>
                 </div>
-                {totalPages > 1 && (
-                    <>
-                        {gridPage > 0 && <button onClick={() => setGridPage(p => p - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronLeft size={32} /></button>}
-                        {gridPage < totalPages - 1 && <button onClick={() => setGridPage(p => p + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronRight size={32} /></button>}
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">Page {gridPage + 1} / {totalPages}</div>
-                    </>
-                )}
+              ) : (
+                <VideoPlayer
+                  stream={p.stream}
+                  isLocal={p.isLocal}
+                  isMirrored={p.isLocal && !screen}
+                  className="w-full h-full object-cover"
+                  audioOutputId={selectedDevices.audioOutput}
+                />
+              )}
+
+              {/* Caption overlay */}
+              {showCaptionOnThisTile && (
+                <div className="absolute bottom-12 md:bottom-16 left-2 right-2 bg-black/70 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 text-center z-40 animate-in slide-in-from-bottom">
+                  <p className="text-white text-base md:text-lg font-medium">
+                    {p.isLocal ? localCaption : remoteCaption?.caption}
+                  </p>
+                </div>
+              )}
+
+              {/* Name label (only if camera ON, since it's already shown when off) */}
+              {!isCamOff && (
+                <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl text-white text-sm md:text-base font-medium flex items-center gap-2 z-30">
+                  {displayName}
+                  {isThisHost && <Crown size={16} className="text-yellow-400 fill-yellow-400" />}
+                  {user.isHandRaised && <Hand size={18} className="text-yellow-500 animate-pulse" />}
+                </div>
+              )}
+
+              {/* Emoji reaction */}
+              {emojiToShow && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-500">
+                  <span className="text-9xl md:text-[12rem] drop-shadow-2xl">
+                    {emojiToShow}
+                  </span>
+                </div>
+              )}
             </div>
-        );
-    };
+          );
+        })}
+      </div>
+
+      {/* Optional: Show "+X more" indicator on mobile if >4 participants */}
+      {isMobile && allParticipants.length > 4 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur px-6 py-3 rounded-full text-white font-bold text-lg">
+          +{allParticipants.length - 4} more
+        </div>
+      )}
+    </div>
+  );
+};
 
   return (
     <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
@@ -1341,20 +1373,18 @@ export default function VideoMeetComponent() {
       {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
         <div className="flex flex-col h-screen relative">
           <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
-            {viewMode === "GRID" ? (
-              renderPaginatedGrid()
-            ) : (
-              <>
-                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">
-                  {renderMainSpotlight()}
-                </div>
-                <div
-                  className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}
-                >
-                  {renderSideStrip()}
-                </div>
-              </>
-            )}
+            {viewMode === "GRID" || isMobile ? (
+  renderPaginatedGrid()  // We'll update this function next
+) : (
+  <>
+    <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">
+      {renderMainSpotlight()}
+    </div>
+    <div className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}>
+      {renderSideStrip()}
+    </div>
+  </>
+)}
           </div>
 
           {/* DESKTOP FOOTER */}
@@ -1607,15 +1637,6 @@ export default function VideoMeetComponent() {
                   className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
                 >
                   <ScreenShare size={24} /> Share Screen
-                </button>
-                <button
-                  onClick={() => {
-                    setViewMode(viewMode === "GRID" ? "SPEAKER" : "GRID");
-                    setShowMobileMenu(false);
-                  }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
-                >
-                  <LayoutDashboard size={24} /> Change Layout
                 </button>
                 <button
                   onClick={() => {
