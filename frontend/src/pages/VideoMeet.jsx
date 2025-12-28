@@ -846,24 +846,29 @@ export default function VideoMeetComponent() {
     addToast("Link copied to clipboard", "success");
   };
 
-  useEffect(() => {
+ useEffect(() => {
+        let isMounted = true; // 1. Add a flag
+
         getMedia().then(() => {
-            if (bypassLobby || (username && username !== "Guest")) {
-                connectSocket();
-            } else {
-                setAskForUsername(true);
+            // 2. Only connect if the component is still alive
+            if (isMounted) {
+                if (bypassLobby || (username && username !== "Guest")) {
+                    connectSocket();
+                } else {
+                    setAskForUsername(true);
+                }
             }
         });
 
         return () => {
+            isMounted = false; // 3. Kill the flag on cleanup
+
             if (localStreamRef.current) {
                 localStreamRef.current.getTracks().forEach(t => t.stop());
             }
             if (socketRef.current) {
                 socketRef.current.disconnect();
             }
-            
-            // 🛠 FIX: Check state before closing
             if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
                 audioContextRef.current.close();
             }
