@@ -391,6 +391,8 @@ io.on("connection", (socket) => {
     handleUserLeave();
   });
 
+  });
+
 /* ================= START SERVER ================= */
 
 const start = async () => {
