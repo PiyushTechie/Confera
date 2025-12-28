@@ -1059,7 +1059,10 @@ export default function VideoMeetComponent() {
       ...videos.map((v) => ({ ...v, isLocal: false })),
     ];
 
-    // Mobile: Auto scroll, no pagination limits for now to show "irrespective of participants"
+    // 1. Calculate total pages (MISSING LINE FIXED HERE)
+    const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
+
+    // Mobile: Auto scroll, no pagination limits
     const visibleParticipants = isMobile
       ? allParticipants
       : allParticipants.slice(
@@ -1069,11 +1072,13 @@ export default function VideoMeetComponent() {
 
     const count = visibleParticipants.length;
     let gridClass = "grid-cols-1";
-    if (count >= 2) gridClass = "grid-cols-2"; // Force 2 cols on mobile if > 1 person
-    if (!isMobile && count >= 3) gridClass = "grid-cols-2 lg:grid-cols-3";
+    
+    // Zoom-style layouts
+    if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2"; // 2 people = split screen
+    if (count >= 3) gridClass = "grid-cols-2"; // 3+ people = 2 columns
+    if (!isMobile && count >= 5) gridClass = "grid-cols-2 lg:grid-cols-3"; // Desktop large grid
 
     return (
-      // Added pb-24 to ensure bottom participants aren't hidden by footer
       <div className="relative w-full h-full bg-black p-2 flex flex-col items-center overflow-y-auto pb-28">
         <div
           className={`grid ${gridClass} gap-2 w-full max-w-6xl transition-all duration-300 ${
@@ -1140,7 +1145,6 @@ export default function VideoMeetComponent() {
                   </div>
                 )}
 
-                {/* Name Label with higher Z-index */}
                 <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1 z-50 max-w-[85%] truncate">
                   <span className="truncate">{displayName}</span>
                   {isThisHost && (
@@ -1167,6 +1171,8 @@ export default function VideoMeetComponent() {
             );
           })}
         </div>
+        
+        {/* Pagination Controls (Desktop Only) */}
         {!isMobile && totalPages > 1 && (
           <>
             {gridPage > 0 && (
