@@ -1059,7 +1059,7 @@ export default function VideoMeetComponent() {
       ...videos.map((v) => ({ ...v, isLocal: false })),
     ];
 
-    // 1. Calculate total pages (MISSING LINE FIXED HERE)
+    // FIX: Define totalPages so pagination buttons work on desktop
     const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
 
     // Mobile: Auto scroll, no pagination limits
@@ -1074,9 +1074,9 @@ export default function VideoMeetComponent() {
     let gridClass = "grid-cols-1";
     
     // Zoom-style layouts
-    if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2"; // 2 people = split screen
-    if (count >= 3) gridClass = "grid-cols-2"; // 3+ people = 2 columns
-    if (!isMobile && count >= 5) gridClass = "grid-cols-2 lg:grid-cols-3"; // Desktop large grid
+    if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
+    if (count >= 3) gridClass = "grid-cols-2"; 
+    if (!isMobile && count >= 5) gridClass = "grid-cols-2 lg:grid-cols-3";
 
     return (
       <div className="relative w-full h-full bg-black p-2 flex flex-col items-center overflow-y-auto pb-28">
@@ -1145,6 +1145,7 @@ export default function VideoMeetComponent() {
                   </div>
                 )}
 
+                {/* Name Label with higher Z-index */}
                 <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1 z-50 max-w-[85%] truncate">
                   <span className="truncate">{displayName}</span>
                   {isThisHost && (
@@ -1172,7 +1173,6 @@ export default function VideoMeetComponent() {
           })}
         </div>
         
-        {/* Pagination Controls (Desktop Only) */}
         {!isMobile && totalPages > 1 && (
           <>
             {gridPage > 0 && (
@@ -1227,8 +1227,9 @@ export default function VideoMeetComponent() {
         ))}
       </div>
 
+      {/* SETTINGS MODAL */}
       {showSettings && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-neutral-800 p-6 rounded-2xl shadow-2xl max-w-md w-full border border-neutral-700">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold flex items-center gap-2">
@@ -1326,8 +1327,9 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
+      {/* PASSCODE MODAL */}
       {showPasscodeModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center">
             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
               <Lock size={32} />
@@ -1358,6 +1360,7 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
+      {/* LOBBY / JOIN SCREEN */}
       {askForUsername && !showPasscodeModal && (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
@@ -1395,6 +1398,7 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
+      {/* WAITING ROOM */}
       {isInWaitingRoom && !askForUsername && !showPasscodeModal && (
         <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900">
           <div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full text-center">
@@ -1409,11 +1413,11 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
+      {/* MAIN MEETING UI */}
       {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
         <div className="flex flex-col h-screen relative">
           <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
             {isMobile ? (
-              // Always render paginated grid on mobile, tailored for 2 cols
               renderPaginatedGrid()
             ) : viewMode === "GRID" ? (
               renderPaginatedGrid()
@@ -1433,6 +1437,7 @@ export default function VideoMeetComponent() {
 
           {/* DESKTOP FOOTER */}
           <div className="hidden md:flex h-20 bg-neutral-900 border-t border-neutral-800 items-center justify-center z-20 px-4 gap-4 relative">
+            {/* ... desktop buttons ... */}
             <button
               onClick={() => setShowSettings(true)}
               className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 absolute left-4"
@@ -1529,7 +1534,7 @@ export default function VideoMeetComponent() {
               <PhoneOff size={24} />
             </button>
 
-            {/* LOCK BUTTON (Animated) */}
+            {/* LOCK BUTTON */}
             <button
               onClick={handleToggleLock}
               className={`p-4 rounded-full transition-all duration-300 transform ${
@@ -1574,7 +1579,7 @@ export default function VideoMeetComponent() {
             </div>
           </div>
 
-          {/* MOBILE SLIDER (FOOTER) - UPDATED FOR LABELS */}
+          {/* MOBILE SLIDER (FOOTER) */}
           <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center justify-between px-4 z-50">
             <div className="flex w-full items-center justify-between overflow-x-auto no-scrollbar gap-6 px-2">
               <button
@@ -1669,9 +1674,10 @@ export default function VideoMeetComponent() {
             </div>
           </div>
 
+          {/* MOBILE MORE MENU */}
           {showMobileMenu && (
             <div
-              className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end justify-center"
+              className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-end justify-center"
               onClick={() => setShowMobileMenu(false)}
             >
               <div
@@ -1712,6 +1718,15 @@ export default function VideoMeetComponent() {
                 >
                   <Hand size={24} />{" "}
                   {isHandRaised ? "Lower Hand" : "Raise Hand"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowInfo(true);
+                    setShowMobileMenu(false);
+                  }}
+                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
+                >
+                  <Info size={24} /> Meeting Info
                 </button>
 
                 {amIHost && (
@@ -1765,9 +1780,9 @@ export default function VideoMeetComponent() {
             </div>
           )}
 
+          {/* SIDEBARS: PARTICIPANTS */}
           {showParticipants && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-6rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-30 flex flex-col slide-in-right">
-              {/* ... (Participants List Content remains largely same, just adjusted height in container above) ... */}
+            <div className="absolute right-0 top-0 h-[calc(100vh-6rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-[70] flex flex-col slide-in-right shadow-2xl">
               <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
                 <h3 className="font-bold">Participants</h3>
                 <button onClick={() => setShowParticipants(false)}>
@@ -1775,7 +1790,6 @@ export default function VideoMeetComponent() {
                 </button>
               </div>
               <div className="flex-1 p-4 space-y-4 overflow-y-auto pb-20">
-                {/* ... existing participant list logic ... */}
                 {amIHost && waitingUsers && waitingUsers.length > 0 && (
                   <div className="pb-4 border-b border-neutral-700">
                     <h4 className="text-xs font-bold text-yellow-500 uppercase mb-3">
@@ -1834,7 +1848,6 @@ export default function VideoMeetComponent() {
                               />
                             )}
                           </span>
-                          {/* Hand Icon in List */}
                           {u.isHandRaised && (
                             <Hand
                               size={14}
@@ -1884,6 +1897,131 @@ export default function VideoMeetComponent() {
                       </div>
                     );
                   })}
+              </div>
+            </div>
+          )}
+
+          {/* SIDEBARS: CHAT */}
+          {showChat && (
+            <div className="absolute right-0 top-0 h-[calc(100vh-6rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-[70] flex flex-col slide-in-right shadow-2xl">
+              <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
+                <h3 className="font-bold">Chat</h3>
+                <button onClick={() => setShowChat(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto p-4 space-y-4"
+              >
+                {messages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex flex-col ${
+                      msg.isMe ? "items-end" : "items-start"
+                    }`}
+                  >
+                    <div className="text-xs text-gray-400 mb-1">
+                      {msg.sender}
+                    </div>
+                    <div
+                      className={`px-4 py-2 rounded-lg text-sm ${
+                        msg.isMe ? "bg-blue-600" : "bg-neutral-700"
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 bg-neutral-900 border-t border-neutral-700">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    className="flex-1 bg-neutral-700 rounded-lg p-2 text-sm"
+                    value={currentMessage}
+                    onChange={(e) => setCurrentMessage(e.target.value)}
+                    placeholder="Type..."
+                  />
+                  <button type="submit" className="p-2 bg-blue-600 rounded-lg">
+                    <Send size={18} />
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* INFO MODAL (CENTERED & HIGH Z-INDEX) */}
+          {showInfo && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-neutral-800 p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 relative animate-in zoom-in duration-200">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-bold text-xl">Meeting Info</h3>
+                  <button
+                    onClick={() => setShowInfo(false)}
+                    className="p-1 hover:bg-neutral-700 rounded-full"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      Meeting Code
+                    </label>
+                    <div className="flex items-center justify-between bg-neutral-900 p-3 rounded-lg mt-2 border border-neutral-700">
+                      <span className="font-mono font-bold text-lg tracking-wider text-blue-400">
+                        {meetingCode}
+                      </span>
+                      <button
+                        onClick={handleCopyLink}
+                        className="p-2 hover:bg-neutral-800 rounded-md text-gray-400 hover:text-white transition-colors"
+                      >
+                        {copied ? (
+                          <Check size={18} className="text-green-500" />
+                        ) : (
+                          <Copy size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {amIHost && (
+                    <div>
+                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2 block">
+                        Host Controls
+                      </label>
+                      <button
+                        onClick={handleToggleLock}
+                        className={`w-full flex items-center justify-center gap-3 py-3 rounded-xl font-bold transition-all ${
+                          isMeetingLocked
+                            ? "bg-red-500/20 text-red-500 border border-red-500/50"
+                            : "bg-neutral-700 text-white hover:bg-neutral-600"
+                        }`}
+                      >
+                        {isMeetingLocked ? (
+                          <Lock size={18} />
+                        ) : (
+                          <Unlock size={18} />
+                        )}
+                        {isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/20"
+                  >
+                    Copy Invite Link
+                  </button>
+                </div>
               </div>
             </div>
           )}
