@@ -1,26 +1,22 @@
 import React from 'react';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
-// 1. Import the logo
 import brandLogo from '../assets/BrandLogo.png';
 
 export default function TermsAndConditions() {
   return (
-    // 2. Added 'relative' and 'overflow-hidden' to the main container
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
       
-      {/* --- 3. WATERMARK START --- */}
-      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden">
-          <img 
-            src={brandLogo} 
-            alt="" 
-            // Using the same light, tilted styling
-            className="w-[70%] h-auto object-contain opacity-[0.03] -rotate-12 transform scale-125 grayscale"
-          />
-      </div>
-       {/* --- WATERMARK END --- */}
+      <div 
+        className="fixed inset-[-50%] z-0 pointer-events-none opacity-[0.03] -rotate-12"
+        style={{
+            backgroundImage: `url(${brandLogo})`,
+            backgroundRepeat: 'repeat',
+            backgroundSize: '80px', 
+            backgroundPosition: 'center'
+        }}
+      />
 
-      {/* 4. Added 'relative' and 'z-10' to ensure content is on top */}
       <div className="max-w-4xl mx-auto relative z-10">
         <Link 
           to="/auth" 

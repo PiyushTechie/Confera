@@ -1,33 +1,30 @@
 import React from 'react';
 import { ArrowLeft, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
-// 1. Import the logo
 import brandLogo from '../assets/BrandLogo.png';
 
 export default function PrivacyPolicy() {
   return (
-    // 2. Added 'relative' and 'overflow-hidden' to the main container
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
       
-      {/* --- 3. WATERMARK START --- */}
-      {/* This sits behind the content.
-          - absolute inset-0: covers the whole screen area
-          - z-0: puts it behind text
-          - opacity-[0.03]: Very subtle/light
-          - -rotate-12 scale-125: Tilted and slightly enlarged to fill corners
-          - pointer-events-none: lets clicks pass through it
+      {/* --- NEW REPEATING WATERMARK PATTERN --- */}
+      {/* 1. fixed: Stays in place while you scroll
+          2. inset-[-50%]: Makes the div huge (extending far beyond the screen) so when we rotate it, we don't see empty corners.
+          3. -rotate-12: Tilts the entire grid of logos.
+          4. z-0: Puts it behind everything.
       */}
-      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden">
-          <img 
-            src={brandLogo} 
-            alt="" 
-            className="w-[70%] h-auto object-contain opacity-[0.03] -rotate-12 transform scale-125 grayscale"
-          />
-      </div>
-       {/* --- WATERMARK END --- */}
+      <div 
+        className="fixed inset-[-50%] z-0 pointer-events-none opacity-[0.03] -rotate-12"
+        style={{
+            backgroundImage: `url(${brandLogo})`,
+            backgroundRepeat: 'repeat',
+            backgroundSize: '80px', // Adjust this to make logos smaller/larger
+            backgroundPosition: 'center'
+        }}
+      />
+      {/* --------------------------------------- */}
 
 
-      {/* 4. Added 'relative' and 'z-10' to ensure content is on top */}
       <div className="max-w-4xl mx-auto relative z-10">
         <Link 
           to="/auth" 
