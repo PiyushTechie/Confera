@@ -8,6 +8,8 @@ import VideoMeetComponent from './pages/VideoMeet';
 import HomeComponent from './pages/Home';
 import History from './pages/History';
 import GuestJoin from './pages/GuestJoin';
+import PrivacyPolicy from './pages/PrivacyPolicy';         // <--- Import this
+import TermsAndConditions from './pages/TermsAndConditions'
 
 const PublicRoute = ({ children }) => {
   const isAuthenticated = !!localStorage.getItem("token");
