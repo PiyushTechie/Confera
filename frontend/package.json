@@ -12,6 +12,7 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "axios": "^1.13.2",
+    "formik": "^2.4.9",
     "http-status": "^2.1.0",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
@@ -19,7 +20,8 @@
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.11.0",
     "socket.io-client": "^4.8.1",
-    "styled-components": "^6.1.19"
+    "styled-components": "^6.1.19",
+    "yup": "^1.7.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
