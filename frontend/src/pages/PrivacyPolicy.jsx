@@ -1,11 +1,34 @@
 import React from 'react';
 import { ArrowLeft, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
+// 1. Import the logo
+import brandLogo from '../assets/BrandLogo.png';
 
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-4xl mx-auto">
+    // 2. Added 'relative' and 'overflow-hidden' to the main container
+    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
+      
+      {/* --- 3. WATERMARK START --- */}
+      {/* This sits behind the content.
+          - absolute inset-0: covers the whole screen area
+          - z-0: puts it behind text
+          - opacity-[0.03]: Very subtle/light
+          - -rotate-12 scale-125: Tilted and slightly enlarged to fill corners
+          - pointer-events-none: lets clicks pass through it
+      */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden">
+          <img 
+            src={brandLogo} 
+            alt="" 
+            className="w-[70%] h-auto object-contain opacity-[0.03] -rotate-12 transform scale-125 grayscale"
+          />
+      </div>
+       {/* --- WATERMARK END --- */}
+
+
+      {/* 4. Added 'relative' and 'z-10' to ensure content is on top */}
+      <div className="max-w-4xl mx-auto relative z-10">
         <Link 
           to="/auth" 
           className="inline-flex items-center text-slate-600 hover:text-indigo-600 transition-colors mb-8 font-medium"
@@ -28,7 +51,7 @@ export default function PrivacyPolicy() {
             </div>
           </div>
 
-          <div className="p-8 md:p-12 space-y-8 text-slate-600 leading-relaxed">
+          <div className="p-8 md:p-12 space-y-8 text-slate-600 leading-relaxed font-medium">
             <section>
               <h2 className="text-xl font-bold text-slate-900 mb-4">1. Introduction</h2>
               <p>
