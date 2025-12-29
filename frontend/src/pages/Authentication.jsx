@@ -4,7 +4,7 @@ import { AuthContext } from '../contexts/AuthContext';
 import { Lock, User, CheckCircle, XCircle } from 'lucide-react';
 import { FcGoogle } from "react-icons/fc";
 import Loader from '../components/Loader';
-
+import logo from '../assets/BrandLogo.png'
 export default function Authentication() {
     const [username, setUsername] = React.useState("");
     const [password, setPassword] = React.useState("");
@@ -97,8 +97,12 @@ export default function Authentication() {
                 <div className="w-full max-w-md space-y-8">
                     
                     <div className="text-center">
-                        <div className="mx-auto w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-600/20">
-                            <Lock className="w-6 h-6 text-white" />
+                        <div className="flex justify-center mb-6">
+                            <img 
+                                src={logo} 
+                                alt="Logo" 
+                                className="h-12 w-auto object-contain" 
+                            />
                         </div>
                         <h2 className="text-3xl font-bold tracking-tight text-slate-900">
                             {formState === 0 ? "Welcome back" : "Create account"}
