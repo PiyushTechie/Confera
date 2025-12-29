@@ -1,8 +1,9 @@
 import * as React from 'react';
-import styled from 'styled-components'; 
+import styled from 'styled-components';
 import { AuthContext } from '../contexts/AuthContext';
 import { Lock, User, CheckCircle, XCircle } from 'lucide-react';
 import { FcGoogle } from "react-icons/fc";
+import Loader from '../components/Loader'; // 1. Import the Loader
 
 export default function Authentication() {
     const [username, setUsername] = React.useState("");
@@ -13,6 +14,9 @@ export default function Authentication() {
 
     const [formState, setFormState] = React.useState(0);
     const [open, setOpen] = React.useState(false);
+    
+    // 2. Add Loading State
+    const [isLoading, setIsLoading] = React.useState(false);
 
     const { handleRegister, handleLogin } = React.useContext(AuthContext);
 
@@ -26,6 +30,10 @@ export default function Authentication() {
     }, [open]);
 
     let handleAuth = async () => {
+        // 3. Start Loading
+        setIsLoading(true);
+        setError("");
+
         try {
             if (formState === 0) { // Login
                 await handleLogin(username, password);
@@ -43,13 +51,15 @@ export default function Authentication() {
             console.log(err);
             let message = err.response?.data?.message || "An unexpected error occurred";
             setError(message);
+        } finally {
+            // 4. Stop Loading (runs whether success or failure)
+            setIsLoading(false);
         }
     }
 
     const handleGoogleLogin = () => {
-    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
-};
-
+        window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+    };
 
     return (
         <div className="min-h-screen flex bg-white text-slate-900 font-sans selection:bg-indigo-100">
@@ -117,7 +127,6 @@ export default function Authentication() {
                                             required
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
-                                            // CHANGE: Light inputs
                                             className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-medium"
                                             placeholder="John Doe"
                                         />
@@ -176,9 +185,16 @@ export default function Authentication() {
                         )}
 
                         <StyledWrapper>
-                            <button onClick={handleAuth}>
-                                {formState === 0 ? "Sign In" : "Create Account"}
-                            </button>
+                            {/* 5. Conditional Rendering for Loader */}
+                            {isLoading ? (
+                                <div className="flex items-center justify-center py-2">
+                                    <Loader />
+                                </div>
+                            ) : (
+                                <button onClick={handleAuth}>
+                                    {formState === 0 ? "Sign In" : "Create Account"}
+                                </button>
+                            )}
                         </StyledWrapper>
 
                         <div className="relative">
@@ -194,7 +210,8 @@ export default function Authentication() {
 
                         <button
                             onClick={handleGoogleLogin}
-                            className="w-full flex items-center justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98]"
+                            disabled={isLoading} // Optional: Disable Google login while loading
+                            className={`w-full flex items-center justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             <FcGoogle className="text-xl" />
                             <span>
@@ -216,11 +233,11 @@ const StyledWrapper = styled.div`
     border-radius: 12px;
     color: #ffffff;
     z-index: 1;
-    background: #4f46e5; /* Indigo-600 */
+    background: #4f46e5;
     position: relative;
     font-weight: 700;
     font-size: 16px;
-    box-shadow: 0px 4px 14px rgba(79, 70, 229, 0.4); /* Indigo glow */
+    box-shadow: 0px 4px 14px rgba(79, 70, 229, 0.4);
     transition: all 250ms;
     overflow: hidden;
     cursor: pointer;
@@ -234,7 +251,7 @@ const StyledWrapper = styled.div`
     height: 100%;
     width: 0;
     border-radius: 12px;
-    background-color: #4338ca; /* Indigo-700 Hover Fill */
+    background-color: #4338ca;
     z-index: -1;
     transition: all 250ms;
   }
