@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { AuthContext } from '../contexts/AuthContext';
 import { Lock, User, CheckCircle, XCircle } from 'lucide-react';
 import { FcGoogle } from "react-icons/fc";
-import Loader from '../components/Loader'; // Ensure this path is correct
+import Loader from './Loader';
 
 export default function Authentication() {
     const [username, setUsername] = React.useState("");
@@ -15,8 +15,8 @@ export default function Authentication() {
     const [formState, setFormState] = React.useState(0);
     const [open, setOpen] = React.useState(false);
     
-    // Loading state
     const [isLoading, setIsLoading] = React.useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
 
     const { handleRegister, handleLogin } = React.useContext(AuthContext);
 
@@ -30,7 +30,7 @@ export default function Authentication() {
     }, [open]);
 
     let handleAuth = async () => {
-        if (isLoading) return; // Prevent double clicks
+        if (isLoading || isGoogleLoading) return;
         
         setIsLoading(true);
         setError("");
@@ -58,7 +58,13 @@ export default function Authentication() {
     }
 
     const handleGoogleLogin = () => {
-        window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+        if (isLoading || isGoogleLoading) return;
+
+        setIsGoogleLoading(true);
+        // Small timeout to allow the UI to update before redirecting
+        setTimeout(() => {
+             window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+        }, 100);
     };
 
     return (
@@ -185,9 +191,13 @@ export default function Authentication() {
                         )}
 
                         <StyledWrapper>
-                            <button onClick={handleAuth} disabled={isLoading}>
+                            <button 
+                                onClick={handleAuth} 
+                                disabled={isLoading || isGoogleLoading}
+                            >
                                 {isLoading ? (
-                                    <Loader />
+                                    // WHITE Loader for the Main Button
+                                    <Loader color="#ffffff" />
                                 ) : (
                                     formState === 0 ? "Sign In" : "Create Account"
                                 )}
@@ -207,13 +217,22 @@ export default function Authentication() {
 
                         <button
                             onClick={handleGoogleLogin}
-                            disabled={isLoading}
-                            className={`w-full flex items-center justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+                            disabled={isLoading || isGoogleLoading}
+                            className={`w-full h-[54px] flex items-center justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${
+                                (isLoading || isGoogleLoading) ? 'opacity-60 cursor-not-allowed' : ''
+                            }`}
                         >
-                            <FcGoogle className="text-xl" />
-                            <span>
-                                {formState === 0 ? "Sign in with Google" : "Sign up with Google"}
-                            </span>
+                            {isGoogleLoading ? (
+                                // PURPLE Loader for the Google Button
+                                <Loader color="#4f46e5" /> 
+                            ) : (
+                                <>
+                                    <FcGoogle className="text-xl" />
+                                    <span>
+                                        {formState === 0 ? "Sign in with Google" : "Sign up with Google"}
+                                    </span>
+                                </>
+                            )}
                         </button>
                     </div>          
                 </div>
@@ -225,10 +244,9 @@ export default function Authentication() {
 const StyledWrapper = styled.div`
   button {
     width: 100%;
-    /* Fixed height helps prevent jumping when content switches to loader */
     height: 54px; 
     padding: 0 25px;
-    display: flex; /* Helps center the loader */
+    display: flex;
     align-items: center;
     justify-content: center;
     
@@ -236,7 +254,7 @@ const StyledWrapper = styled.div`
     border-radius: 12px;
     color: #ffffff;
     z-index: 1;
-    background: #4f46e5; /* Indigo-600 */
+    background: #4f46e5;
     position: relative;
     font-weight: 700;
     font-size: 16px;
@@ -246,7 +264,6 @@ const StyledWrapper = styled.div`
     cursor: pointer;
   }
   
-  /* Disable pointer events when loading */
   button:disabled {
     cursor: not-allowed;
     opacity: 0.9;
@@ -260,7 +277,7 @@ const StyledWrapper = styled.div`
     height: 100%;
     width: 0;
     border-radius: 12px;
-    background-color: #4338ca; /* Indigo-700 Hover Fill */
+    background-color: #4338ca;
     z-index: -1;
     transition: all 250ms;
   }

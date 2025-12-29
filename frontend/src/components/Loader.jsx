@@ -1,9 +1,10 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const Loader = () => {
+const Loader = ({ color = "#ffffff" }) => {
   return (
-    <StyledWrapper>
+    // Pass the color prop to the wrapper
+    <StyledWrapper $color={color}>
       <div className="loading-wave">
         <div className="loading-bar" />
         <div className="loading-bar" />
@@ -15,7 +16,6 @@ const Loader = () => {
 }
 
 const StyledWrapper = styled.div`
-  /* Center the loader inside the parent container */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -23,7 +23,6 @@ const StyledWrapper = styled.div`
   height: 100%;
 
   .loading-wave {
-    /* Auto width and fixed small height to fit button */
     width: auto;
     height: 20px; 
     display: flex;
@@ -35,7 +34,8 @@ const StyledWrapper = styled.div`
     width: 4px;
     height: 10px;
     margin: 0 3px;
-    background-color: #ffffff; /* White bars to match button text */
+    /* Use the passed color prop, or default to white */
+    background-color: ${props => props.$color}; 
     border-radius: 5px;
     animation: loading-wave-animation 1s ease-in-out infinite;
   }
@@ -53,17 +53,9 @@ const StyledWrapper = styled.div`
   }
 
   @keyframes loading-wave-animation {
-    0% {
-      height: 5px;
-    }
-
-    50% {
-      height: 20px; /* Max height fits within button */
-    }
-
-    100% {
-      height: 5px;
-    }
+    0% { height: 5px; }
+    50% { height: 20px; }
+    100% { height: 5px; }
   }
 `;
 
