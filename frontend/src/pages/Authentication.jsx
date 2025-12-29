@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { AuthContext } from '../contexts/AuthContext';
 import { Lock, User, CheckCircle, XCircle } from 'lucide-react';
 import { FcGoogle } from "react-icons/fc";
-import Loader from './Loader';
+import Loader from '../components/Loader';
 
 export default function Authentication() {
     const [username, setUsername] = React.useState("");
