@@ -94,7 +94,6 @@ export default function Authentication() {
 
     return (
         <div className="min-h-screen flex bg-white text-slate-900 font-sans selection:bg-indigo-100">
-
             <div className="hidden lg:flex w-2/3 relative items-center justify-center overflow-hidden">
                 <div className="absolute inset-0 bg-indigo-900/40 z-10" />
                 <img
@@ -111,7 +110,6 @@ export default function Authentication() {
             </div>
 
             <div className="w-full lg:w-1/3 flex items-center justify-center p-8 relative bg-white">
-
                 {open && (
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 lg:left-6 lg:translate-x-0 bg-emerald-50 border border-emerald-200 text-emerald-700 px-6 py-3 rounded-xl flex items-center gap-3 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300 z-50">
                         <CheckCircle className="w-5 h-5 text-emerald-500" />
@@ -263,7 +261,7 @@ export default function Authentication() {
                             type="button"
                             onClick={handleGoogleLogin}
                             disabled={isLoading || isGoogleLoading}
-                            className={`w-full h-[54px] flex items-center cursor-pointer justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${
+                            className={`w-full h-[56px] flex items-center cursor-pointer justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${
                                 (isLoading || isGoogleLoading) ? 'opacity-60 cursor-not-allowed' : ''
                             }`}
                         >
@@ -285,61 +283,71 @@ export default function Authentication() {
     );
 }
 
-// Updated styled-components based on your new design
+// Updated styled-components for smaller purple button
 const StyledWrapper = styled.div`
   .button {
-    width: 100%; /* Force full width to match form */
+    width: 100%;
+    /* HEIGHT ADJUSTMENT: 56px to match Google button */
+    height: 56px; 
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 16px 32px;
-    background-color: #006aff;
-    border: 8px solid #c0dfff;
+    /* Removed huge padding, centered content via flexbox */
+    padding: 0 20px; 
+    
+    /* THEME COLOR: Purple (Indigo-600) instead of Blue */
+    background-color: #4f46e5;
+    
+    /* BORDER COLOR: Lighter Purple (Indigo-200) */
+    border: 5px solid #c7d2fe; 
+    
     color: white;
-    gap: 8px;
+    gap: 12px;
     border-radius: 50px;
     cursor: pointer;
     transition: all 0.3s;
-    /* Ensure height remains consistent during loading */
-    min-height: 80px; 
   }
   
   .button:disabled {
     cursor: not-allowed;
-    opacity: 0.9;
-    border-color: #e2e8f0;
+    opacity: 0.8;
+    background-color: #6366f1;
+    border-color: #e0e7ff;
   }
 
   .text {
-    font-size: 1.2em; /* Adjusted slightly for form fit */
+    font-size: 1.1em;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
   }
 
   .svg {
-    padding-top: 5px;
+    display: flex;
+    align-items: center;
     height: 100%;
-    width: fit-content;
   }
 
   .svg svg {
-    width: 30px; /* Scaled down slightly to fit form button better */
-    height: 20px;
+    width: 28px;
+    height: 28px;
   }
 
   .button:hover:not(:disabled) {
-    border: 8px solid #b1d8ff;
-    background-color: #1b7aff;
+    /* HOVER COLOR: Darker Purple */
+    background-color: #4338ca;
+    /* HOVER BORDER: Slightly darker border */
+    border: 5px solid #a5b4fc; 
   }
 
   .button:active:not(:disabled) {
-    border: 5px solid #c0dfff;
+    border: 3px solid #c7d2fe;
+    transform: scale(0.98);
   }
 
   .button:hover:not(:disabled) .svg svg {
     animation: jello-vertical 0.9s both;
-    transform-origin: left;
+    transform-origin: center;
   }
 
   @keyframes jello-vertical {
