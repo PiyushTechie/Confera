@@ -27,6 +27,8 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/auth" element={<PublicRoute><Authentication /></PublicRoute>} />
           <Route path="/guest" element={<GuestJoin />} />
           
