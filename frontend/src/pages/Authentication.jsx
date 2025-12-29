@@ -1,9 +1,9 @@
 import * as React from 'react';
-import styled from 'styled-components';
+import styled from 'styled-components'; 
 import { AuthContext } from '../contexts/AuthContext';
 import { Lock, User, CheckCircle, XCircle } from 'lucide-react';
 import { FcGoogle } from "react-icons/fc";
-import Loader from '../components/Loader'; // 1. Import the Loader
+import Loader from './Loader'; // Ensure this path is correct
 
 export default function Authentication() {
     const [username, setUsername] = React.useState("");
@@ -15,7 +15,7 @@ export default function Authentication() {
     const [formState, setFormState] = React.useState(0);
     const [open, setOpen] = React.useState(false);
     
-    // 2. Add Loading State
+    // Loading state
     const [isLoading, setIsLoading] = React.useState(false);
 
     const { handleRegister, handleLogin } = React.useContext(AuthContext);
@@ -30,7 +30,8 @@ export default function Authentication() {
     }, [open]);
 
     let handleAuth = async () => {
-        // 3. Start Loading
+        if (isLoading) return; // Prevent double clicks
+        
         setIsLoading(true);
         setError("");
 
@@ -52,7 +53,6 @@ export default function Authentication() {
             let message = err.response?.data?.message || "An unexpected error occurred";
             setError(message);
         } finally {
-            // 4. Stop Loading (runs whether success or failure)
             setIsLoading(false);
         }
     }
@@ -185,16 +185,13 @@ export default function Authentication() {
                         )}
 
                         <StyledWrapper>
-                            {/* 5. Conditional Rendering for Loader */}
-                            {isLoading ? (
-                                <div className="flex items-center justify-center py-2">
+                            <button onClick={handleAuth} disabled={isLoading}>
+                                {isLoading ? (
                                     <Loader />
-                                </div>
-                            ) : (
-                                <button onClick={handleAuth}>
-                                    {formState === 0 ? "Sign In" : "Create Account"}
-                                </button>
-                            )}
+                                ) : (
+                                    formState === 0 ? "Sign In" : "Create Account"
+                                )}
+                            </button>
                         </StyledWrapper>
 
                         <div className="relative">
@@ -210,8 +207,8 @@ export default function Authentication() {
 
                         <button
                             onClick={handleGoogleLogin}
-                            disabled={isLoading} // Optional: Disable Google login while loading
-                            className={`w-full flex items-center justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={isLoading}
+                            className={`w-full flex items-center justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
                         >
                             <FcGoogle className="text-xl" />
                             <span>
@@ -228,12 +225,18 @@ export default function Authentication() {
 const StyledWrapper = styled.div`
   button {
     width: 100%;
-    padding: 15px 25px;
+    /* Fixed height helps prevent jumping when content switches to loader */
+    height: 54px; 
+    padding: 0 25px;
+    display: flex; /* Helps center the loader */
+    align-items: center;
+    justify-content: center;
+    
     border: unset;
     border-radius: 12px;
     color: #ffffff;
     z-index: 1;
-    background: #4f46e5;
+    background: #4f46e5; /* Indigo-600 */
     position: relative;
     font-weight: 700;
     font-size: 16px;
@@ -241,6 +244,12 @@ const StyledWrapper = styled.div`
     transition: all 250ms;
     overflow: hidden;
     cursor: pointer;
+  }
+  
+  /* Disable pointer events when loading */
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.9;
   }
 
   button::before {
@@ -251,22 +260,22 @@ const StyledWrapper = styled.div`
     height: 100%;
     width: 0;
     border-radius: 12px;
-    background-color: #4338ca;
+    background-color: #4338ca; /* Indigo-700 Hover Fill */
     z-index: -1;
     transition: all 250ms;
   }
 
-  button:hover {
+  button:hover:not(:disabled) {
     color: #ffffff;
     box-shadow: 0px 6px 20px rgba(79, 70, 229, 0.6);
     transform: translateY(-1px);
   }
 
-  button:hover::before {
+  button:hover:not(:disabled)::before {
     width: 100%;
   }
 
-  button:active {
+  button:active:not(:disabled) {
     transform: translateY(1px);
     box-shadow: 0px 2px 10px rgba(79, 70, 229, 0.3);
   }

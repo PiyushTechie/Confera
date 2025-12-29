@@ -15,19 +15,27 @@ const Loader = () => {
 }
 
 const StyledWrapper = styled.div`
+  /* Center the loader inside the parent container */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%; 
+  height: 100%;
+
   .loading-wave {
-    width: 300px;
-    height: 100px;
+    /* Auto width and fixed small height to fit button */
+    width: auto;
+    height: 20px; 
     display: flex;
     justify-content: center;
     align-items: flex-end;
   }
 
   .loading-bar {
-    width: 20px;
+    width: 4px;
     height: 10px;
-    margin: 0 5px;
-    background-color: purple;
+    margin: 0 3px;
+    background-color: #ffffff; /* White bars to match button text */
     border-radius: 5px;
     animation: loading-wave-animation 1s ease-in-out infinite;
   }
@@ -46,16 +54,17 @@ const StyledWrapper = styled.div`
 
   @keyframes loading-wave-animation {
     0% {
-      height: 10px;
+      height: 5px;
     }
 
     50% {
-      height: 50px;
+      height: 20px; /* Max height fits within button */
     }
 
     100% {
-      height: 10px;
+      height: 5px;
     }
-  }`;
+  }
+`;
 
 export default Loader;
