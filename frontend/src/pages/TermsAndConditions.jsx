@@ -8,11 +8,11 @@ export default function TermsAndConditions() {
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
       
       <div 
-        className="fixed inset-[-50%] z-0 pointer-events-none opacity-[0.03] -rotate-12"
+        className="fixed inset-[-50%] z-0 pointer-events-none opacity-[0.07] -rotate-12"
         style={{
             backgroundImage: `url(${brandLogo})`,
             backgroundRepeat: 'repeat',
-            backgroundSize: '80px', 
+            backgroundSize: '180px',
             backgroundPosition: 'center'
         }}
       />

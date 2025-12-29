@@ -7,22 +7,15 @@ export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
       
-      {/* --- NEW REPEATING WATERMARK PATTERN --- */}
-      {/* 1. fixed: Stays in place while you scroll
-          2. inset-[-50%]: Makes the div huge (extending far beyond the screen) so when we rotate it, we don't see empty corners.
-          3. -rotate-12: Tilts the entire grid of logos.
-          4. z-0: Puts it behind everything.
-      */}
       <div 
-        className="fixed inset-[-50%] z-0 pointer-events-none opacity-[0.03] -rotate-12"
+        className="fixed inset-[-50%] z-0 pointer-events-none opacity-[0.07] -rotate-12" // Increased opacity
         style={{
             backgroundImage: `url(${brandLogo})`,
             backgroundRepeat: 'repeat',
-            backgroundSize: '80px', // Adjust this to make logos smaller/larger
+            backgroundSize: '180px', // Increased size
             backgroundPosition: 'center'
         }}
       />
-      {/* --------------------------------------- */}
 
 
       <div className="max-w-4xl mx-auto relative z-10">
