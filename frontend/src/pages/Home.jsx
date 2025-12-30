@@ -1,7 +1,9 @@
 import React, { useContext, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
-import brandLogo from "../assets/BrandLogo.png"
+import brandLogo from "../assets/BrandLogo.png";
+import ScheduleModal from "../components/ScheduleModal"; // <--- Import 1
+import ScheduledList from "../components/ScheduledList"; // <--- Import 2
 import {
     Video,
     Plus,
@@ -70,6 +72,11 @@ function HomeComponent() {
 
     const [date, setDate] = useState(new Date());
     const [showJoinInputModal, setShowJoinInputModal] = useState(false);
+    
+    // --- SCHEDULE STATE ---
+    const [showScheduleModal, setShowScheduleModal] = useState(false); // <--- New State
+    const [refreshSchedule, setRefreshSchedule] = useState(0);         // <--- New State
+
     const [meetingCode, setMeetingCode] = useState("");
     const [passcode, setPasscode] = useState(""); 
     const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -218,7 +225,8 @@ function HomeComponent() {
                         <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Join</span>
                     </button>
 
-                    <button className="group flex flex-col cursor-pointer items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
+                    {/* --- UPDATED SCHEDULE BUTTON --- */}
+                    <button onClick={() => setShowScheduleModal(true)} className="group flex flex-col cursor-pointer items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <Calendar size={28} className="sm:w-8 sm:h-8" />
                         </div>
@@ -232,8 +240,14 @@ function HomeComponent() {
                         <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Screen</span>
                     </button>
                 </div>
+
+                {/* --- SCHEDULED LIST SECTION --- */}
+                <div className="w-full max-w-4xl mt-10">
+                    <ScheduledList refreshTrigger={refreshSchedule} />
+                </div>
             </div>
 
+            {/* --- MODALS --- */}
             {showJoinInputModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto">
                     <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 my-auto">
@@ -276,12 +290,8 @@ function HomeComponent() {
                             </button>
 
                             {/* LEFT: Video Preview Area */}
-                            {/* FIXED: Removed min-h from parent to prevent confusion */}
                             <div className="w-full md:w-2/3 bg-black relative flex flex-col justify-center p-4">
-                                
-                                {/* FIXED: Added h-[400px] explicitly for mobile so it doesn't collapse */}
                                 <div className="relative w-full h-[400px] md:h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center isolate">
-                                    
                                     <video 
                                         ref={localVideoRef} 
                                         autoPlay 
@@ -375,6 +385,12 @@ function HomeComponent() {
                     </div>
                 </div>
             )}
+
+            <ScheduleModal
+                isOpen={showScheduleModal}
+                onClose={() => setShowScheduleModal(false)}
+                onScheduleAdded={() => setRefreshSchedule(prev => prev + 1)}
+            />
         </div>
     );
 }

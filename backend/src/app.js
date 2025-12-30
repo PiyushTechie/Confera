@@ -6,10 +6,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import passport from "passport";
 import helmet from "helmet";
-
-// 1. Import User Model for Hex Token Validation
+import scheduleRoutes from "./routes/scheduleRoutes.js";
 import { User } from "./models/user.js"; 
-
 import { authLimiter, apiLimiter } from "./middlewares/limiters.js";
 import "./config/passportConfig.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -41,56 +39,37 @@ const io = new Server(server, { cors: corsOptions });
 
 const PORT = process.env.PORT || 8000;
 
-/* ================= ROUTES ================= */
-
 app.use("/auth", authLimiter, authRoutes);
 app.use("/api/v1/users", apiLimiter, userRoutes);
-
+app.use("/api/schedule", scheduleRoutes);
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
-/* ================= SOCKET SECURITY ================= */
-
-// 🔐 UPDATED: Auth for Crypto Hex Tokens (Database Lookup)
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
-
-    // 1. If NO token, allow them as a Guest
     if (!token) {
       socket.user = { role: "guest", username: "Guest" };
       return next();
     }
-
-    // 2. If Token exists, search MongoDB
-    // We look for a user who has this specific token string
     const user = await User.findOne({ token: token });
-
     if (user) {
-      // ✅ Found valid user
       socket.user = { 
-        username: user.name, // Using 'name' from your schema
+        username: user.name,
         userId: user._id, 
         role: "user" 
       };
       return next();
     } else {
-      // ❌ Token sent, but not found in DB (Old/Invalid)
-      // We reject to force the frontend to clear the bad token
       return next(new Error("Invalid authentication token"));
     }
-
   } catch (err) {
     console.error("Socket Auth Error:", err);
     return next(new Error("Internal Server Error"));
   }
 });
-
-// 🔐 Secure Engine.IO handshake
 io.engine.use(helmet());
-
-/* ================= SOCKET RATE LIMITING ================= */
 
 const RATE_LIMIT = { windowMs: 10_000, max: 20 };
 const socketRateMap = new Map();
@@ -117,11 +96,8 @@ const rateLimitSocket = (socket, event) => {
   return true;
 };
 
-/* ================= ROOM MEMORY ================= */
-
 const rooms = {};
 
-/* ================= SOCKET LOGIC ================= */
 
 io.on("connection", (socket) => {
   console.log("SOCKET CONNECTED::", socket.id);
@@ -131,7 +107,6 @@ io.on("connection", (socket) => {
     return path && rooms[path] && rooms[path].hostId === socket.id;
   };
 
-  /* -------- 1. GUEST JOIN REQUEST -------- */
   socket.on("request-join", ({ path, username, passcode }) => {
     if (!rateLimitSocket(socket, "request-join")) return;
 
@@ -152,7 +127,6 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Use name from DB if logged in, otherwise use passed username or "Guest"
     const finalName = socket.user?.role === "user" ? socket.user.username : (username || "Guest");
 
     room.waiting.push({
@@ -168,7 +142,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  /* -------- 2. JOIN CALL -------- */
   socket.on("join-call", ({ path, username, passcode }) => {
     if (!rateLimitSocket(socket, "join-call")) return;
 
@@ -221,7 +194,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  /* -------- HOST CONTROLS -------- */
 
   socket.on("toggle-lock", () => {
     if (isAuthorizedHost()) {
@@ -238,7 +210,6 @@ io.on("connection", (socket) => {
       if (user) {
         user.isHandRaised = isRaised;
         
-        // 🛠 FIX: Send 'username' so frontend can show a notification
         io.to(path).emit("hand-toggled", { 
             socketId: socket.id, 
             isRaised,
@@ -312,11 +283,8 @@ io.on("connection", (socket) => {
     io.to(toId).emit("signal", socket.id, message);
   });
 
-  // 📝 CAPTIONS (Your Logic Added Here)
   socket.on("send-caption", ({ roomId, caption, username }) => {
     if (!rateLimitSocket(socket, "send-caption")) return;
-    
-    // Broadcast to everyone ELSE in room
     socket.to(roomId).emit("receive-caption", {
       caption,
       username: username || "Speaker"
@@ -337,12 +305,7 @@ io.on("connection", (socket) => {
       });
   });
 
-  /* -------- DISCONNECT -------- */
-
-  /* -------- DISCONNECT & LEAVE LOGIC (FIXED) -------- */
-
   const handleUserLeave = () => {
-    // 1. Optimization: Use the saved room path instead of looping through all rooms
     const path = socket.roomPath; 
     
     if (!path || !rooms[path]) return;
@@ -351,49 +314,37 @@ io.on("connection", (socket) => {
     const userIndex = room.users.findIndex((u) => u.socketId === socket.id);
 
     if (userIndex !== -1) {
-      // Remove user from the list
       room.users.splice(userIndex, 1);
-      
-      // Notify everyone else that this user is gone
-      // Using io.to ensure delivery even if socket is unstable
       io.to(path).emit("user-left", socket.id);
 
-      // 2. Host Migration Logic
-      // If the person leaving was the HOST, assign a new host automatically
       if (room.hostId === socket.id) {
         if (room.users.length > 0) {
-          const newHost = room.users[0]; // Pick the next person
+          const newHost = room.users[0];
           room.hostId = newHost.socketId;
           
-          // Notify the room of the new host
           io.to(path).emit("update-host-id", room.hostId);
           io.to(room.hostId).emit("update-waiting-list", room.waiting);
         }
       }
     }
 
-    // Clean up waiting list
     room.waiting = room.waiting.filter((u) => u.socketId !== socket.id);
 
-    // 3. Delete Room if empty
     if (room.users.length === 0 && room.waiting.length === 0) {
       delete rooms[path];
     }
   };
 
-  // Case A: Browser closed or Internet lost
   socket.on("disconnect", () => {
     handleUserLeave();
   });
 
-  // Case B: User clicked "End Call" button (Instant removal)
   socket.on("leave-room", () => {
     handleUserLeave();
   });
 
   });
 
-/* ================= START SERVER ================= */
 
 const start = async () => {
   try {

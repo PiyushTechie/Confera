@@ -6,21 +6,14 @@ import {
   login,
   register,
 } from "../controllers/authentication.js";
+import authMiddleware from "../middlewares/auth.js";
 
 const router = Router();
 
-/* ======================
-   AUTH ROUTES
-====================== */
 router.post("/login", login);
 router.post("/register", register);
 
-/* ======================
-   USER ACTIVITY
-====================== */
-// No middleware needed here. 
-// The controllers already check the database for the token.
-router.post("/activity", addToHistory);
-router.get("/activity", getUserHistory);
+router.post("/activity", authMiddleware, addToHistory);
+router.get("/activity", authMiddleware, getUserHistory);
 
 export default router;
