@@ -51,21 +51,91 @@ const peerConfig = {
   ],
 };
 
+/* --------------------- AVATAR HELPERS --------------------- */
+const getAvatarColor = (name) => {
+  const colors = [
+    "bg-red-600",
+    "bg-orange-600",
+    "bg-amber-600",
+    "bg-green-600",
+    "bg-emerald-600",
+    "bg-teal-600",
+    "bg-cyan-600",
+    "bg-blue-600",
+    "bg-indigo-600",
+    "bg-violet-600",
+    "bg-purple-600",
+    "bg-fuchsia-600",
+    "bg-pink-600",
+    "bg-rose-600",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
+const AvatarFallback = ({ username, className = "" }) => {
+  const initial = (username || "Guest").charAt(0).toUpperCase();
+  const colorClass = getAvatarColor(username || "Guest");
+
+  return (
+    <div
+      className={`w-full h-full flex items-center justify-center bg-neutral-800 ${className}`}
+    >
+      <div
+        className={`${colorClass} rounded-full flex items-center justify-center text-white font-bold shadow-lg aspect-square h-[50%] max-h-[150px] min-h-[40px]`}
+      >
+        <span className="text-[clamp(1rem,4vw,4rem)] leading-none">
+          {initial}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/* --------------------- SMART VIDEO PLAYER --------------------- */
 const VideoPlayer = ({
   stream,
   isLocal,
   isMirrored,
   className,
   audioOutputId,
+  username,
 }) => {
   const videoRef = useRef(null);
+  const [isTrackMuted, setIsTrackMuted] = useState(false);
+
   useEffect(() => {
     const videoEl = videoRef.current;
     if (videoEl && stream) {
       videoEl.srcObject = stream;
       videoEl.play().catch((e) => console.warn("Autoplay blocked", e));
+
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        setIsTrackMuted(!videoTrack.enabled || videoTrack.muted);
+
+        const handleMute = () => setIsTrackMuted(true);
+        const handleUnmute = () => setIsTrackMuted(false);
+        const handleEnded = () => setIsTrackMuted(true);
+
+        videoTrack.addEventListener("mute", handleMute);
+        videoTrack.addEventListener("unmute", handleUnmute);
+        videoTrack.addEventListener("ended", handleEnded);
+
+        return () => {
+          videoTrack.removeEventListener("mute", handleMute);
+          videoTrack.removeEventListener("unmute", handleUnmute);
+          videoTrack.removeEventListener("ended", handleEnded);
+        };
+      }
+    } else if (!stream) {
+      setIsTrackMuted(true);
     }
   }, [stream]);
+
   useEffect(() => {
     if (
       videoRef.current &&
@@ -77,6 +147,11 @@ const VideoPlayer = ({
         .catch((err) => console.warn("Audio Sink Error:", err));
     }
   }, [audioOutputId]);
+
+  if (isTrackMuted) {
+    return <AvatarFallback username={username} className={className} />;
+  }
+
   return (
     <video
       ref={videoRef}
@@ -219,7 +294,7 @@ export default function VideoMeetComponent() {
         });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.style.display = "none";
+        const a.style.display = "none";
         a.href = url;
         a.download = `recording-${new Date().toISOString()}.webm`;
         document.body.appendChild(a);
@@ -475,9 +550,11 @@ export default function VideoMeetComponent() {
       socketIdRef.current = socketRef.current.id;
 
       const payload = {
-        path: window.location.href,
+        path: meetingCode,
         username: userName,
         passcode: passcodeInput || passcode,
+        isVideoOff: !video,
+        isMuted: !audio,
       };
 
       if (isHost) {
@@ -549,9 +626,11 @@ export default function VideoMeetComponent() {
     socketRef.current.on("admitted", () => {
       setIsInWaitingRoom(false);
       socketRef.current.emit("join-call", {
-        path: window.location.href,
+        path: meetingCode,
         username: userName,
         passcode: passcodeInput || passcode,
+        isVideoOff: !video,
+        isMuted: !audio,
       });
       addToast("You have been admitted!", "success");
     });
@@ -936,21 +1015,57 @@ export default function VideoMeetComponent() {
       isThisHost = mainId === roomHostId;
     }
 
+    if (isCamOff) {
+      return (
+        <div className="relative w-full h-full flex items-center justify-center bg-black/90">
+          <AvatarFallback username={displayName} />
+
+          {showCaptions && (remoteCaption || localCaption) && (
+            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-40">
+              <p className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">
+                {remoteCaption ? remoteCaption.username : "You"}
+              </p>
+              <p className="text-white text-lg font-medium leading-relaxed">
+                {remoteCaption ? remoteCaption.caption : localCaption}
+              </p>
+            </div>
+          )}
+
+          <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
+            <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
+              {displayName}
+              {isThisHost && (
+                <Crown size={16} className="text-yellow-400 fill-yellow-400" />
+              )}
+            </span>
+            {user.isHandRaised && (
+              <Hand size={20} className="text-yellow-500 animate-pulse" />
+            )}
+            {pinnedUserId === mainId && (
+              <Pin size={16} className="text-blue-400 rotate-45" />
+            )}
+          </div>
+          {emojiToShow && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
+              <span className="text-[12rem] filter drop-shadow-2xl leading-none">
+                {emojiToShow}
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="relative w-full h-full flex items-center justify-center bg-black/90">
-        {isCamOff ? (
-          <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center text-7xl font-bold text-white shadow-2xl">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
-        ) : (
-          <VideoPlayer
-            stream={stream}
-            isLocal={isLocal}
-            isMirrored={isLocal && !screen}
-            className="max-w-full max-h-full object-contain shadow-2xl"
-            audioOutputId={selectedDevices.audioOutput}
-          />
-        )}
+        <VideoPlayer
+          stream={stream}
+          isLocal={isLocal}
+          isMirrored={isLocal && !screen}
+          className="max-w-full max-h-full object-contain shadow-2xl"
+          audioOutputId={selectedDevices.audioOutput}
+          username={displayName}
+        />
 
         {showCaptions && (remoteCaption || localCaption) && (
           <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-40">
@@ -1023,11 +1138,7 @@ export default function VideoMeetComponent() {
           }`}
         >
           {isCamOff ? (
-            <div className="w-full h-full flex items-center justify-center bg-neutral-700">
-              <span className="text-xl font-bold text-gray-300">
-                {displayName.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            <AvatarFallback username={displayName} />
           ) : (
             <VideoPlayer
               stream={p.stream}
@@ -1035,6 +1146,7 @@ export default function VideoMeetComponent() {
               isMirrored={p.isLocal && !screen}
               className="w-full h-full object-cover"
               audioOutputId={selectedDevices.audioOutput}
+              username={displayName}
             />
           )}
           <div className="absolute bottom-1 left-1 bg-black/60 px-1.5 rounded text-[10px] truncate max-w-[90%] flex items-center gap-1">
@@ -1072,10 +1184,10 @@ export default function VideoMeetComponent() {
 
     const count = visibleParticipants.length;
     let gridClass = "grid-cols-1";
-    
+
     // Zoom-style layouts
     if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
-    if (count >= 3) gridClass = "grid-cols-2"; 
+    if (count >= 3) gridClass = "grid-cols-2";
     if (!isMobile && count >= 5) gridClass = "grid-cols-2 lg:grid-cols-3";
 
     return (
@@ -1122,11 +1234,7 @@ export default function VideoMeetComponent() {
                 }`}
               >
                 {isCamOff ? (
-                  <div className="w-full h-full flex items-center justify-center bg-neutral-700">
-                    <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-blue-600 flex items-center justify-center text-3xl md:text-4xl font-bold text-white shadow-lg">
-                      {displayName.charAt(0).toUpperCase()}
-                    </div>
-                  </div>
+                  <AvatarFallback username={displayName} />
                 ) : (
                   <VideoPlayer
                     stream={p.stream}
@@ -1134,6 +1242,7 @@ export default function VideoMeetComponent() {
                     isMirrored={p.isLocal && !screen}
                     className="w-full h-full object-cover"
                     audioOutputId={selectedDevices.audioOutput}
+                    username={displayName}
                   />
                 )}
 
@@ -1172,7 +1281,7 @@ export default function VideoMeetComponent() {
             );
           })}
         </div>
-        
+
         {!isMobile && totalPages > 1 && (
           <>
             {gridPage > 0 && (
@@ -1756,7 +1865,11 @@ export default function VideoMeetComponent() {
                       }}
                       className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
                     >
-                      {isMeetingLocked ? <Unlock size={24} /> : <Lock size={24} />}{" "}
+                      {isMeetingLocked ? (
+                        <Unlock size={24} />
+                      ) : (
+                        <Lock size={24} />
+                      )}{" "}
                       {isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}
                     </button>
                   </>

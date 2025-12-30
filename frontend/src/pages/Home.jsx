@@ -32,7 +32,7 @@ const Navbar = ({ navigate, handleLogout }) => {
                     <img
                         src={brandLogoSrc}
                         alt="Brand Logo"
-                        className="h-16 md:h-20 w-auto object-contain transition-all"
+                        className="h-16 md:h-16 w-auto object-contain transition-all"
                         onError={(e) => {
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'block';
