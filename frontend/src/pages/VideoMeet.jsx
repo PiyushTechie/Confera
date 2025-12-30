@@ -294,7 +294,7 @@ export default function VideoMeetComponent() {
         });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        const a.style.display = "none";
+        a.style.display = "none";
         a.href = url;
         a.download = `recording-${new Date().toISOString()}.webm`;
         document.body.appendChild(a);
