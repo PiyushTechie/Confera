@@ -2,8 +2,8 @@ import React, { useContext, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import brandLogo from "../assets/BrandLogo.png";
-import ScheduleModal from "../components/ScheduleModal"; // <--- Import 1
-import ScheduledList from "../components/ScheduledList"; // <--- Import 2
+import ScheduleModal from "../components/ScheduleModal";
+import ScheduledList from "../components/ScheduledList";
 import {
     Video,
     Plus,
@@ -73,9 +73,10 @@ function HomeComponent() {
     const [date, setDate] = useState(new Date());
     const [showJoinInputModal, setShowJoinInputModal] = useState(false);
     
-    // --- SCHEDULE STATE ---
-    const [showScheduleModal, setShowScheduleModal] = useState(false); // <--- New State
-    const [refreshSchedule, setRefreshSchedule] = useState(0);         // <--- New State
+    // --- SCHEDULE & EDIT STATE ---
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [refreshSchedule, setRefreshSchedule] = useState(0);
+    const [meetingToEdit, setMeetingToEdit] = useState(null); // <--- Added for Edit Mode
 
     const [meetingCode, setMeetingCode] = useState("");
     const [passcode, setPasscode] = useState(""); 
@@ -87,6 +88,22 @@ function HomeComponent() {
     const [isVideoOn, setIsVideoOn] = useState(true);
     const [isAudioOn, setIsAudioOn] = useState(true);
     const [copied, setCopied] = useState(false);
+
+    // --- HANDLERS FOR SCHEDULE ---
+    const handleEditMeeting = (meeting) => {
+        setMeetingToEdit(meeting);
+        setShowScheduleModal(true);
+    };
+
+    const handleScheduleSuccess = () => {
+        setRefreshSchedule((prev) => prev + 1);
+        setMeetingToEdit(null);
+    };
+
+    const handleCloseSchedule = () => {
+        setShowScheduleModal(false);
+        setMeetingToEdit(null);
+    };
 
     useEffect(() => {
         const timer = setInterval(() => setDate(new Date()), 1000);
@@ -225,7 +242,6 @@ function HomeComponent() {
                         <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Join</span>
                     </button>
 
-                    {/* --- UPDATED SCHEDULE BUTTON --- */}
                     <button onClick={() => setShowScheduleModal(true)} className="group flex flex-col cursor-pointer items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
                         <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                             <Calendar size={28} className="sm:w-8 sm:h-8" />
@@ -243,7 +259,11 @@ function HomeComponent() {
 
                 {/* --- SCHEDULED LIST SECTION --- */}
                 <div className="w-full max-w-4xl mt-10">
-                    <ScheduledList refreshTrigger={refreshSchedule} />
+                    <ScheduledList 
+                        refreshTrigger={refreshSchedule}
+                        onEditClick={handleEditMeeting} // Pass the edit handler
+                        onRefresh={() => setRefreshSchedule(prev => prev + 1)} // Pass refresh for delete
+                    />
                 </div>
             </div>
 
@@ -386,10 +406,13 @@ function HomeComponent() {
                 </div>
             )}
 
+            {/* --- SCHEDULE MODAL --- */}
+            {/* FIXED: Passing 'onSuccess' correctly to match ScheduleModal.jsx */}
             <ScheduleModal
                 isOpen={showScheduleModal}
-                onClose={() => setShowScheduleModal(false)}
-                onScheduleAdded={() => setRefreshSchedule(prev => prev + 1)}
+                onClose={handleCloseSchedule}
+                onSuccess={handleScheduleSuccess}
+                meetingToEdit={meetingToEdit}
             />
         </div>
     );
