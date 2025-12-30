@@ -1553,40 +1553,65 @@ export default function VideoMeetComponent() {
             >
               <Settings size={24} />
             </button>
+
             <button
               onClick={handleAudio}
-              className={`p-4 rounded-full transition-all ${
-                audio ? "bg-neutral-700" : "bg-red-500"
-              }`}
+              className="flex flex-col items-center gap-1 min-w-[50px]"
             >
-              {audio ? <Mic size={24} /> : <MicOff size={24} />}
+              <div
+                className={`p-3 rounded-xl ${
+                  audio ? "bg-neutral-700" : "bg-red-500"
+                }`}
+              >
+                {audio ? <Mic size={24} /> : <MicOff size={24} />}
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">Mic</span>
             </button>
+
             <button
               onClick={handleVideo}
-              className={`p-4 rounded-full transition-all ${
-                video ? "bg-neutral-700" : "bg-red-500"
-              }`}
+              className="flex flex-col items-center gap-1 min-w-[50px]"
             >
-              {video ? <Video size={24} /> : <VideoOff size={24} />}
+              <div
+                className={`p-3 rounded-xl ${
+                  video ? "bg-neutral-700" : "bg-red-500"
+                }`}
+              >
+                {video ? <Video size={24} /> : <VideoOff size={24} />}
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">Cam</span>
             </button>
+
             <button
               onClick={handleToggleHand}
-              className={`p-4 rounded-full transition-all ${
-                isHandRaised
-                  ? "bg-yellow-500 text-black"
-                  : "bg-neutral-700 text-white"
-              }`}
+              className="flex flex-col items-center gap-1 min-w-[50px]"
             >
-              <Hand size={24} />
+              <div
+                className={`p-3 rounded-xl ${
+                  isHandRaised
+                    ? "bg-yellow-500 text-black"
+                    : "bg-neutral-700 text-white"
+                }`}
+              >
+                <Hand size={24} />
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">
+                Hand
+              </span>
             </button>
 
             {/* Emoji Picker */}
             <div className="relative">
               <button
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600"
+                className="flex flex-col items-center gap-1 min-w-[50px]"
               >
-                <Smile size={24} />
+                <div className="p-3 rounded-xl bg-neutral-700 hover:bg-neutral-600">
+                  <Smile size={24} />
+                </div>
+                <span className="text-[10px] text-gray-400 font-medium">
+                  Emoji
+                </span>
               </button>
               {showEmojiPicker && (
                 <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">
@@ -1605,55 +1630,85 @@ export default function VideoMeetComponent() {
 
             <button
               onClick={handleScreen}
-              className={`p-4 rounded-full ${
-                screen ? "bg-blue-600" : "bg-neutral-700"
-              }`}
+              className="flex flex-col items-center gap-1 min-w-[50px]"
             >
-              {screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}
+              <div
+                className={`p-3 rounded-xl ${
+                  screen ? "bg-blue-600" : "bg-neutral-700"
+                }`}
+              >
+                {screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">
+                Share
+              </span>
             </button>
 
             {/* CAPTION & RECORD BUTTONS */}
             <button
               onClick={toggleCaptions}
-              className={`p-4 rounded-full transition-all ${
-                showCaptions
-                  ? "bg-indigo-600 text-white"
-                  : "bg-neutral-700 text-white"
-              }`}
+              className="flex flex-col items-center gap-1 min-w-[50px]"
               title="Captions"
             >
-              <Captions size={24} />
+              <div
+                className={`p-3 rounded-xl transition-all ${
+                  showCaptions
+                    ? "bg-indigo-600 text-white"
+                    : "bg-neutral-700 text-white"
+                }`}
+              >
+                <Captions size={24} />
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">
+                Caps
+              </span>
             </button>
+
             <button
               onClick={handleToggleRecord}
-              className={`p-4 rounded-full transition-all ${
-                isRecording
-                  ? "bg-red-600 animate-pulse text-white"
-                  : "bg-neutral-700 text-white"
-              }`}
+              className="flex flex-col items-center gap-1 min-w-[50px]"
               title="Record"
             >
-              <Disc size={24} />
+              <div
+                className={`p-3 rounded-xl transition-all ${
+                  isRecording
+                    ? "bg-red-600 animate-pulse text-white"
+                    : "bg-neutral-700 text-white"
+                }`}
+              >
+                <Disc size={24} />
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">Rec</span>
             </button>
 
             <button
               onClick={handleEndCall}
-              className="p-4 rounded-full bg-red-600 text-white"
+              className="flex flex-col items-center gap-1 min-w-[50px]"
             >
-              <PhoneOff size={24} />
+              <div className="p-3 rounded-xl bg-red-600 text-white">
+                <PhoneOff size={24} />
+              </div>
+              <span className="text-[10px] text-red-500 font-bold">End</span>
             </button>
 
             {/* LOCK BUTTON */}
             <button
               onClick={handleToggleLock}
-              className={`p-4 rounded-full transition-all duration-300 transform ${
-                isMeetingLocked
-                  ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.6)] scale-110"
-                  : "bg-neutral-700 text-white hover:bg-neutral-600"
-              }`}
+              className="flex flex-col items-center gap-1 min-w-[50px]"
               title={isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}
             >
-              {isMeetingLocked ? <Lock size={24} /> : <Unlock size={24} />}
+              <div
+                className={`p-3 rounded-xl transition-all duration-300 transform ${
+                  isMeetingLocked
+                    ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.6)] scale-110"
+                    : "bg-neutral-700 text-white hover:bg-neutral-600"
+                }`}
+              >
+                {isMeetingLocked ? <Lock size={24} /> : <Unlock size={24} />}
+              </div>
+              <span className="text-[10px] text-gray-400 font-medium">
+                {isMeetingLocked ? "Unlock" : "Lock"}
+              </span>
             </button>
 
             <div className="absolute right-6 gap-3 flex">
@@ -1720,19 +1775,19 @@ export default function VideoMeetComponent() {
               </button>
 
               <button
-                onClick={handleToggleRecord}
+                onClick={handleToggleHand}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
               >
                 <div
                   className={`p-3 rounded-xl ${
-                    isRecording
-                      ? "bg-red-500/20 text-red-500 animate-pulse"
+                    isHandRaised
+                      ? "bg-yellow-500 text-black"
                       : "bg-neutral-800"
                   }`}
                 >
-                  <Disc size={24} />
+                  <Hand size={24} />
                 </div>
-                <span className="text-[10px] text-gray-400">Rec</span>
+                <span className="text-[10px] text-gray-400">Hand</span>
               </button>
 
               <button
@@ -1759,6 +1814,56 @@ export default function VideoMeetComponent() {
                   <span className="absolute top-0 right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-neutral-900"></span>
                 )}
                 <span className="text-[10px] text-gray-400">People</span>
+              </button>
+
+              <button
+                onClick={handleScreen}
+                className="flex flex-col items-center gap-1 min-w-[50px]"
+              >
+                <div
+                  className={`p-3 rounded-xl ${
+                    screen ? "bg-blue-600" : "bg-neutral-800"
+                  }`}
+                >
+                  {screen ? (
+                    <MonitorOff size={24} />
+                  ) : (
+                    <ScreenShare size={24} />
+                  )}
+                </div>
+                <span className="text-[10px] text-gray-400">Share</span>
+              </button>
+
+              <button
+                onClick={toggleCaptions}
+                className="flex flex-col items-center gap-1 min-w-[50px]"
+              >
+                <div
+                  className={`p-3 rounded-xl ${
+                    showCaptions
+                      ? "bg-indigo-600 text-white"
+                      : "bg-neutral-800"
+                  }`}
+                >
+                  <Captions size={24} />
+                </div>
+                <span className="text-[10px] text-gray-400">Caps</span>
+              </button>
+
+              <button
+                onClick={handleToggleRecord}
+                className="flex flex-col items-center gap-1 min-w-[50px]"
+              >
+                <div
+                  className={`p-3 rounded-xl ${
+                    isRecording
+                      ? "bg-red-500/20 text-red-500 animate-pulse"
+                      : "bg-neutral-800"
+                  }`}
+                >
+                  <Disc size={24} />
+                </div>
+                <span className="text-[10px] text-gray-400">Rec</span>
               </button>
 
               <button
@@ -1799,35 +1904,7 @@ export default function VideoMeetComponent() {
                     <X size={24} />
                   </button>
                 </div>
-                <button
-                  onClick={() => {
-                    handleScreen();
-                    setShowMobileMenu(false);
-                  }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
-                >
-                  <ScreenShare size={24} /> Share Screen
-                </button>
-                <button
-                  onClick={() => {
-                    toggleCaptions();
-                    setShowMobileMenu(false);
-                  }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
-                >
-                  <Captions size={24} />{" "}
-                  {showCaptions ? "Hide Captions" : "Show Captions"}
-                </button>
-                <button
-                  onClick={() => {
-                    handleToggleHand();
-                    setShowMobileMenu(false);
-                  }}
-                  className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
-                >
-                  <Hand size={24} />{" "}
-                  {isHandRaised ? "Lower Hand" : "Raise Hand"}
-                </button>
+
                 <button
                   onClick={() => {
                     setShowInfo(true);
