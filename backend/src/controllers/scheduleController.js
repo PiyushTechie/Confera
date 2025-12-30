@@ -39,3 +39,30 @@ export const getMySchedules = async (req, res) => {
     res.status(500).json({ message: "Something went wrong. Please try again!." });
   }
 };
+
+export const deleteSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ScheduledMeeting.findByIdAndDelete(id);
+    res.json({ message: "Meeting deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const updateSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, date, time } = req.body;
+
+    const updatedMeeting = await ScheduledMeeting.findByIdAndUpdate(
+      id,
+      { title, date, time },
+      { new: true }
+    );
+
+    res.json(updatedMeeting);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
