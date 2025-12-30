@@ -1,61 +1,59 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { X, Calendar, Clock, Loader2, Save } from "lucide-react";
-import server from "../environment";
+import { X, Calendar, Clock, Type, Loader2 } from "lucide-react";
+import server from "../environment"; // Corrected Import path
 
 export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdit }) {
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [formData, setFormData] = useState({ title: "", date: "", time: "" });
   const [loading, setLoading] = useState(false);
 
-  // Load data when "meetingToEdit" prop changes
   useEffect(() => {
     if (meetingToEdit) {
-      setTitle(meetingToEdit.title);
-      setTime(meetingToEdit.time);
-      
-      // Convert stored "DD-MM-YYYY" back to input-friendly "YYYY-MM-DD"
+      // Backend uses DD-MM-YYYY, Frontend Input needs YYYY-MM-DD
+      let formattedDate = "";
       if (meetingToEdit.date) {
         const [day, month, year] = meetingToEdit.date.split("-");
-        setDate(`${year}-${month}-${day}`);
+        formattedDate = `${year}-${month}-${day}`;
       }
+      setFormData({
+        title: meetingToEdit.title,
+        time: meetingToEdit.time,
+        date: formattedDate
+      });
     } else {
-      // Reset if adding new
-      setTitle("");
-      setDate("");
-      setTime("");
+      setFormData({ title: "", date: "", time: "" });
     }
   }, [meetingToEdit, isOpen]);
 
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !date || !time) return;
-
     setLoading(true);
+
     try {
       const token = localStorage.getItem("token");
-      
-      // Convert Input "YYYY-MM-DD" -> Backend "DD-MM-YYYY"
-      const [year, month, day] = date.split("-");
-      const formattedDate = `${day}-${month}-${year}`;
+      // Convert YYYY-MM-DD back to DD-MM-YYYY for backend
+      const [year, month, day] = formData.date.split("-");
+      const backendDate = `${day}-${month}-${year}`;
 
-      const payload = { title, date: formattedDate, time };
+      const payload = { ...formData, date: backendDate };
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       if (meetingToEdit) {
-        // --- UPDATE MODE ---
         await axios.put(`${server}/api/schedule/update/${meetingToEdit._id}`, payload, config);
       } else {
-        // --- CREATE MODE ---
         await axios.post(`${server}/api/schedule/create`, payload, config);
       }
 
-      onSuccess(); // Refresh list
-      onClose();   // Close modal
+      if (onSuccess) onSuccess();
+      onClose();
+      setFormData({ title: "", date: "", time: "" }); // Reset
     } catch (error) {
-      console.error("Operation failed:", error);
-      alert("Something went wrong.");
+      console.error("Schedule error:", error);
+      alert("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -64,46 +62,71 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md p-6 rounded-2xl shadow-2xl relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-          <X size={20} />
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+        onClick={onClose}
+      />
 
-        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-          <Calendar className="text-blue-500" /> 
-          {meetingToEdit ? "Edit Meeting" : "Schedule a Meeting"}
-        </h2>
+      {/* Modal Content */}
+      <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden transform transition-all scale-100">
+        
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-800/50">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            {meetingToEdit ? <Calendar className="text-blue-400" size={20}/> : <Calendar className="text-green-400" size={20}/>}
+            {meetingToEdit ? "Edit Meeting Details" : "Schedule New Meeting"}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+            <X size={20} />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Title</label>
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <Type size={14} /> Meeting Title
+            </label>
             <input
+              name="title"
               type="text"
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg p-3 text-white outline-none focus:border-blue-500"
-              placeholder="e.g., Weekly Sync"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-white placeholder-neutral-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              placeholder="e.g. Project Sprint Review"
+              value={formData.title}
+              onChange={handleChange}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Date</label>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                <Calendar size={14} /> Date
+              </label>
               <input
+                name="date"
                 type="date"
-                className="w-full bg-neutral-800 border border-neutral-700 rounded-lg p-3 text-white outline-none focus:border-blue-500 [color-scheme:dark]"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+                required
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all [color-scheme:dark]"
+                value={formData.date}
+                onChange={handleChange}
+                min={new Date().toISOString().split("T")[0]}
               />
             </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Time</label>
+            
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                <Clock size={14} /> Time
+              </label>
               <input
+                name="time"
                 type="time"
-                className="w-full bg-neutral-800 border border-neutral-700 rounded-lg p-3 text-white outline-none focus:border-blue-500 [color-scheme:dark]"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
+                required
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all [color-scheme:dark]"
+                value={formData.time}
+                onChange={handleChange}
               />
             </div>
           </div>
@@ -111,9 +134,13 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 mt-4 transition-all"
+            className={`w-full font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all mt-2 ${
+              loading 
+                ? "bg-neutral-800 text-gray-400 cursor-not-allowed" 
+                : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/30 hover:shadow-blue-900/50"
+            }`}
           >
-            {loading ? <Loader2 className="animate-spin" /> : (meetingToEdit ? "Save Changes" : "Schedule")}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (meetingToEdit ? "Save Changes" : "Confirm Schedule")}
           </button>
         </form>
       </div>
