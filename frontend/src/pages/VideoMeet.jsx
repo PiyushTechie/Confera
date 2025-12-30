@@ -82,12 +82,12 @@ const AvatarFallback = ({ username, className = "" }) => {
 
   return (
     <div
-      className={`w-full h-full flex items-center justify-center bg-neutral-800 ${className}`}
+      className={`w-full h-full flex flex-col items-center justify-center bg-neutral-800/80 backdrop-blur-md ${className}`}
     >
       <div
-        className={`${colorClass} rounded-full flex items-center justify-center text-white font-bold shadow-lg aspect-square h-[50%] max-h-[150px] min-h-[40px]`}
+        className={`${colorClass} rounded-full flex items-center justify-center text-white font-bold shadow-2xl aspect-square w-[35%] max-w-[150px] min-w-[80px] border-4 border-white/10`}
       >
-        <span className="text-[clamp(1rem,4vw,4rem)] leading-none">
+        <span className="text-[clamp(2rem,6vw,5rem)] leading-none">
           {initial}
         </span>
       </div>
@@ -115,6 +115,7 @@ const VideoPlayer = ({
 
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
+        // Initial check: if track is disabled or muted, show avatar
         setIsTrackMuted(!videoTrack.enabled || videoTrack.muted);
 
         const handleMute = () => setIsTrackMuted(true);
@@ -1001,6 +1002,7 @@ export default function VideoMeetComponent() {
         username: userName,
         isHandRaised: isHandRaised,
         isVideoOff: !video,
+        isMuted: !audio,
       };
       stream = localStream;
       isCamOff = !video;
@@ -1032,6 +1034,17 @@ export default function VideoMeetComponent() {
           )}
 
           <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
+            {/* MIC STATUS INDICATOR */}
+            <div className="mr-2">
+              {user.isMuted ? (
+                <MicOff size={16} className="text-red-500" />
+              ) : activeSpeakerId === mainId ? (
+                <Mic size={16} className="text-green-500 animate-pulse" />
+              ) : (
+                <Mic size={16} className="text-white/70" />
+              )}
+            </div>
+
             <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
               {displayName}
               {isThisHost && (
@@ -1079,6 +1092,17 @@ export default function VideoMeetComponent() {
         )}
 
         <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
+          {/* MIC STATUS INDICATOR */}
+          <div className="mr-2">
+            {user.isMuted ? (
+              <MicOff size={16} className="text-red-500" />
+            ) : activeSpeakerId === mainId ? (
+              <Mic size={16} className="text-green-500 animate-pulse" />
+            ) : (
+              <Mic size={16} className="text-white/70" />
+            )}
+          </div>
+
           <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
             {displayName}
             {isThisHost && (
@@ -1119,7 +1143,12 @@ export default function VideoMeetComponent() {
     return stripParticipants.map((p) => {
       const pId = p.isLocal ? socketIdRef.current || "local" : p.socketId;
       const user = p.isLocal
-        ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video }
+        ? {
+            username: userName,
+            isHandRaised: isHandRaised,
+            isVideoOff: !video,
+            isMuted: !audio,
+          }
         : userMap[pId] || { username: "Guest" };
       const isCamOff = user.isVideoOff;
       const displayName = p.isLocal ? `${userName} (You)` : user.username;
@@ -1150,6 +1179,14 @@ export default function VideoMeetComponent() {
             />
           )}
           <div className="absolute bottom-1 left-1 bg-black/60 px-1.5 rounded text-[10px] truncate max-w-[90%] flex items-center gap-1">
+            {/* MIC INDICATOR */}
+            {user.isMuted ? (
+              <MicOff size={10} className="text-red-500" />
+            ) : activeSpeakerId === pId ? (
+              <Mic size={10} className="text-green-500 animate-pulse" />
+            ) : (
+              <Mic size={10} className="text-white/70" />
+            )}
             {displayName}
             {isThisHost && (
               <Crown size={10} className="text-yellow-400 fill-yellow-400" />
@@ -1206,6 +1243,7 @@ export default function VideoMeetComponent() {
                   username: userName,
                   isHandRaised: isHandRaised,
                   isVideoOff: !video,
+                  isMuted: !audio,
                 }
               : userMap[pId] || { username: "Guest" };
             const displayName = p.isLocal ? `${userName} (You)` : user.username;
@@ -1256,6 +1294,20 @@ export default function VideoMeetComponent() {
 
                 {/* Name Label with higher Z-index */}
                 <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1 z-50 max-w-[85%] truncate">
+                  {/* MIC INDICATOR */}
+                  <div className="mr-1">
+                    {user.isMuted ? (
+                      <MicOff size={12} className="text-red-500" />
+                    ) : activeSpeakerId === pId ? (
+                      <Mic
+                        size={12}
+                        className="text-green-500 animate-pulse"
+                      />
+                    ) : (
+                      <Mic size={12} className="text-white/70" />
+                    )}
+                  </div>
+
                   <span className="truncate">{displayName}</span>
                   {isThisHost && (
                     <Crown
@@ -1965,252 +2017,6 @@ export default function VideoMeetComponent() {
                       {emoji}
                     </button>
                   ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SIDEBARS: PARTICIPANTS */}
-          {showParticipants && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-6rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-[70] flex flex-col slide-in-right shadow-2xl">
-              <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
-                <h3 className="font-bold">Participants</h3>
-                <button onClick={() => setShowParticipants(false)}>
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="flex-1 p-4 space-y-4 overflow-y-auto pb-20">
-                {amIHost && waitingUsers && waitingUsers.length > 0 && (
-                  <div className="pb-4 border-b border-neutral-700">
-                    <h4 className="text-xs font-bold text-yellow-500 uppercase mb-3">
-                      Waiting
-                    </h4>
-                    {waitingUsers.map((u) => (
-                      <div
-                        key={u.socketId}
-                        className="flex justify-between items-center bg-neutral-700/50 p-2 rounded mb-2"
-                      >
-                        <span className="text-sm">{u.username || "Guest"}</span>
-                        <button
-                          onClick={() => handleAdmit(u.socketId)}
-                          className="p-1 bg-green-600 rounded text-xs"
-                        >
-                          <UserCheck size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex justify-between items-center bg-neutral-700/50 p-2 rounded">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs">
-                      {(userName || "G").charAt(0)}
-                    </div>
-                    <span className="text-sm">
-                      {userName} (You){" "}
-                      {amIHost && (
-                        <Crown
-                          size={12}
-                          className="text-yellow-400 fill-yellow-400 inline ml-1"
-                        />
-                      )}
-                    </span>
-                  </div>
-                </div>
-                {userMap &&
-                  Object.values(userMap).map((u) => {
-                    const isUserHost = u.socketId === roomHostId;
-                    return (
-                      <div
-                        key={u.socketId}
-                        className="flex justify-between items-center bg-neutral-700/50 p-2 rounded group"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-xs">
-                            {(u.username || "G").charAt(0)}
-                          </div>
-                          <span className="text-sm">
-                            {u.username || "Guest"}{" "}
-                            {isUserHost && (
-                              <Crown
-                                size={12}
-                                className="text-yellow-400 fill-yellow-400 inline ml-1"
-                              />
-                            )}
-                          </span>
-                          {u.isHandRaised && (
-                            <Hand
-                              size={14}
-                              className="text-yellow-500 ml-1 animate-pulse"
-                            />
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={
-                              u.isVideoOff ? "text-red-500" : "text-gray-400"
-                            }
-                          >
-                            {u.isVideoOff ? (
-                              <VideoOff size={14} />
-                            ) : (
-                              <Video size={14} />
-                            )}
-                          </div>
-                          <div
-                            className={
-                              u.isMuted ? "text-red-500" : "text-gray-400"
-                            }
-                          >
-                            {u.isMuted ? <MicOff size={14} /> : <Mic size={14} />}
-                          </div>
-
-                          {amIHost && (
-                            <>
-                              <button
-                                onClick={() => handleTransferHost(u.socketId)}
-                                className="text-gray-500 hover:text-blue-500 transition-colors"
-                                title="Make Host"
-                              >
-                                <UserCog size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleKickUser(u.socketId)}
-                                className="text-gray-500 hover:text-red-500 transition-colors"
-                                title="Remove"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-
-          {/* SIDEBARS: CHAT */}
-          {showChat && (
-            <div className="absolute right-0 top-0 h-[calc(100vh-6rem)] w-full md:w-80 bg-neutral-800 border-l border-neutral-700 z-[70] flex flex-col slide-in-right shadow-2xl">
-              <div className="p-4 border-b border-neutral-700 flex justify-between items-center bg-neutral-900">
-                <h3 className="font-bold">Chat</h3>
-                <button onClick={() => setShowChat(false)}>
-                  <X size={20} />
-                </button>
-              </div>
-              <div
-                ref={chatContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4"
-              >
-                {messages.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex flex-col ${
-                      msg.isMe ? "items-end" : "items-start"
-                    }`}
-                  >
-                    <div className="text-xs text-gray-400 mb-1">
-                      {msg.sender}
-                    </div>
-                    <div
-                      className={`px-4 py-2 rounded-lg text-sm ${
-                        msg.isMe ? "bg-blue-600" : "bg-neutral-700"
-                      }`}
-                    >
-                      {msg.text}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 bg-neutral-900 border-t border-neutral-700">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }}
-                  className="flex gap-2"
-                >
-                  <input
-                    className="flex-1 bg-neutral-700 rounded-lg p-2 text-sm"
-                    value={currentMessage}
-                    onChange={(e) => setCurrentMessage(e.target.value)}
-                    placeholder="Type..."
-                  />
-                  <button type="submit" className="p-2 bg-blue-600 rounded-lg">
-                    <Send size={18} />
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* INFO MODAL (CENTERED & HIGH Z-INDEX) */}
-          {showInfo && (
-            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-              <div className="bg-neutral-800 p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 relative animate-in zoom-in duration-200">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-xl">Meeting Info</h3>
-                  <button
-                    onClick={() => setShowInfo(false)}
-                    className="p-1 hover:bg-neutral-700 rounded-full"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                      Meeting Code
-                    </label>
-                    <div className="flex items-center justify-between bg-neutral-900 p-3 rounded-lg mt-2 border border-neutral-700">
-                      <span className="font-mono font-bold text-lg tracking-wider text-blue-400">
-                        {meetingCode}
-                      </span>
-                      <button
-                        onClick={handleCopyLink}
-                        className="p-2 hover:bg-neutral-800 rounded-md text-gray-400 hover:text-white transition-colors"
-                      >
-                        {copied ? (
-                          <Check size={18} className="text-green-500" />
-                        ) : (
-                          <Copy size={18} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {amIHost && (
-                    <div>
-                      <label className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2 block">
-                        Host Controls
-                      </label>
-                      <button
-                        onClick={handleToggleLock}
-                        className={`w-full flex items-center justify-center gap-3 py-3 rounded-xl font-bold transition-all ${
-                          isMeetingLocked
-                            ? "bg-red-500/20 text-red-500 border border-red-500/50"
-                            : "bg-neutral-700 text-white hover:bg-neutral-600"
-                        }`}
-                      >
-                        {isMeetingLocked ? (
-                          <Lock size={18} />
-                        ) : (
-                          <Unlock size={18} />
-                        )}
-                        {isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}
-                      </button>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleCopyLink}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/20"
-                  >
-                    Copy Invite Link
-                  </button>
                 </div>
               </div>
             </div>
