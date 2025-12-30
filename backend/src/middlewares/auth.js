@@ -2,14 +2,17 @@ import { User } from "../models/user.js";
 import httpStatus from "http-status";
 
 const authMiddleware = async (req, res, next) => {
-    const token = req.headers['authorization'];
+    const authHeader = req.headers['authorization'];
 
-    if (!token) {
-        return res.status(httpStatus.UNAUTHORIZED).json({ message: "Authentication token missing" });
+    if (!authHeader) {
+        return res.status(httpStatus.UNAUTHORIZED).json({ message: "Authorization header missing" });
     }
 
+    const token = authHeader.startsWith("Bearer ") 
+        ? authHeader.split(" ")[1] 
+        : authHeader;
+
     try {
-        // 2. Find the user associated with this token
         const user = await User.findOne({ token: token });
 
         if (!user) {
@@ -17,8 +20,7 @@ const authMiddleware = async (req, res, next) => {
         }
 
         req.user = user;
-
-        next(); 
+        next();
 
     } catch (error) {
         return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({ message: `Auth Error: ${error}` });
