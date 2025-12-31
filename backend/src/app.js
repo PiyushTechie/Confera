@@ -96,6 +96,15 @@ const rateLimitSocket = (socket, event) => {
   return true;
 };
 
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of socketRateMap.entries()) {
+    if (now - value.start > RATE_LIMIT.windowMs) {
+      socketRateMap.delete(key);
+    }
+  }
+}, 10 * 60 * 1000);
+
 const rooms = {};
 
 
