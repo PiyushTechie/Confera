@@ -20,46 +20,44 @@ import {
     LogOut,
     ArrowRight,
     Lock,
-    Settings
+    MoreHorizontal,
+    ChevronDown
 } from "lucide-react";
 
 // --- NAVBAR COMPONENT ---
 const Navbar = ({ navigate, handleLogout }) => {
-    const brandLogoSrc = brandLogo;
-
     return (
-        <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-2">
+        <nav className="sticky top-0 z-40 w-full bg-white px-4 sm:px-6 py-3 shadow-sm border-b border-slate-100">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => navigate("/home")}>
+                <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/home")}>
+                     {/* Placeholder for logo if image fails, or use img tag */}
                     <img
-                        src={brandLogoSrc}
-                        alt="Brand Logo"
-                        className="h-16 md:h-16 w-auto object-contain transition-all"
-                        onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'block';
-                        }}
+                        src={brandLogo}
+                        alt="Conferra"
+                        className="h-8 md:h-10 w-auto object-contain"
+                        onError={(e) => { e.target.style.display = 'none'; }}
                     />
                 </div>
 
-                <div className="flex items-center gap-2 md:gap-3">
+                <div className="flex items-center gap-2">
                     <button 
                         onClick={() => navigate("/history")} 
-                        className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 text-sm font-semibold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
+                        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                        title="History"
                     >
                         <Clock size={20} />
-                        <span className="hidden sm:inline">History</span>
                     </button>
-                    
-                    <div className="h-6 w-px bg-slate-200 mx-1"></div>
-
                     <button 
                         onClick={handleLogout} 
-                        className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-full transition-all"
+                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Logout"
                     >
                         <LogOut size={20} />
-                        <span className="hidden sm:inline">Logout</span>
                     </button>
+                    {/* User Avatar Placeholder */}
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm ml-2">
+                        U
+                    </div>
                 </div>
             </div>
         </nav>
@@ -76,7 +74,7 @@ function HomeComponent() {
     // --- SCHEDULE & EDIT STATE ---
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [refreshSchedule, setRefreshSchedule] = useState(0);
-    const [meetingToEdit, setMeetingToEdit] = useState(null); // <--- Added for Edit Mode
+    const [meetingToEdit, setMeetingToEdit] = useState(null);
 
     const [meetingCode, setMeetingCode] = useState("");
     const [passcode, setPasscode] = useState(""); 
@@ -89,7 +87,7 @@ function HomeComponent() {
     const [isAudioOn, setIsAudioOn] = useState(true);
     const [copied, setCopied] = useState(false);
 
-    // --- HANDLERS FOR SCHEDULE ---
+    // --- HANDLERS ---
     const handleEditMeeting = (meeting) => {
         setMeetingToEdit(meeting);
         setShowScheduleModal(true);
@@ -122,16 +120,7 @@ function HomeComponent() {
         navigate("/auth");
     };
 
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get("token");
-
-        if (token) {
-            localStorage.setItem("token", token);
-            window.history.replaceState({}, document.title, "/home");
-        }
-    }, []);
-
+    // --- MEETING LOGIC ---
     const handleNewMeeting = () => {
         setIsJoining(false);
         setPasscode("");
@@ -210,204 +199,214 @@ function HomeComponent() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const formatTime = (date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    // --- DATE FORMATTING ---
+    const formatTime = (date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
     const formatDate = (date) => date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 
+    // --- BUTTON COMPONENT (Zoom Style) ---
+    const ActionButton = ({ icon: Icon, color, label, onClick }) => (
+        <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={onClick}>
+            <div className={`
+                w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center shadow-sm transition-all duration-200 transform group-hover:-translate-y-1 group-hover:shadow-md
+                ${color === 'orange' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}
+            `}>
+                <Icon size={32} className="text-white" strokeWidth={1.5} />
+            </div>
+            <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">{label}</span>
+        </div>
+    );
+
     return (
-        <div className="min-h-screen w-full bg-slate-50 flex flex-col font-sans text-slate-800">
+        <div className="min-h-screen w-full bg-white flex flex-col font-sans text-slate-800">
             <Navbar navigate={navigate} handleLogout={handleLogout} />
 
-            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto px-4 sm:px-6 -mt-10">
-                <div className="text-center mb-8 sm:mb-20">
-                    <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold text-slate-800 mb-2 tracking-tight">
-                        {formatTime(date)}
-                    </h1>
-                    <p className="text-slate-500 text-lg sm:text-2xl font-medium">
-                        {formatDate(date)}
-                    </p>
+            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col md:flex-row gap-8">
+                
+                {/* LEFT SECTION: Time & Actions */}
+                <div className="flex-1 flex flex-col items-center pt-8 md:pt-16">
+                    {/* Time Display */}
+                    <div className="text-center mb-12">
+                        <h1 className="text-6xl sm:text-7xl font-bold text-slate-900 tracking-tight leading-none mb-2">
+                            {formatTime(date)}
+                        </h1>
+                        <p className="text-slate-500 text-lg font-medium">
+                            {formatDate(date)}
+                        </p>
+                    </div>
+
+                    {/* Action Buttons Grid */}
+                    <div className="flex flex-wrap justify-center gap-6 sm:gap-10 mb-12">
+                        <ActionButton 
+                            icon={Video} 
+                            color="orange" 
+                            label="New Meeting" 
+                            onClick={handleNewMeeting} 
+                        />
+                        <ActionButton 
+                            icon={Plus} 
+                            color="blue" 
+                            label="Join" 
+                            onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} 
+                        />
+                        <ActionButton 
+                            icon={Calendar} 
+                            color="blue" 
+                            label="Schedule" 
+                            onClick={() => setShowScheduleModal(true)} 
+                        />
+                        <ActionButton 
+                            icon={ScreenShare} 
+                            color="blue" 
+                            label="Share Screen" 
+                            onClick={() => {}} // Placeholder
+                        />
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 w-full max-w-4xl">
-                    <button onClick={handleNewMeeting} className="group relative flex flex-col items-center cursor-pointer justify-center gap-3 p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 rounded-3xl shadow-xl shadow-orange-500/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl">
-                        <div className="p-3 sm:p-4 bg-white/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                            <Video size={28} className="text-white sm:w-8 sm:h-8" />
+                {/* RIGHT SECTION: Scheduled List (The "Today" Card) */}
+                <div className="w-full md:w-[400px] lg:w-[450px] flex flex-col">
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-sm h-full flex flex-col overflow-hidden min-h-[400px]">
+                        {/* Card Header */}
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div className="flex items-center gap-2">
+                                <h2 className="font-semibold text-slate-700">Today</h2>
+                                <span className="text-slate-400 text-sm font-normal">
+                                    {new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </span>
+                            </div>
+                            <button className="text-slate-400 hover:text-slate-600">
+                                <ChevronDown size={18} />
+                            </button>
                         </div>
-                        <span className="text-sm sm:text-lg font-bold text-white">New Meeting</span>
-                    </button>
 
-                    <button onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} className="group cursor-pointer flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
-                        <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                            <Plus size={28} className="sm:w-8 sm:h-8" />
+                        {/* Card Body: The List */}
+                        <div className="flex-1 p-2 overflow-y-auto bg-slate-50/30">
+                            <ScheduledList 
+                                refreshTrigger={refreshSchedule}
+                                onEditClick={handleEditMeeting}
+                                onRefresh={() => setRefreshSchedule(prev => prev + 1)}
+                            />
                         </div>
-                        <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Join</span>
-                    </button>
-
-                    <button onClick={() => setShowScheduleModal(true)} className="group flex flex-col cursor-pointer items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
-                        <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                            <Calendar size={28} className="sm:w-8 sm:h-8" />
+                        
+                        {/* Helper Footer (Optional, like Zoom's 'View all') */}
+                        <div className="p-3 text-center border-t border-slate-100">
+                             <button className="text-xs font-medium text-slate-400 hover:text-indigo-600 transition-colors">
+                                View all meetings
+                             </button>
                         </div>
-                        <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Schedule</span>
-                    </button>
-
-                    <button className="group flex flex-col items-center cursor-pointer justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
-                        <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                            <ScreenShare size={28} className="sm:w-8 sm:h-8" />
-                        </div>
-                        <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Screen</span>
-                    </button>
+                    </div>
                 </div>
 
-                {/* --- SCHEDULED LIST SECTION --- */}
-                <div className="w-full max-w-4xl mt-10">
-                    <ScheduledList 
-                        refreshTrigger={refreshSchedule}
-                        onEditClick={handleEditMeeting} // Pass the edit handler
-                        onRefresh={() => setRefreshSchedule(prev => prev + 1)} // Pass refresh for delete
-                    />
-                </div>
-            </div>
+            </main>
 
-            {/* --- MODALS --- */}
+            {/* --- JOIN MODAL --- */}
             {showJoinInputModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto">
-                    <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 my-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800">Join a Meeting</h3>
-                            <button onClick={() => setShowJoinInputModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-slate-800">Join Meeting</h3>
+                            <button onClick={() => setShowJoinInputModal(false)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
                                 <X size={20} />
                             </button>
                         </div>
                         <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Meeting ID</label>
-                                <div className="relative">
-                                    <input type="text" placeholder="e.g. 123-456-789" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono" value={meetingCode} onChange={(e) => setMeetingCode(e.target.value)} autoFocus />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Passcode (Optional)</label>
-                                <div className="relative">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Lock size={18} /></div>
-                                    <input type="text" placeholder="Host provided passcode" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" value={passcode} onChange={(e) => setPasscode(e.target.value)} />
-                                </div>
-                            </div>
-                            <button onClick={handleJoinVideoCall} disabled={!meetingCode.trim()} className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all mt-4 ${meetingCode.trim() ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transform hover:-translate-y-0.5" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
-                                Join Now <ArrowRight size={20} />
+                            <input 
+                                type="text" 
+                                placeholder="Meeting ID" 
+                                className="w-full bg-slate-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg px-4 py-3 outline-none transition-all"
+                                value={meetingCode} 
+                                onChange={(e) => setMeetingCode(e.target.value)} 
+                                autoFocus 
+                            />
+                            <input 
+                                type="text" 
+                                placeholder="Passcode (Optional)" 
+                                className="w-full bg-slate-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg px-4 py-3 outline-none transition-all"
+                                value={passcode} 
+                                onChange={(e) => setPasscode(e.target.value)} 
+                            />
+                            <button 
+                                onClick={handleJoinVideoCall} 
+                                disabled={!meetingCode.trim()} 
+                                className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${meetingCode.trim() ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-300 cursor-not-allowed"}`}
+                            >
+                                Join
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* PREVIEW MODAL */}
+            {/* --- PREVIEW MODAL (Kept same logic, slightly cleaned UI) --- */}
             {showPreviewModal && (
-                <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-md">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px] border border-white/10 relative">
+                <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+                    <div className="w-full max-w-4xl bg-neutral-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row border border-neutral-800">
+                        {/* Video Area */}
+                        <div className="flex-1 relative bg-black aspect-video md:aspect-auto min-h-[300px]">
+                            <video 
+                                ref={localVideoRef} 
+                                autoPlay 
+                                muted 
+                                className={`w-full h-full object-cover -scale-x-100 ${!isVideoOn ? "hidden" : ""}`}
+                            ></video>
+                            {!isVideoOn && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center text-white text-3xl font-bold">
+                                        {participantName ? participantName.charAt(0).toUpperCase() : "U"}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4">
+                                <button onClick={togglePreviewAudio} className={`p-4 rounded-full ${isAudioOn ? "bg-white text-black" : "bg-red-600 text-white"}`}>
+                                    {isAudioOn ? <Mic size={20} /> : <MicOff size={20} />}
+                                </button>
+                                <button onClick={togglePreviewVideo} className={`p-4 rounded-full ${isVideoOn ? "bg-white text-black" : "bg-red-600 text-white"}`}>
+                                    {isVideoOn ? <Video size={20} /> : <VideoOff size={20} />}
+                                </button>
+                            </div>
+                            <button onClick={stopPreviewCamera} className="absolute top-4 right-4 text-white/50 hover:text-white"><X size={24}/></button>
+                        </div>
+
+                        {/* Controls Area */}
+                        <div className="w-full md:w-80 bg-white p-8 flex flex-col justify-center gap-6">
+                            <h2 className="text-xl font-bold">{isJoining ? "Join Meeting" : "Start Meeting"}</h2>
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Display Name</label>
+                                <input 
+                                    type="text" 
+                                    value={participantName} 
+                                    onChange={(e) => setParticipantName(e.target.value)} 
+                                    className="w-full border-b-2 border-slate-200 focus:border-blue-600 py-2 outline-none font-medium text-lg bg-transparent"
+                                    placeholder="Your Name"
+                                />
+                            </div>
                             
-                            <button onClick={stopPreviewCamera} className="absolute top-4 right-4 z-50 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white md:hidden">
-                                <X size={20} />
+                            {!isJoining && (
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Passcode</label>
+                                    <input 
+                                        type="text" 
+                                        value={passcode} 
+                                        onChange={(e) => setPasscode(e.target.value)} 
+                                        className="w-full border-b-2 border-slate-200 focus:border-blue-600 py-2 outline-none font-medium text-lg bg-transparent"
+                                        placeholder="Optional"
+                                    />
+                                </div>
+                            )}
+
+                            <button 
+                                onClick={startMeeting} 
+                                disabled={!participantName.trim()}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                            >
+                                {isJoining ? "Join" : "Start"}
                             </button>
-
-                            {/* LEFT: Video Preview Area */}
-                            <div className="w-full md:w-2/3 bg-black relative flex flex-col justify-center p-4">
-                                <div className="relative w-full h-[400px] md:h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center isolate">
-                                    <video 
-                                        ref={localVideoRef} 
-                                        autoPlay 
-                                        muted 
-                                        className={`w-full h-full object-cover -scale-x-100 z-0 ${!isVideoOn ? "hidden" : ""}`}
-                                    ></video>
-                                    
-                                    {!isVideoOn && (
-                                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-800">
-                                            <div className="relative">
-                                                <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
-                                                <div className="relative w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg border-4 border-neutral-700">
-                                                    {participantName ? participantName.charAt(0).toUpperCase() : "U"}
-                                                </div>
-                                            </div>
-                                            <p className="mt-4 text-neutral-400 text-sm font-medium">Camera is off</p>
-                                        </div>
-                                    )}
-
-                                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 border border-white/10 z-20">
-                                        <span className="text-xs text-white/70">ID:</span>
-                                        <span className="text-sm font-mono font-bold text-white tracking-wider">{generatedMeetingId}</span>
-                                        <button onClick={copyToClipboard} className="text-white/70 hover:text-white ml-2 transition-colors">
-                                            {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 z-30">
-                                        <button 
-                                            onClick={togglePreviewAudio} 
-                                            className={`p-4 rounded-full transition-all duration-300 border shadow-lg ${
-                                                isAudioOn 
-                                                ? "bg-white/20 hover:bg-white/30 text-white border-white/10 backdrop-blur-md" 
-                                                : "bg-rose-500 text-white border-rose-500 shadow-rose-500/40"
-                                            }`}
-                                        >
-                                            {isAudioOn ? <Mic size={24} /> : <MicOff size={24} />}
-                                        </button>
-                                        
-                                        <button 
-                                            onClick={togglePreviewVideo} 
-                                            className={`p-4 rounded-full transition-all duration-300 border shadow-lg ${
-                                                isVideoOn 
-                                                ? "bg-white/20 hover:bg-white/30 text-white border-white/10 backdrop-blur-md" 
-                                                : "bg-rose-500 text-white border-rose-500 shadow-rose-500/40"
-                                            }`}
-                                        >
-                                            {isVideoOn ? <Video size={24} /> : <VideoOff size={24} />}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="w-full md:w-1/3 bg-white p-6 sm:p-8 flex flex-col">
-                                <div className="flex justify-between items-center mb-6 md:mb-8">
-                                    <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
-                                        {isJoining ? "Join Meeting" : "Ready to join?"}
-                                    </h2>
-                                    <button onClick={stopPreviewCamera} className="hidden md:block p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
-                                        <X size={20} />
-                                    </button>
-                                </div>
-
-                                <div className="flex-1 space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Display Name</label>
-                                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-                                            <User size={20} className="text-slate-400" />
-                                            <input type="text" value={participantName} onChange={(e) => setParticipantName(e.target.value)} className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" placeholder="Enter your name" />
-                                        </div>
-                                    </div>
-                                    {!isJoining && (
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Set Passcode (Optional)</label>
-                                            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-                                                <Lock size={20} className="text-slate-400" />
-                                                <input type="text" value={passcode} onChange={(e) => setPasscode(e.target.value)} className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" placeholder="No passcode" />
-                                            </div>
-                                            <p className="text-xs text-slate-400 px-1">Share this code with your guests.</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="mt-8 mb-4 md:mb-0">
-                                    <button onClick={startMeeting} disabled={!participantName.trim()} className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:-translate-y-0.5 ${participantName.trim() ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30" : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"}`}>
-                                        {isJoining ? "Join Now" : "Start Meeting"}
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* --- SCHEDULE MODAL --- */}
-            {/* FIXED: Passing 'onSuccess' correctly to match ScheduleModal.jsx */}
+            {/* --- SCHEDULE MODAL (Rendered Hidden or Visible based on state) --- */}
             <ScheduleModal
                 isOpen={showScheduleModal}
                 onClose={handleCloseSchedule}
