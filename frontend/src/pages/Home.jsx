@@ -27,10 +27,9 @@ import {
 // --- NAVBAR COMPONENT ---
 const Navbar = ({ navigate, handleLogout }) => {
     return (
-        <nav className="sticky top-0 z-40 w-full bg-white px-4 sm:px-6 py-3 shadow-sm border-b border-slate-100">
+        <nav className="sticky top-0 z-40 w-full bg-white px-4 sm:px-6 py-3 shadow-sm border-b border-purple-100">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/home")}>
-                     {/* Placeholder for logo if image fails, or use img tag */}
                     <img
                         src={brandLogo}
                         alt="Conferra"
@@ -42,7 +41,7 @@ const Navbar = ({ navigate, handleLogout }) => {
                 <div className="flex items-center gap-2">
                     <button 
                         onClick={() => navigate("/history")} 
-                        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                         title="History"
                     >
                         <Clock size={20} />
@@ -54,8 +53,7 @@ const Navbar = ({ navigate, handleLogout }) => {
                     >
                         <LogOut size={20} />
                     </button>
-                    {/* User Avatar Placeholder */}
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm ml-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm ml-2">
                         U
                     </div>
                 </div>
@@ -71,7 +69,6 @@ function HomeComponent() {
     const [date, setDate] = useState(new Date());
     const [showJoinInputModal, setShowJoinInputModal] = useState(false);
     
-    // --- SCHEDULE & EDIT STATE ---
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [refreshSchedule, setRefreshSchedule] = useState(0);
     const [meetingToEdit, setMeetingToEdit] = useState(null);
@@ -87,7 +84,6 @@ function HomeComponent() {
     const [isAudioOn, setIsAudioOn] = useState(true);
     const [copied, setCopied] = useState(false);
 
-    // --- HANDLERS ---
     const handleEditMeeting = (meeting) => {
         setMeetingToEdit(meeting);
         setShowScheduleModal(true);
@@ -120,7 +116,6 @@ function HomeComponent() {
         navigate("/auth");
     };
 
-    // --- MEETING LOGIC ---
     const handleNewMeeting = () => {
         setIsJoining(false);
         setPasscode("");
@@ -199,16 +194,14 @@ function HomeComponent() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // --- DATE FORMATTING ---
     const formatTime = (date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
     const formatDate = (date) => date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 
-    // --- BUTTON COMPONENT (Zoom Style) ---
     const ActionButton = ({ icon: Icon, color, label, onClick }) => (
         <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={onClick}>
             <div className={`
                 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center shadow-sm transition-all duration-200 transform group-hover:-translate-y-1 group-hover:shadow-md
-                ${color === 'orange' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}
+                ${color === 'primary' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-500 hover:bg-purple-600'}
             `}>
                 <Icon size={32} className="text-white" strokeWidth={1.5} />
             </div>
@@ -217,7 +210,11 @@ function HomeComponent() {
     );
 
     return (
-        <div className="min-h-screen w-full bg-white flex flex-col font-sans text-slate-800">
+        <div className="min-h-screen w-full bg-white flex flex-col text-slate-800" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+            `}</style>
+            
             <Navbar navigate={navigate} handleLogout={handleLogout} />
 
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col md:flex-row gap-8">
@@ -238,49 +235,47 @@ function HomeComponent() {
                     <div className="flex flex-wrap justify-center gap-6 sm:gap-10 mb-12">
                         <ActionButton 
                             icon={Video} 
-                            color="orange" 
+                            color="primary" 
                             label="New Meeting" 
                             onClick={handleNewMeeting} 
                         />
                         <ActionButton 
                             icon={Plus} 
-                            color="blue" 
+                            color="secondary" 
                             label="Join" 
                             onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} 
                         />
                         <ActionButton 
                             icon={Calendar} 
-                            color="blue" 
+                            color="secondary" 
                             label="Schedule" 
                             onClick={() => setShowScheduleModal(true)} 
                         />
                         <ActionButton 
                             icon={ScreenShare} 
-                            color="blue" 
+                            color="secondary" 
                             label="Share Screen" 
-                            onClick={() => {}} // Placeholder
+                            onClick={() => {}} 
                         />
                     </div>
                 </div>
 
-                {/* RIGHT SECTION: Scheduled List (The "Today" Card) */}
+                {/* RIGHT SECTION: Scheduled List */}
                 <div className="w-full md:w-[400px] lg:w-[450px] flex flex-col">
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-sm h-full flex flex-col overflow-hidden min-h-[400px]">
-                        {/* Card Header */}
-                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div className="bg-white border border-purple-200 rounded-xl shadow-sm h-full flex flex-col overflow-hidden min-h-[400px]">
+                        <div className="px-5 py-4 border-b border-purple-100 flex items-center justify-between bg-purple-50/30">
                             <div className="flex items-center gap-2">
-                                <h2 className="font-semibold text-slate-700">Today</h2>
-                                <span className="text-slate-400 text-sm font-normal">
+                                <h2 className="font-semibold text-purple-900">Today</h2>
+                                <span className="text-purple-400 text-sm font-normal">
                                     {new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}
                                 </span>
                             </div>
-                            <button className="text-slate-400 hover:text-slate-600">
+                            <button className="text-purple-400 hover:text-purple-600">
                                 <ChevronDown size={18} />
                             </button>
                         </div>
 
-                        {/* Card Body: The List */}
-                        <div className="flex-1 p-2 overflow-y-auto bg-slate-50/30">
+                        <div className="flex-1 p-2 overflow-y-auto bg-purple-50/10">
                             <ScheduledList 
                                 refreshTrigger={refreshSchedule}
                                 onEditClick={handleEditMeeting}
@@ -288,9 +283,8 @@ function HomeComponent() {
                             />
                         </div>
                         
-                        {/* Helper Footer (Optional, like Zoom's 'View all') */}
-                        <div className="p-3 text-center border-t border-slate-100">
-                             <button className="text-xs font-medium text-slate-400 hover:text-indigo-600 transition-colors">
+                        <div className="p-3 text-center border-t border-purple-100">
+                             <button className="text-xs font-medium text-purple-400 hover:text-purple-600 transition-colors">
                                 View all meetings
                              </button>
                         </div>
@@ -299,7 +293,7 @@ function HomeComponent() {
 
             </main>
 
-            {/* --- JOIN MODAL --- */}
+            {/* JOIN MODAL */}
             {showJoinInputModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm">
@@ -313,7 +307,7 @@ function HomeComponent() {
                             <input 
                                 type="text" 
                                 placeholder="Meeting ID" 
-                                className="w-full bg-slate-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg px-4 py-3 outline-none transition-all"
+                                className="w-full bg-purple-50 border-transparent focus:bg-white border focus:border-purple-500 rounded-lg px-4 py-3 outline-none transition-all"
                                 value={meetingCode} 
                                 onChange={(e) => setMeetingCode(e.target.value)} 
                                 autoFocus 
@@ -321,14 +315,14 @@ function HomeComponent() {
                             <input 
                                 type="text" 
                                 placeholder="Passcode (Optional)" 
-                                className="w-full bg-slate-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg px-4 py-3 outline-none transition-all"
+                                className="w-full bg-purple-50 border-transparent focus:bg-white border focus:border-purple-500 rounded-lg px-4 py-3 outline-none transition-all"
                                 value={passcode} 
                                 onChange={(e) => setPasscode(e.target.value)} 
                             />
                             <button 
                                 onClick={handleJoinVideoCall} 
                                 disabled={!meetingCode.trim()} 
-                                className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${meetingCode.trim() ? "bg-blue-600 hover:bg-blue-700" : "bg-slate-300 cursor-not-allowed"}`}
+                                className={`w-full py-3 rounded-lg font-semibold text-white transition-all ${meetingCode.trim() ? "bg-purple-600 hover:bg-purple-700" : "bg-slate-300 cursor-not-allowed"}`}
                             >
                                 Join
                             </button>
@@ -337,11 +331,10 @@ function HomeComponent() {
                 </div>
             )}
 
-            {/* --- PREVIEW MODAL (Kept same logic, slightly cleaned UI) --- */}
+            {/* PREVIEW MODAL */}
             {showPreviewModal && (
                 <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
                     <div className="w-full max-w-4xl bg-neutral-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row border border-neutral-800">
-                        {/* Video Area */}
                         <div className="flex-1 relative bg-black aspect-video md:aspect-auto min-h-[300px]">
                             <video 
                                 ref={localVideoRef} 
@@ -351,7 +344,7 @@ function HomeComponent() {
                             ></video>
                             {!isVideoOn && (
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center text-white text-3xl font-bold">
+                                    <div className="w-24 h-24 rounded-full bg-purple-900 flex items-center justify-center text-white text-3xl font-bold">
                                         {participantName ? participantName.charAt(0).toUpperCase() : "U"}
                                     </div>
                                 </div>
@@ -367,28 +360,27 @@ function HomeComponent() {
                             <button onClick={stopPreviewCamera} className="absolute top-4 right-4 text-white/50 hover:text-white"><X size={24}/></button>
                         </div>
 
-                        {/* Controls Area */}
                         <div className="w-full md:w-80 bg-white p-8 flex flex-col justify-center gap-6">
                             <h2 className="text-xl font-bold">{isJoining ? "Join Meeting" : "Start Meeting"}</h2>
                             <div className="space-y-3">
-                                <label className="text-xs font-bold text-slate-400 uppercase">Display Name</label>
+                                <label className="text-xs font-bold text-purple-400 uppercase">Display Name</label>
                                 <input 
                                     type="text" 
                                     value={participantName} 
                                     onChange={(e) => setParticipantName(e.target.value)} 
-                                    className="w-full border-b-2 border-slate-200 focus:border-blue-600 py-2 outline-none font-medium text-lg bg-transparent"
+                                    className="w-full border-b-2 border-purple-200 focus:border-purple-600 py-2 outline-none font-medium text-lg bg-transparent"
                                     placeholder="Your Name"
                                 />
                             </div>
                             
                             {!isJoining && (
                                 <div className="space-y-3">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Passcode</label>
+                                    <label className="text-xs font-bold text-purple-400 uppercase">Passcode</label>
                                     <input 
                                         type="text" 
                                         value={passcode} 
                                         onChange={(e) => setPasscode(e.target.value)} 
-                                        className="w-full border-b-2 border-slate-200 focus:border-blue-600 py-2 outline-none font-medium text-lg bg-transparent"
+                                        className="w-full border-b-2 border-purple-200 focus:border-purple-600 py-2 outline-none font-medium text-lg bg-transparent"
                                         placeholder="Optional"
                                     />
                                 </div>
@@ -397,7 +389,7 @@ function HomeComponent() {
                             <button 
                                 onClick={startMeeting} 
                                 disabled={!participantName.trim()}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                             >
                                 {isJoining ? "Join" : "Start"}
                             </button>
@@ -406,7 +398,6 @@ function HomeComponent() {
                 </div>
             )}
 
-            {/* --- SCHEDULE MODAL (Rendered Hidden or Visible based on state) --- */}
             <ScheduleModal
                 isOpen={showScheduleModal}
                 onClose={handleCloseSchedule}
