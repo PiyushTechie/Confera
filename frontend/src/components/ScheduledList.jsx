@@ -1,129 +1,167 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { Calendar, Clock, Video, Copy, Check, Trash2, Pencil, CalendarX } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import server from "../environment"; // Corrected Import path
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Clock, Video, Copy, Trash2, Edit2, Check, ArrowRight, MoreHorizontal } from 'lucide-react';
 
-export default function ScheduledList({ refreshTrigger, onEditClick, onRefresh }) {
-  const [meetings, setMeetings] = useState([]);
-  const [copiedId, setCopiedId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+const ScheduledList = ({ refreshTrigger, onEditClick, onRefresh }) => {
+    const [meetings, setMeetings] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [copiedId, setCopiedId] = useState(null);
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchMeetings = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
-        const res = await axios.get(`${server}/api/schedule/all`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setMeetings(res.data);
-      } catch (err) {
-        console.error("Error fetching schedules:", err);
-      } finally {
-        setLoading(false);
-      }
+    // Use your actual backend URL here
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL; 
+
+    useEffect(() => {
+        fetchScheduledMeetings();
+    }, [refreshTrigger]);
+
+    const fetchScheduledMeetings = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            if(!token) return;
+
+            const response = await axios.get(`${BACKEND_URL}/api/v1/meeting/schedule`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            // Assuming API returns array in response.data.meetings
+            setMeetings(response.data.meetings || []);
+        } catch (error) {
+            console.error("Error fetching schedule:", error);
+            // Fallback for demo purposes if API isn't set up yet
+            setMeetings([]); 
+        } finally {
+            setLoading(false);
+        }
     };
-    fetchMeetings();
-  }, [refreshTrigger]);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this meeting?")) return;
-    try {
-      const token = localStorage.getItem("token");
-      await axios.delete(`${server}/api/schedule/delete/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert("Failed to delete meeting");
+    const handleStart = (meetingId) => {
+        navigate(`/meeting/${meetingId}`);
+    };
+
+    const handleCopy = (meetingId) => {
+        navigator.clipboard.writeText(meetingId);
+        setCopiedId(meetingId);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const handleDelete = async (meetingId) => {
+        if(!window.confirm("Delete this scheduled meeting?")) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`${BACKEND_URL}/api/v1/meeting/schedule/${meetingId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            onRefresh(); // Trigger refresh in parent
+        } catch (error) {
+            console.error("Failed to delete", error);
+        }
+    };
+
+    // --- DATE FORMATTERS ---
+    const getMonth = (dateStr) => new Date(dateStr).toLocaleString('default', { month: 'short' }).toUpperCase();
+    const getDay = (dateStr) => new Date(dateStr).getDate();
+    const getTime = (dateStr) => new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (loading) {
+        return (
+            <div className="flex flex-col gap-4 mt-2">
+                {[1, 2, 3].map(i => (
+                    <div key={i} className="h-20 bg-slate-50 rounded-2xl animate-pulse"></div>
+                ))}
+            </div>
+        );
     }
-  };
 
-  const handleStart = (code) => {
-    navigate(`/meeting/${code}`, { state: { isHost: true } });
-  };
+    if (meetings.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-10 text-center opacity-0 animate-in fade-in duration-500 fill-mode-forwards">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                    <Calendar className="text-slate-300" size={32} />
+                </div>
+                <h3 className="text-slate-600 font-bold mb-1">No Meetings Scheduled</h3>
+                <p className="text-slate-400 text-sm max-w-[200px]">
+                    Upcoming scheduled meetings will appear here.
+                </p>
+            </div>
+        );
+    }
 
-  const handleCopy = (code, id) => {
-    navigator.clipboard.writeText(`${window.location.origin}/meeting/${code}`);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  if (loading) {
-    return <div className="text-gray-400 text-center py-10">Loading schedule...</div>;
-  }
-
-  if (meetings.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-neutral-900/50 rounded-xl border border-dashed border-neutral-700">
-        <CalendarX size={48} className="mb-3 opacity-50" />
-        <p className="text-lg font-medium">No meetings scheduled</p>
-        <p className="text-sm opacity-60">Create a new meeting to get started.</p>
-      </div>
-    );
-  }
+        <div className="flex flex-col gap-3 overflow-y-auto pr-1 max-h-[500px] custom-scrollbar">
+            {meetings.map((meeting) => (
+                <div 
+                    key={meeting._id} 
+                    className="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-500/5 transition-all duration-300"
+                >
+                    {/* Date Badge */}
+                    <div className="flex flex-col items-center justify-center min-w-[60px] h-[70px] bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
+                        <span className="text-[10px] font-bold tracking-wider">{getMonth(meeting.date)}</span>
+                        <span className="text-2xl font-bold leading-none my-0.5">{getDay(meeting.date)}</span>
+                        <span className="text-[10px] font-medium opacity-80">{getTime(meeting.date)}</span>
+                    </div>
 
-  return (
-    <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1">
-      {meetings.map((m) => (
-        <div
-          key={m._id}
-          className="group relative bg-neutral-900/80 backdrop-blur-sm border border-neutral-800 p-5 rounded-xl hover:border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10"
-        >
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Info Section */}
-            <div className="space-y-2">
-              <h3 className="font-bold text-white text-xl tracking-tight">{m.title}</h3>
-              <div className="flex items-center gap-4 text-sm font-medium text-gray-400">
-                <span className="flex items-center gap-2 bg-neutral-800 px-2 py-1 rounded">
-                  <Calendar size={14} className="text-blue-400" /> {m.date}
-                </span>
-                <span className="flex items-center gap-2 bg-neutral-800 px-2 py-1 rounded">
-                  <Clock size={14} className="text-orange-400" /> {m.time}
-                </span>
-              </div>
-            </div>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-slate-800 truncate text-base sm:text-lg">
+                            {meeting.title || "Untitled Meeting"}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center gap-1 text-xs font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md">
+                                {meeting.meetingId}
+                            </span>
+                            {meeting.passcode && (
+                                <span className="text-[10px] text-slate-400 border border-slate-200 px-1.5 rounded">
+                                    Pass: {meeting.passcode}
+                                </span>
+                            )}
+                        </div>
+                    </div>
 
-            {/* Actions Section */}
-            <div className="flex items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-neutral-800">
-              <button
-                onClick={() => onEditClick && onEditClick(m)}
-                className="p-2 text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
-                title="Edit Details"
-              >
-                <Pencil size={18} />
-              </button>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        {/* Start Button (Prominent) */}
+                        <button 
+                            onClick={() => handleStart(meeting.meetingId)}
+                            title="Start Meeting"
+                            className="p-2 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-200 hover:bg-indigo-700 hover:scale-105 transition-all"
+                        >
+                            <Video size={18} />
+                        </button>
 
-              <button
-                onClick={() => handleDelete(m._id)}
-                className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                title="Cancel Meeting"
-              >
-                <Trash2 size={18} />
-              </button>
-
-              <div className="w-px h-8 bg-neutral-700 mx-1 hidden md:block"></div>
-
-              <button
-                onClick={() => handleCopy(m.meetingCode, m._id)}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-300 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
-              >
-                {copiedId === m._id ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-                <span className="hidden md:inline">Copy</span>
-              </button>
-
-              <button
-                onClick={() => handleStart(m.meetingCode)}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white px-4 py-2 rounded-lg font-bold text-sm transition-all shadow-lg shadow-blue-900/20"
-              >
-                <Video size={16} /> Launch
-              </button>
-            </div>
-          </div>
+                        {/* Dropdown / Extra Actions */}
+                        <div className="flex flex-col sm:flex-row gap-1">
+                            <button 
+                                onClick={() => handleCopy(meeting.meetingId)}
+                                title="Copy ID"
+                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            >
+                                {copiedId === meeting.meetingId ? <Check size={18} /> : <Copy size={18} />}
+                            </button>
+                            
+                            <button 
+                                onClick={() => onEditClick(meeting)}
+                                title="Edit"
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors hidden sm:block"
+                            >
+                                <Edit2 size={18} />
+                            </button>
+                            
+                            <button 
+                                onClick={() => handleDelete(meeting._id)}
+                                title="Delete"
+                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ))}
         </div>
-      ))}
-    </div>
-  );
-}
+    );
+};
+
+export default ScheduledList;
