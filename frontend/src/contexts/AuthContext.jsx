@@ -79,8 +79,8 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const handleRegister = async (name, username, password) => {
-    let request = await client.post("/register", { name, username, password });
+  const handleRegister = async (name, username, password, email) => {
+    let request = await client.post("/register", { name, username, password, email });
     if (request.status === HttpStatusCode.Created) return request.data.message;
   };
 
