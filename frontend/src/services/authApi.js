@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Ensure this matches your backend URL
-const API_URL = 'http://localhost:5000/api/auth'; 
+const API_URL = 'https://confera-backend-nixq.onrender.com/api/auth';
 
 export const sendOtp = async (email) => {
   return await axios.post(`${API_URL}/send-otp`, { email });
