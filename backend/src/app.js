@@ -42,7 +42,6 @@ const PORT = process.env.PORT || 8000;
 app.use("/auth", authLimiter, authRoutes);
 app.use("/api/v1/users", apiLimiter, userRoutes);
 app.use("/api/schedule", scheduleRoutes);
-app.use('/api/auth', authRoutes);
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
