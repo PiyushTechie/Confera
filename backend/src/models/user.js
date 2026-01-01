@@ -5,6 +5,9 @@ const userSchema = new Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String },
     token: { type: String },
+    otp: { type: String },          
+    otpExpires: { type: Date },     
+    isVerified: { type: Boolean, default: false }, 
     history: [
         {
             meetingCode: { type: String, required: true },

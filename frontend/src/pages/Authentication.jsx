@@ -3,15 +3,18 @@ import styled from 'styled-components';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { AuthContext } from '../contexts/AuthContext';
-import { Lock, User, CheckCircle, XCircle } from 'lucide-react';
+import { Lock, User, CheckCircle, XCircle, Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { FcGoogle } from "react-icons/fc";
 import Loader from '../components/Loader';
 import logo from '../assets/BrandLogo.png';
+import { sendOtp, verifyOtp, resendOtp, forgotPassword, resetPassword } from '../services/authApi'; // Import your API calls
 
 export default function Authentication() {
     const [error, setError] = React.useState("");
     const [message, setMessage] = React.useState("");
-    const [formState, setFormState] = React.useState(0); // 0 = Login, 1 = Register
+    
+    // 0: Login, 1: Register, 2: OTP Verify, 3: Forgot Pass, 4: Reset Pass
+    const [formState, setFormState] = React.useState(0); 
     const [open, setOpen] = React.useState(false);
 
     const [isLoading, setIsLoading] = React.useState(false);
@@ -28,72 +31,156 @@ export default function Authentication() {
     const registerSchema = Yup.object().shape({
         name: Yup.string().required("Full name is required"),
         username: Yup.string().required("Username is required"),
-        password: Yup.string()
-            .min(6, "Password must be at least 6 characters")
-            .required("Password is required"),
+        email: Yup.string().email("Invalid email").required("Email is required for verification"),
+        password: Yup.string().min(6, "Min 6 characters").required("Password is required"),
     });
+
+    const otpSchema = Yup.object().shape({
+        otp: Yup.string().length(6, "Must be 6 digits").required("OTP is required"),
+    });
+
+    const forgotSchema = Yup.object().shape({
+        email: Yup.string().email("Invalid email").required("Email is required"),
+    });
+
+    const resetSchema = Yup.object().shape({
+        otp: Yup.string().length(6, "Must be 6 digits").required("OTP is required"),
+        newPassword: Yup.string().min(6, "Min 6 characters").required("New Password is required"),
+    });
+
+    // Helper to pick schema
+    const getSchema = () => {
+        switch(formState) {
+            case 0: return loginSchema;
+            case 1: return registerSchema;
+            case 2: return otpSchema;
+            case 3: return forgotSchema;
+            case 4: return resetSchema;
+            default: return loginSchema;
+        }
+    };
 
     // --- Formik Setup ---
     const formik = useFormik({
         initialValues: {
             name: "",
             username: "",
+            email: "",
             password: "",
+            otp: "",
+            newPassword: ""
         },
-        validationSchema: formState === 0 ? loginSchema : registerSchema,
+        validationSchema: getSchema(),
         onSubmit: async (values) => {
-            if (isLoading || isGoogleLoading) return;
-
+            if (isLoading) return;
             setIsLoading(true);
             setError("");
+            setMessage("");
 
             try {
-                if (formState === 0) { // Login
+                // --- LOGIN FLOW ---
+                if (formState === 0) { 
                     await handleLogin(values.username, values.password);
                 }
-                if (formState === 1) { // Register
-                    let result = await handleRegister(values.name, values.username, values.password);
-                    setMessage(result);
+
+                // --- REGISTER FLOW ---
+                if (formState === 1) { 
+                    // 1. Create User in DB
+                    await handleRegister(values.name, values.username, values.password, values.email);
+                    // 2. Send OTP
+                    await sendOtp(values.email);
+                    
+                    setMessage("Account created. OTP sent to email!");
                     setOpen(true);
-                    setError("");
-                    setFormState(0);
+                    setFormState(2); // Move to OTP Verification
+                }
+
+                // --- OTP VERIFICATION FLOW ---
+                if (formState === 2) {
+                    await verifyOtp(values.email, values.otp);
+                    setMessage("Email Verified! Please Login.");
+                    setOpen(true);
+                    setFormState(0); // Move to Login
                     formik.resetForm();
                 }
+
+                // --- FORGOT PASSWORD FLOW ---
+                if (formState === 3) {
+                    await forgotPassword(values.email);
+                    setMessage(`OTP sent to ${values.email}`);
+                    setOpen(true);
+                    setFormState(4); // Move to Reset Password
+                }
+
+                // --- RESET PASSWORD FLOW ---
+                if (formState === 4) {
+                    await resetPassword(values.email, values.otp, values.newPassword);
+                    setMessage("Password Reset Successfully!");
+                    setOpen(true);
+                    setFormState(0); // Move to Login
+                    formik.resetForm();
+                }
+
             } catch (err) {
                 console.log(err);
-                let message = err.response?.data?.message || "An unexpected error occurred";
-                setError(message);
+                let msg = err.response?.data?.message || err.message || "An unexpected error occurred";
+                setError(msg);
             } finally {
                 setIsLoading(false);
             }
         },
     });
 
+    // Reset form errors when switching states
     React.useEffect(() => {
-        formik.resetForm();
+        formik.setErrors({});
         setError("");
     }, [formState]);
 
     React.useEffect(() => {
         if (open) {
-            const timer = setTimeout(() => {
-                setOpen(false);
-            }, 4000);
+            const timer = setTimeout(() => setOpen(false), 4000);
             return () => clearTimeout(timer);
         }
     }, [open]);
 
     const handleGoogleLogin = () => {
         if (isLoading || isGoogleLoading) return;
-
         setIsGoogleLoading(true);
-        setTimeout(() => {
-            window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
-        }, 100);
+        window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+    };
+
+    const handleResendClick = async () => {
+        if(!formik.values.email) return setError("Email is missing");
+        try {
+            await resendOtp(formik.values.email);
+            setMessage("OTP Resent!");
+            setOpen(true);
+        } catch (e) {
+            setError("Failed to resend OTP");
+        }
+    }
+
+    // --- Dynamic Text Helpers ---
+    const getTitle = () => {
+        if (formState === 0) return "Welcome back";
+        if (formState === 1) return "Create account";
+        if (formState === 2) return "Verify Email";
+        if (formState === 3) return "Forgot Password";
+        if (formState === 4) return "Reset Password";
+    };
+
+    const getButtonText = () => {
+        if (formState === 0) return "Sign In";
+        if (formState === 1) return "Sign Up";
+        if (formState === 2) return "Verify OTP";
+        if (formState === 3) return "Send Code";
+        if (formState === 4) return "Reset Password";
     };
 
     return (
         <div className="min-h-screen flex bg-white text-slate-900 font-sans selection:bg-indigo-100">
+            {/* Background Image Section (Unchanged) */}
             <div className="hidden lg:flex w-2/3 relative items-center justify-center overflow-hidden">
                 <div className="absolute inset-0 bg-indigo-900/40 z-10" />
                 <img
@@ -109,7 +196,10 @@ export default function Authentication() {
                 </div>
             </div>
 
+            {/* Form Section */}
             <div className="w-full lg:w-1/3 flex items-center justify-center p-8 relative bg-white">
+                
+                {/* Success Notification */}
                 {open && (
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 lg:left-6 lg:translate-x-0 bg-emerald-50 border border-emerald-200 text-emerald-700 px-6 py-3 rounded-xl flex items-center gap-3 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300 z-50">
                         <CheckCircle className="w-5 h-5 text-emerald-500" />
@@ -121,24 +211,34 @@ export default function Authentication() {
 
                     <div className="text-center">
                         <div className="flex justify-center mb-6">
-                            <img
-                                src={logo}
-                                alt="Logo"
-                                className="h-20 w-auto object-contain"
-                            />
+                            <img src={logo} alt="Logo" className="h-20 w-auto object-contain" />
                         </div>
                         <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                            {formState === 0 ? "Welcome back" : "Create account"}
+                            {getTitle()}
                         </h2>
+                        
+                        {/* Subtext Logic */}
                         <p className="mt-2 text-sm text-slate-500">
-                            {formState === 0 ? "New to Cenfora? " : "Already have an account? "}
-                            <button
-                                type="button"
-                                onClick={() => setFormState(formState === 0 ? 1 : 0)}
-                                className="font-bold text-indigo-600 hover:text-indigo-700 transition-colors underline-offset-4 hover:underline cursor-pointer"
-                            >
-                                {formState === 0 ? "Create an account" : "Sign in"}
-                            </button>
+                            {formState === 0 && (
+                                <>
+                                    New to Cenfora? 
+                                    <button onClick={() => setFormState(1)} className="ml-1 font-bold text-indigo-600 hover:underline">
+                                        Create an account
+                                    </button>
+                                </>
+                            )}
+                            {formState === 1 && (
+                                <>
+                                    Already have an account? 
+                                    <button onClick={() => setFormState(0)} className="ml-1 font-bold text-indigo-600 hover:underline">
+                                        Sign in
+                                    </button>
+                                </>
+                            )}
+                            {(formState === 2 || formState === 4) && (
+                                <span>Check your email <b>{formik.values.email}</b> for the code.</span>
+                            )}
+                            {formState === 3 && "Enter your email to receive a reset code."}
                         </p>
                     </div>
 
@@ -146,74 +246,108 @@ export default function Authentication() {
 
                         <form onSubmit={formik.handleSubmit} className="space-y-4">
 
+                            {/* --- REGISTER FIELDS --- */}
                             {formState === 1 && (
-                                <div>
-                                    <label htmlFor="name" className="block text-sm font-bold text-slate-700 mb-1">
-                                        Full Name
-                                    </label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input
-                                            id="name"
-                                            name="name"
-                                            type="text"
-                                            {...formik.getFieldProps('name')}
-                                            className={`block w-full pl-10 pr-3 py-2.5 bg-slate-50 border rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium ${formik.touched.name && formik.errors.name ? 'border-red-500 focus:ring-red-200' : 'border-slate-200'}`}
-                                            placeholder="John Doe"
-                                        />
-                                    </div>
-                                    {formik.touched.name && formik.errors.name && (
-                                        <p className="mt-1 text-xs text-red-500 font-medium ml-1">{formik.errors.name}</p>
-                                    )}
+                                <>
+                                    <InputField 
+                                        id="name" 
+                                        label="Full Name" 
+                                        icon={<User className="h-5 w-5 text-slate-400" />} 
+                                        placeholder="John Doe" 
+                                        formik={formik} 
+                                    />
+                                    <InputField 
+                                        id="username" 
+                                        label="Username" 
+                                        icon={<User className="h-5 w-5 text-slate-400" />} 
+                                        placeholder="johndoe123" 
+                                        formik={formik} 
+                                    />
+                                    <InputField 
+                                        id="email" 
+                                        label="Email Address" 
+                                        icon={<Mail className="h-5 w-5 text-slate-400" />} 
+                                        placeholder="john@example.com" 
+                                        formik={formik} 
+                                    />
+                                </>
+                            )}
+
+                            {/* --- LOGIN FIELDS --- */}
+                            {formState === 0 && (
+                                <InputField 
+                                    id="username" 
+                                    label="Username" 
+                                    icon={<User className="h-5 w-5 text-slate-400" />} 
+                                    placeholder="johndoe123" 
+                                    formik={formik} 
+                                />
+                            )}
+
+                            {/* --- SHARED PASSWORD FIELD (Login & Register) --- */}
+                            {(formState === 0 || formState === 1) && (
+                                <InputField 
+                                    id="password" 
+                                    type="password"
+                                    label="Password" 
+                                    icon={<Lock className="h-5 w-5 text-slate-400" />} 
+                                    placeholder="••••••••" 
+                                    formik={formik} 
+                                />
+                            )}
+
+                            {/* --- OTP FIELD (Verify & Reset) --- */}
+                            {(formState === 2 || formState === 4) && (
+                                <div className="text-center">
+                                    <InputField 
+                                        id="otp" 
+                                        label="Verification Code" 
+                                        icon={<KeyRound className="h-5 w-5 text-slate-400" />} 
+                                        placeholder="123456" 
+                                        formik={formik}
+                                        className="tracking-[10px] text-center font-bold text-xl"
+                                    />
                                 </div>
                             )}
 
-                            <div>
-                                <label htmlFor="username" className="block text-sm font-bold text-slate-700 mb-1">
-                                    Username
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <User className="h-5 w-5 text-slate-400" />
-                                    </div>
-                                    <input
-                                        id="username"
-                                        name="username"
-                                        type="text"
-                                        {...formik.getFieldProps('username')}
-                                        className={`block w-full pl-10 pr-3 py-2.5 bg-slate-50 border rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium ${formik.touched.username && formik.errors.username ? 'border-red-500 focus:ring-red-200' : 'border-slate-200'}`}
-                                        placeholder="johndoe123"
-                                    />
-                                </div>
-                                {formik.touched.username && formik.errors.username && (
-                                    <p className="mt-1 text-xs text-red-500 font-medium ml-1">{formik.errors.username}</p>
+                            {/* --- FORGOT PASSWORD FIELD --- */}
+                            {formState === 3 && (
+                                <InputField 
+                                    id="email" 
+                                    label="Email Address" 
+                                    icon={<Mail className="h-5 w-5 text-slate-400" />} 
+                                    placeholder="john@example.com" 
+                                    formik={formik} 
+                                />
+                            )}
+
+                            {/* --- NEW PASSWORD FIELD (Reset) --- */}
+                            {formState === 4 && (
+                                <InputField 
+                                    id="newPassword" 
+                                    type="password"
+                                    label="New Password" 
+                                    icon={<Lock className="h-5 w-5 text-slate-400" />} 
+                                    placeholder="New secure password" 
+                                    formik={formik} 
+                                />
+                            )}
+
+                            {/* --- EXTRAS: Forgot Link & Resend --- */}
+                            <div className="flex justify-between items-center text-sm">
+                                {formState === 0 && (
+                                    <button type="button" onClick={() => setFormState(3)} className="text-indigo-600 hover:text-indigo-500 font-semibold ml-auto">
+                                        Forgot password?
+                                    </button>
+                                )}
+                                {(formState === 2 || formState === 4) && (
+                                    <button type="button" onClick={handleResendClick} className="text-indigo-600 hover:text-indigo-500 font-semibold ml-auto">
+                                        Resend Code
+                                    </button>
                                 )}
                             </div>
 
-                            <div>
-                                <label htmlFor="password" className="block text-sm font-bold text-slate-700 mb-1">
-                                    Password
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Lock className="h-5 w-5 text-slate-400" />
-                                    </div>
-                                    <input
-                                        id="password"
-                                        name="password"
-                                        type="password"
-                                        {...formik.getFieldProps('password')}
-                                        className={`block w-full pl-10 pr-3 py-2.5 bg-slate-50 border rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium ${formik.touched.password && formik.errors.password ? 'border-red-500 focus:ring-red-200' : 'border-slate-200'}`}
-                                        placeholder="••••••••"
-                                    />
-                                </div>
-                                {formik.touched.password && formik.errors.password && (
-                                    <p className="mt-1 text-xs text-red-500 font-medium ml-1">{formik.errors.password}</p>
-                                )}
-                            </div>
-
+                            {/* --- ERROR MESSAGE --- */}
                             {error && (
                                 <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
                                     <XCircle className="w-4 h-4" />
@@ -221,61 +355,61 @@ export default function Authentication() {
                                 </div>
                             )}
 
+                            {/* --- SUBMIT BUTTON --- */}
                             <StyledWrapper>
-                                <button
-                                    className="button"
-                                    type="submit"
-                                    disabled={isLoading || isGoogleLoading}
-                                >
+                                <button className="button" type="submit" disabled={isLoading || isGoogleLoading}>
                                     {isLoading ? (
                                         <Loader color="#ffffff" />
                                     ) : (
-                                        <>
-                                            <span className="text">
-                                                {formState === 0 ? "Sign In" : "Create Account"}
-                                            </span>
-                                            <span className="svg">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width={50} height={20} viewBox="0 0 38 15" fill="none">
-                                                    <path fill="white" d="M10 7.519l-.939-.344h0l.939.344zm14.386-1.205l-.981-.192.981.192zm1.276 5.509l.537.843.148-.094.107-.139-.792-.611zm4.819-4.304l-.385-.923h0l.385.923zm7.227.707a1 1 0 0 0 0-1.414L31.343.448a1 1 0 0 0-1.414 0 1 1 0 0 0 0 1.414l5.657 5.657-5.657 5.657a1 1 0 0 0 1.414 1.414l6.364-6.364zM1 7.519l.554.833.029-.019.094-.061.361-.23 1.277-.77c1.054-.609 2.397-1.32 3.629-1.787.617-.234 1.17-.392 1.623-.455.477-.066.707-.008.788.034.025.013.031.021.039.034a.56.56 0 0 1 .058.235c.029.327-.047.906-.39 1.842l1.878.689c.383-1.044.571-1.949.505-2.705-.072-.815-.45-1.493-1.16-1.865-.627-.329-1.358-.332-1.993-.244-.659.092-1.367.305-2.056.566-1.381.523-2.833 1.297-3.921 1.925l-1.341.808-.385.245-.104.068-.028.018c-.011.007-.011.007.543.84zm8.061-.344c-.198.54-.328 1.038-.36 1.484-.032.441.024.94.325 1.364.319.45.786.64 1.21.697.403.054.824-.001 1.21-.09.775-.179 1.694-.566 2.633-1.014l3.023-1.554c2.115-1.122 4.107-2.168 5.476-2.524.329-.086.573-.117.742-.115s.195.038.161.014c-.15-.105.085-.139-.076.685l1.963.384c.192-.98.152-2.083-.74-2.707-.405-.283-.868-.37-1.28-.376s-.849.069-1.274.179c-1.65.43-3.888 1.621-5.909 2.693l-2.948 1.517c-.92.439-1.673.743-2.221.87-.276.064-.429.065-.492.057-.043-.006.066.003.155.127.07.099.024.131.038-.063.014-.187.078-.49.243-.94l-1.878-.689zm14.343-1.053c-.361 1.844-.474 3.185-.413 4.161.059.95.294 1.72.811 2.215.567.544 1.242.546 1.664.459a2.34 2.34 0 0 0 .502-.167l.15-.076.049-.028.018-.011c.013-.008.013-.008-.524-.852l-.536-.844.019-.012c-.038.018-.064.027-.084.032-.037.008.053-.013.125.056.021.02-.151-.135-.198-.895-.046-.734.034-1.887.38-3.652l-1.963-.384zm2.257 5.701l.791.611.024-.031.08-.101.311-.377 1.093-1.213c.922-.954 2.005-1.894 2.904-2.27l-.771-1.846c-1.31.547-2.637 1.758-3.572 2.725l-1.184 1.314-.341.414-.093.117-.025.032c-.01.013-.01.013.781.624zm5.204-3.381c.989-.413 1.791-.42 2.697-.307.871.108 2.083.385 3.437.385v-2c-1.197 0-2.041-.226-3.19-.369-1.114-.139-2.297-.146-3.715.447l.771 1.846z" />
-                                                </svg>
-                                            </span>
-                                        </>
+                                        <span className="text">{getButtonText()}</span>
                                     )}
                                 </button>
                             </StyledWrapper>
 
+                            {/* --- BACK TO LOGIN (For nested states) --- */}
+                            {(formState > 1) && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setFormState(0); formik.resetForm(); }}
+                                    className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mt-4"
+                                >
+                                    <ArrowLeft className="w-4 h-4" /> Back to Login
+                                </button>
+                            )}
+
                         </form>
 
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t border-slate-200" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white px-2 text-slate-400 font-semibold tracking-wide">
-                                    Or continue with
-                                </span>
-                            </div>
-                        </div>
+                        {/* --- GOOGLE LOGIN (Only show on Login/Register) --- */}
+                        {(formState === 0 || formState === 1) && (
+                            <>
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <span className="w-full border-t border-slate-200" />
+                                    </div>
+                                    <div className="relative flex justify-center text-xs uppercase">
+                                        <span className="bg-white px-2 text-slate-400 font-semibold tracking-wide">
+                                            Or continue with
+                                        </span>
+                                    </div>
+                                </div>
 
-                        <button
-                            type="button"
-                            onClick={handleGoogleLogin}
-                            disabled={isLoading || isGoogleLoading}
-                            className={`w-full h-[56px] flex items-center cursor-pointer justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${
-                                (isLoading || isGoogleLoading) ? 'opacity-60 cursor-not-allowed' : ''
-                            }`}
-                        >
-                            {isGoogleLoading ? (
-                                <Loader color="#4f46e5" />
-                            ) : (
-                                <>
-                                    <FcGoogle className="text-xl" />
-                                    <span>
-                                        {formState === 0 ? "Sign in with Google" : "Sign up with Google"}
-                                    </span>
-                                </>
-                            )}
-                        </button>
+                                <button
+                                    type="button"
+                                    onClick={handleGoogleLogin}
+                                    disabled={isLoading || isGoogleLoading}
+                                    className={`w-full h-[56px] flex items-center cursor-pointer justify-center gap-3 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all font-semibold rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] ${
+                                        (isLoading || isGoogleLoading) ? 'opacity-60 cursor-not-allowed' : ''
+                                    }`}
+                                >
+                                    {isGoogleLoading ? <Loader color="#4f46e5" /> : (
+                                        <>
+                                            <FcGoogle className="text-xl" />
+                                            <span>{formState === 0 ? "Sign in with Google" : "Sign up with Google"}</span>
+                                        </>
+                                    )}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -283,80 +417,64 @@ export default function Authentication() {
     );
 }
 
-// Updated styled-components for smaller purple button
+// --- Reusable Input Component to Clean up Code ---
+const InputField = ({ id, label, icon, type = "text", placeholder, formik, className }) => (
+    <div>
+        <label htmlFor={id} className="block text-sm font-bold text-slate-700 mb-1">{label}</label>
+        <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                {icon}
+            </div>
+            <input
+                id={id}
+                name={id}
+                type={type}
+                {...formik.getFieldProps(id)}
+                className={`block w-full pl-10 pr-3 py-2.5 bg-slate-50 border rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium ${formik.touched[id] && formik.errors[id] ? 'border-red-500 focus:ring-red-200' : 'border-slate-200'} ${className}`}
+                placeholder={placeholder}
+            />
+        </div>
+        {formik.touched[id] && formik.errors[id] && (
+            <p className="mt-1 text-xs text-red-500 font-medium ml-1">{formik.errors[id]}</p>
+        )}
+    </div>
+);
+
+// --- Styled Components (Unchanged from your request) ---
 const StyledWrapper = styled.div`
   .button {
     width: 100%;
-    /* HEIGHT ADJUSTMENT: 56px to match Google button */
     height: 56px; 
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Removed huge padding, centered content via flexbox */
     padding: 0 20px; 
-    
-    /* THEME COLOR: Purple (Indigo-600) instead of Blue */
     background-color: #4f46e5;
-    
-    /* BORDER COLOR: Lighter Purple (Indigo-200) */
     border: 5px solid #c7d2fe; 
-    
     color: white;
     gap: 12px;
     border-radius: 50px;
     cursor: pointer;
     transition: all 0.3s;
   }
-  
   .button:disabled {
     cursor: not-allowed;
     opacity: 0.8;
     background-color: #6366f1;
     border-color: #e0e7ff;
   }
-
   .text {
     font-size: 1.1em;
     font-weight: 700;
     letter-spacing: 0.5px;
     text-transform: uppercase;
   }
-
-  .svg {
-    display: flex;
-    align-items: center;
-    height: 100%;
-  }
-
-  .svg svg {
-    width: 28px;
-    height: 28px;
-  }
-
   .button:hover:not(:disabled) {
-    /* HOVER COLOR: Darker Purple */
     background-color: #4338ca;
-    /* HOVER BORDER: Slightly darker border */
     border: 5px solid #a5b4fc; 
   }
-
   .button:active:not(:disabled) {
     border: 3px solid #c7d2fe;
     transform: scale(0.98);
-  }
-
-  .button:hover:not(:disabled) .svg svg {
-    animation: jello-vertical 0.9s both;
-    transform-origin: center;
-  }
-
-  @keyframes jello-vertical {
-    0% { transform: scale3d(1, 1, 1); }
-    30% { transform: scale3d(0.75, 1.25, 1); }
-    40% { transform: scale3d(1.25, 0.75, 1); }
-    50% { transform: scale3d(0.85, 1.15, 1); }
-    65% { transform: scale3d(1.05, 0.95, 1); }
-    75% { transform: scale3d(0.95, 1.05, 1); }
-    100% { transform: scale3d(1, 1, 1); }
   }
 `;

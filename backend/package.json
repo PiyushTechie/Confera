@@ -12,7 +12,9 @@
     "prod": "pm2 start src/app.js"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
@@ -24,6 +26,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.2",
     "nodemon": "^3.1.11",
+    "otp-generator": "^4.0.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "socket.io": "^4.8.1",

@@ -1,7 +1,14 @@
 import { Router } from "express";
 import passport from "passport";
-import crypto from "crypto"; // Import crypto instead of jwt
+import crypto from "crypto";
 import { login, register } from "../controllers/authentication.js";
+import { 
+  sendOtp, 
+  verifyOtp, 
+  resendOtp, 
+  forgotPassword, 
+  resetPassword 
+} from '../controllers/authController.js';
 
 const router = Router();
 
@@ -32,5 +39,11 @@ router.get(
     }
   }
 );
+
+router.post('/send-otp', sendOtp);
+router.post('/verify-otp', verifyOtp);
+router.post('/resend-otp', resendOtp);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 export default router;

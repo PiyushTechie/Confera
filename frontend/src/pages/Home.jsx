@@ -13,153 +13,124 @@ import {
     MicOff,
     VideoOff,
     X,
+    Copy,
+    Check,
+    User,
     Clock,
     LogOut,
-    ChevronRight,
-    Sparkles,
-    CalendarDays
+    ArrowRight,
+    Lock,
+    Settings
 } from "lucide-react";
 
-// --- CSS STYLES FOR ANIMATIONS ---
-const styles = `
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  .animate-fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-  .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
-  .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-  .glass-panel {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-  }
-`;
+// --- NAVBAR COMPONENT ---
+const Navbar = ({ navigate, handleLogout }) => {
+    const brandLogoSrc = brandLogo;
 
-// --- COMPONENTS ---
-
-const Navbar = ({ navigate, handleLogout, userInitial }) => {
     return (
-        <nav className="sticky top-0 z-40 w-full glass-panel border-b border-white/20 px-6 py-4 transition-all duration-300">
+        <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-2">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <div 
-                    className="flex items-center gap-3 cursor-pointer group" 
-                    onClick={() => navigate("/home")}
-                >
+                <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => navigate("/home")}>
                     <img
-                        src={brandLogo}
-                        alt="Conferra"
-                        className="h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
-                        onError={(e) => { e.target.style.display = 'none'; }}
+                        src={brandLogoSrc}
+                        alt="Brand Logo"
+                        className="h-16 md:h-16 w-auto object-contain transition-all"
+                        onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'block';
+                        }}
                     />
-                    <span className="font-bold text-xl tracking-tight text-slate-800 hidden sm:block">Conferra</span>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 md:gap-3">
                     <button 
                         onClick={() => navigate("/history")} 
-                        className="p-2.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
-                        title="Meeting History"
+                        className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 text-sm font-semibold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
                     >
-                        <Clock size={22} strokeWidth={1.5} />
+                        <Clock size={20} />
+                        <span className="hidden sm:inline">History</span>
                     </button>
                     
                     <div className="h-6 w-px bg-slate-200 mx-1"></div>
 
-                    <div className="flex items-center gap-3 pl-1">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-lg shadow-blue-200 ring-2 ring-white">
-                            {userInitial}
-                        </div>
-                        <button 
-                            onClick={handleLogout} 
-                            className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors duration-200"
-                            title="Logout"
-                        >
-                            <LogOut size={20} strokeWidth={2} />
-                        </button>
-                    </div>
+                    <button 
+                        onClick={handleLogout} 
+                        className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-full transition-all"
+                    >
+                        <LogOut size={20} />
+                        <span className="hidden sm:inline">Logout</span>
+                    </button>
                 </div>
             </div>
         </nav>
     );
 };
 
-const ActionCard = ({ icon: Icon, title, desc, gradient, onClick, delay }) => (
-    <button
-        onClick={onClick}
-        style={{ animationDelay: `${delay}ms` }}
-        className="animate-fade-in-up opacity-0 relative flex flex-col items-start p-6 rounded-[2rem] w-full text-left overflow-hidden group bg-white border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-slate-200/60 transition-all duration-300 hover:-translate-y-1 active:scale-[0.98]"
-    >
-        {/* Subtle background glow on hover */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300`}></div>
-        
-        <div className={`p-3.5 rounded-2xl mb-4 text-white bg-gradient-to-br ${gradient} shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-110`}>
-            <Icon size={28} strokeWidth={1.5} />
-        </div>
-        
-        <h3 className="text-lg font-bold text-slate-800 mb-1">{title}</h3>
-        <p className="text-sm text-slate-500 font-medium leading-relaxed">{desc}</p>
-        
-        <div className="mt-auto pt-6 flex items-center text-sm font-bold opacity-0 translate-x-[-10px] group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
-            <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>Proceed</span>
-            <ChevronRight size={16} className="ml-1 text-slate-400" />
-        </div>
-    </button>
-);
-
 function HomeComponent() {
     let navigate = useNavigate();
     const { addToUserHistory, userData } = useContext(AuthContext);
 
     const [date, setDate] = useState(new Date());
-    const [greeting, setGreeting] = useState("");
-    
-    // Modals
     const [showJoinInputModal, setShowJoinInputModal] = useState(false);
-    const [showScheduleModal, setShowScheduleModal] = useState(false);
-    const [showPreviewModal, setShowPreviewModal] = useState(false);
     
-    // Data & Logic
+    // --- SCHEDULE & EDIT STATE ---
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
     const [refreshSchedule, setRefreshSchedule] = useState(0);
-    const [meetingToEdit, setMeetingToEdit] = useState(null);
+    const [meetingToEdit, setMeetingToEdit] = useState(null); // <--- Added for Edit Mode
+
     const [meetingCode, setMeetingCode] = useState("");
     const [passcode, setPasscode] = useState(""); 
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [generatedMeetingId, setGeneratedMeetingId] = useState("");
     const [isJoining, setIsJoining] = useState(false);
     const [participantName, setParticipantName] = useState("");
     const localVideoRef = useRef(null);
     const [isVideoOn, setIsVideoOn] = useState(true);
     const [isAudioOn, setIsAudioOn] = useState(true);
+    const [copied, setCopied] = useState(false);
 
-    // --- EFFECTS ---
+    // --- HANDLERS FOR SCHEDULE ---
+    const handleEditMeeting = (meeting) => {
+        setMeetingToEdit(meeting);
+        setShowScheduleModal(true);
+    };
+
+    const handleScheduleSuccess = () => {
+        setRefreshSchedule((prev) => prev + 1);
+        setMeetingToEdit(null);
+    };
+
+    const handleCloseSchedule = () => {
+        setShowScheduleModal(false);
+        setMeetingToEdit(null);
+    };
+
     useEffect(() => {
         const timer = setInterval(() => setDate(new Date()), 1000);
-        const hour = new Date().getHours();
-        if (hour < 12) setGreeting("Good Morning");
-        else if (hour < 18) setGreeting("Good Afternoon");
-        else setGreeting("Good Evening");
         return () => clearInterval(timer);
     }, []);
 
     useEffect(() => {
-        if (userData?.name) setParticipantName(userData.name);
+        if (userData?.name) {
+            setParticipantName(userData.name);
+        }
     }, [userData]);
 
-    // --- HANDLERS ---
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("userData");
         navigate("/auth");
     };
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+
+        if (token) {
+            localStorage.setItem("token", token);
+            window.history.replaceState({}, document.title, "/home");
+        }
+    }, []);
 
     const handleNewMeeting = () => {
         setIsJoining(false);
@@ -167,6 +138,7 @@ function HomeComponent() {
         const randomId = Math.floor(100000000 + Math.random() * 900000000).toString();
         const formattedId = `${randomId.substring(0, 3)}-${randomId.substring(3, 6)}-${randomId.substring(6, 9)}`;
         setGeneratedMeetingId(formattedId);
+        setParticipantName(userData?.name || "");
         setShowPreviewModal(true);
         startPreviewCamera();
     };
@@ -176,6 +148,7 @@ function HomeComponent() {
         setShowJoinInputModal(false);
         setIsJoining(true);
         setGeneratedMeetingId(meetingCode);
+        setParticipantName(userData?.name || "");
         setShowPreviewModal(true);
         startPreviewCamera();
     };
@@ -202,6 +175,7 @@ function HomeComponent() {
         stopPreviewCamera();
         await addToUserHistory(generatedMeetingId);
         const finalName = participantName.trim() || "Host";
+
         navigate(`/meeting/${generatedMeetingId}`, {
             state: {
                 bypassLobby: true,
@@ -230,232 +204,201 @@ function HomeComponent() {
         }
     };
 
-    const formatDate = (date) => date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(generatedMeetingId);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     const formatTime = (date) => date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const formatDate = (date) => date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 
     return (
-        <div className="min-h-screen w-full bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-100 overflow-hidden">
-            <style>{styles}</style>
-            
-            {/* Background Aesthetics (Zero lag CSS) */}
-            <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-400/10 rounded-full blur-[100px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-purple-400/10 rounded-full blur-[100px]"></div>
+        <div className="min-h-screen w-full bg-slate-50 flex flex-col font-sans text-slate-800">
+            <Navbar navigate={navigate} handleLogout={handleLogout} />
+
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto px-4 sm:px-6 -mt-10">
+                <div className="text-center mb-8 sm:mb-20">
+                    <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold text-slate-800 mb-2 tracking-tight">
+                        {formatTime(date)}
+                    </h1>
+                    <p className="text-slate-500 text-lg sm:text-2xl font-medium">
+                        {formatDate(date)}
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 w-full max-w-4xl">
+                    <button onClick={handleNewMeeting} className="group relative flex flex-col items-center cursor-pointer justify-center gap-3 p-4 sm:p-8 bg-orange-500 hover:bg-orange-600 rounded-3xl shadow-xl shadow-orange-500/20 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl">
+                        <div className="p-3 sm:p-4 bg-white/20 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                            <Video size={28} className="text-white sm:w-8 sm:h-8" />
+                        </div>
+                        <span className="text-sm sm:text-lg font-bold text-white">New Meeting</span>
+                    </button>
+
+                    <button onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }} className="group cursor-pointer flex flex-col items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
+                        <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                            <Plus size={28} className="sm:w-8 sm:h-8" />
+                        </div>
+                        <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Join</span>
+                    </button>
+
+                    <button onClick={() => setShowScheduleModal(true)} className="group flex flex-col cursor-pointer items-center justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
+                        <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                            <Calendar size={28} className="sm:w-8 sm:h-8" />
+                        </div>
+                        <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Schedule</span>
+                    </button>
+
+                    <button className="group flex flex-col items-center cursor-pointer justify-center gap-3 p-4 sm:p-8 bg-white hover:bg-indigo-50 rounded-3xl shadow-sm border border-slate-200 transition-all duration-300 transform hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg">
+                        <div className="p-3 sm:p-4 bg-indigo-100 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                            <ScreenShare size={28} className="sm:w-8 sm:h-8" />
+                        </div>
+                        <span className="text-sm sm:text-lg font-bold text-slate-700 group-hover:text-indigo-700">Screen</span>
+                    </button>
+                </div>
+
+                <div className="w-full max-w-4xl mt-10">
+                    <ScheduledList 
+                        refreshTrigger={refreshSchedule}
+                        onEditClick={handleEditMeeting} // Pass the edit handler
+                        onRefresh={() => setRefreshSchedule(prev => prev + 1)} // Pass refresh for delete
+                    />
+                </div>
             </div>
 
-            <Navbar 
-                navigate={navigate} 
-                handleLogout={handleLogout} 
-                userInitial={userData?.name ? userData.name.charAt(0).toUpperCase() : "U"} 
-            />
-
-            <main className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col lg:flex-row gap-8 lg:h-[calc(100vh-80px)]">
-                
-                {/* LEFT SECTION: Hero & Actions */}
-                <div className="flex-1 flex flex-col justify-center animate-fade-in-up" style={{ animationDelay: '0ms' }}>
-                    
-                    {/* Hero Text */}
-                    <div className="mb-10 pl-2">
-                        <div className="flex items-center gap-2 mb-3 text-blue-600 font-semibold bg-blue-50 w-fit px-3 py-1 rounded-full text-sm">
-                            <Sparkles size={16} />
-                            <span>{greeting}, {userData?.name?.split(" ")[0] || "User"}</span>
-                        </div>
-                        <h1 className="text-6xl sm:text-7xl font-bold text-slate-900 tracking-tight leading-[1.1] mb-4">
-                           {formatTime(date).split(" ")[0]}
-                           <span className="text-2xl sm:text-3xl text-slate-400 font-normal ml-3">{formatTime(date).split(" ")[1]}</span>
-                        </h1>
-                        <p className="text-slate-500 text-lg font-medium flex items-center gap-2">
-                           <CalendarDays size={20} className="text-blue-500"/> {formatDate(date)}
-                        </p>
-                    </div>
-
-                    {/* Action Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <ActionCard 
-                            icon={Video} 
-                            title="New Meeting" 
-                            desc="Start an instant meeting" 
-                            gradient="from-orange-400 to-rose-500"
-                            onClick={handleNewMeeting}
-                            delay={100}
-                        />
-                        <ActionCard 
-                            icon={Plus} 
-                            title="Join Meeting" 
-                            desc="Enter via meeting code" 
-                            gradient="from-blue-500 to-indigo-600"
-                            onClick={() => { setMeetingCode(""); setPasscode(""); setShowJoinInputModal(true); }}
-                            delay={200}
-                        />
-                        <ActionCard 
-                            icon={Calendar} 
-                            title="Schedule" 
-                            desc="Plan for upcoming events" 
-                            gradient="from-emerald-400 to-teal-500"
-                            onClick={() => setShowScheduleModal(true)}
-                            delay={300}
-                        />
-                        <ActionCard 
-                            icon={ScreenShare} 
-                            title="Screen Share" 
-                            desc="Share your screen only" 
-                            gradient="from-violet-500 to-purple-600"
-                            onClick={() => {}} 
-                            delay={400}
-                        />
-                    </div>
-                </div>
-
-                {/* RIGHT SECTION: Floating Schedule Panel */}
-                <div className="w-full lg:w-[420px] h-full py-2 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-                    <div className="glass-panel rounded-[2rem] h-full min-h-[500px] flex flex-col overflow-hidden shadow-2xl shadow-slate-200/50">
-                        <div className="px-8 py-6 border-b border-slate-100/50 bg-white/40 flex items-center justify-between backdrop-blur-md">
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-800">Your Schedule</h2>
-                                <p className="text-sm text-slate-500 mt-1">Today's Timeline</p>
-                            </div>
-                            <div className="bg-white p-2 rounded-xl shadow-sm text-blue-600">
-                                <Calendar size={20} />
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-white/30">
-                            <ScheduledList 
-                                refreshTrigger={refreshSchedule}
-                                onEditClick={(m) => { setMeetingToEdit(m); setShowScheduleModal(true); }}
-                                onRefresh={() => setRefreshSchedule(prev => prev + 1)}
-                            />
-                        </div>
-                        
-                        <div className="p-4 bg-white/60 border-t border-slate-100/50 backdrop-blur-sm">
-                             <button className="w-full py-3.5 rounded-xl text-sm font-bold text-slate-500 hover:text-blue-600 hover:bg-white transition-all duration-300 flex items-center justify-center gap-2 group shadow-sm hover:shadow">
-                                View Full Calendar
-                                <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                             </button>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            {/* --- JOIN MODAL --- */}
+            {/* --- MODALS --- */}
             {showJoinInputModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in bg-slate-900/20 backdrop-blur-sm p-4">
-                    <div 
-                        className="glass-panel bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-sm border border-white/60 animate-scale-in"
-                        onClick={(e) => e.stopPropagation()}
-                    >
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto">
+                    <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 my-auto">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800">Join Meeting</h3>
-                            <button onClick={() => setShowJoinInputModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                            <h3 className="text-xl font-bold text-slate-800">Join a Meeting</h3>
+                            <button onClick={() => setShowJoinInputModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
                         <div className="space-y-4">
-                            <input 
-                                type="text" 
-                                placeholder="Enter Meeting ID" 
-                                className="w-full bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-5 py-4 outline-none transition-all font-mono text-lg"
-                                value={meetingCode} 
-                                onChange={(e) => setMeetingCode(e.target.value)} 
-                                autoFocus 
-                            />
-                            <input 
-                                type="text" 
-                                placeholder="Passcode (Optional)" 
-                                className="w-full bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-5 py-4 outline-none transition-all"
-                                value={passcode} 
-                                onChange={(e) => setPasscode(e.target.value)} 
-                            />
-                            <button 
-                                onClick={handleJoinVideoCall} 
-                                disabled={!meetingCode.trim()} 
-                                className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all transform active:scale-[0.98] ${meetingCode.trim() ? "bg-blue-600 hover:bg-blue-700 shadow-blue-500/30" : "bg-slate-300 cursor-not-allowed"}`}
-                            >
-                                Join Now
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Meeting ID</label>
+                                <div className="relative">
+                                    <input type="text" placeholder="e.g. 123-456-789" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono" value={meetingCode} onChange={(e) => setMeetingCode(e.target.value)} autoFocus />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Passcode (Optional)</label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><Lock size={18} /></div>
+                                    <input type="text" placeholder="Host provided passcode" className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" value={passcode} onChange={(e) => setPasscode(e.target.value)} />
+                                </div>
+                            </div>
+                            <button onClick={handleJoinVideoCall} disabled={!meetingCode.trim()} className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all mt-4 ${meetingCode.trim() ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transform hover:-translate-y-0.5" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
+                                Join Now <ArrowRight size={20} />
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* --- PREVIEW MODAL --- */}
+            {/* PREVIEW MODAL */}
             {showPreviewModal && (
-                <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
-                    <div className="w-full max-w-5xl bg-neutral-900 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col md:flex-row border border-white/10 animate-scale-in">
-                        {/* Video Preview */}
-                        <div className="flex-1 relative bg-black aspect-video md:aspect-auto min-h-[400px] flex items-center justify-center group">
-                            <video 
-                                ref={localVideoRef} 
-                                autoPlay 
-                                muted 
-                                className={`w-full h-full object-cover -scale-x-100 ${!isVideoOn ? "hidden" : ""}`}
-                            ></video>
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-md">
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px] border border-white/10 relative">
                             
-                            {!isVideoOn && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/90">
-                                    <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl shadow-blue-500/20 border-4 border-neutral-800">
-                                        {participantName ? participantName.charAt(0).toUpperCase() : "U"}
-                                    </div>
-                                </div>
-                            )}
-                            
-                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-4 z-10">
-                                <button 
-                                    onClick={togglePreviewAudio} 
-                                    className={`p-4 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 ${isAudioOn ? "bg-white text-black" : "bg-rose-500 text-white shadow-lg shadow-rose-500/40"}`}
-                                >
-                                    {isAudioOn ? <Mic size={22} /> : <MicOff size={22} />}
-                                </button>
-                                <button 
-                                    onClick={togglePreviewVideo} 
-                                    className={`p-4 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 ${isVideoOn ? "bg-white text-black" : "bg-rose-500 text-white shadow-lg shadow-rose-500/40"}`}
-                                >
-                                    {isVideoOn ? <Video size={22} /> : <VideoOff size={22} />}
-                                </button>
-                            </div>
-                            
-                            <button onClick={stopPreviewCamera} className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
-                                <X size={24}/>
+                            <button onClick={stopPreviewCamera} className="absolute top-4 right-4 z-50 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white md:hidden">
+                                <X size={20} />
                             </button>
-                        </div>
 
-                        {/* Controls */}
-                        <div className="w-full md:w-[380px] bg-white p-8 md:p-10 flex flex-col justify-center">
-                            <h2 className="text-2xl font-bold text-slate-900 mb-2">Ready?</h2>
-                            <p className="text-slate-500 mb-8">Setup your audio and video before joining.</p>
-                            
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Display Name</label>
-                                    <input 
-                                        type="text" 
-                                        value={participantName} 
-                                        onChange={(e) => setParticipantName(e.target.value)} 
-                                        className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 outline-none transition-all font-medium text-lg"
-                                        placeholder="Your Name"
-                                    />
-                                </div>
-                                
-                                {!isJoining && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Passcode</label>
-                                        <input 
-                                            type="text" 
-                                            value={passcode} 
-                                            onChange={(e) => setPasscode(e.target.value)} 
-                                            className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl px-4 py-3 outline-none transition-all font-medium text-lg"
-                                            placeholder="Optional"
-                                        />
+                            {/* LEFT: Video Preview Area */}
+                            <div className="w-full md:w-2/3 bg-black relative flex flex-col justify-center p-4">
+                                <div className="relative w-full h-[400px] md:h-full rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shadow-2xl flex items-center justify-center isolate">
+                                    <video 
+                                        ref={localVideoRef} 
+                                        autoPlay 
+                                        muted 
+                                        className={`w-full h-full object-cover -scale-x-100 z-0 ${!isVideoOn ? "hidden" : ""}`}
+                                    ></video>
+                                    
+                                    {!isVideoOn && (
+                                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-neutral-800">
+                                            <div className="relative">
+                                                <div className="absolute inset-0 bg-indigo-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
+                                                <div className="relative w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg border-4 border-neutral-700">
+                                                    {participantName ? participantName.charAt(0).toUpperCase() : "U"}
+                                                </div>
+                                            </div>
+                                            <p className="mt-4 text-neutral-400 text-sm font-medium">Camera is off</p>
+                                        </div>
+                                    )}
+
+                                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 border border-white/10 z-20">
+                                        <span className="text-xs text-white/70">ID:</span>
+                                        <span className="text-sm font-mono font-bold text-white tracking-wider">{generatedMeetingId}</span>
+                                        <button onClick={copyToClipboard} className="text-white/70 hover:text-white ml-2 transition-colors">
+                                            {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                                        </button>
                                     </div>
-                                )}
+                                    
+                                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 z-30">
+                                        <button 
+                                            onClick={togglePreviewAudio} 
+                                            className={`p-4 rounded-full transition-all duration-300 border shadow-lg ${
+                                                isAudioOn 
+                                                ? "bg-white/20 hover:bg-white/30 text-white border-white/10 backdrop-blur-md" 
+                                                : "bg-rose-500 text-white border-rose-500 shadow-rose-500/40"
+                                            }`}
+                                        >
+                                            {isAudioOn ? <Mic size={24} /> : <MicOff size={24} />}
+                                        </button>
+                                        
+                                        <button 
+                                            onClick={togglePreviewVideo} 
+                                            className={`p-4 rounded-full transition-all duration-300 border shadow-lg ${
+                                                isVideoOn 
+                                                ? "bg-white/20 hover:bg-white/30 text-white border-white/10 backdrop-blur-md" 
+                                                : "bg-rose-500 text-white border-rose-500 shadow-rose-500/40"
+                                            }`}
+                                        >
+                                            {isVideoOn ? <Video size={24} /> : <VideoOff size={24} />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
 
-                                <button 
-                                    onClick={startMeeting} 
-                                    disabled={!participantName.trim()}
-                                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl shadow-blue-500/30 transition-all transform hover:-translate-y-1 active:scale-[0.98]"
-                                >
-                                    {isJoining ? "Join Meeting" : "Start Meeting"}
-                                </button>
+                            <div className="w-full md:w-1/3 bg-white p-6 sm:p-8 flex flex-col">
+                                <div className="flex justify-between items-center mb-6 md:mb-8">
+                                    <h2 className="text-xl sm:text-2xl font-bold text-slate-800">
+                                        {isJoining ? "Join Meeting" : "Ready to join?"}
+                                    </h2>
+                                    <button onClick={stopPreviewCamera} className="hidden md:block p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Display Name</label>
+                                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
+                                            <User size={20} className="text-slate-400" />
+                                            <input type="text" value={participantName} onChange={(e) => setParticipantName(e.target.value)} className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" placeholder="Enter your name" />
+                                        </div>
+                                    </div>
+                                    {!isJoining && (
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider ml-1">Set Passcode (Optional)</label>
+                                            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-3 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
+                                                <Lock size={20} className="text-slate-400" />
+                                                <input type="text" value={passcode} onChange={(e) => setPasscode(e.target.value)} className="bg-transparent border-none w-full text-slate-800 font-medium placeholder-slate-400 focus:ring-0 p-0" placeholder="No passcode" />
+                                            </div>
+                                            <p className="text-xs text-slate-400 px-1">Share this code with your guests.</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-8 mb-4 md:mb-0">
+                                    <button onClick={startMeeting} disabled={!participantName.trim()} className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:-translate-y-0.5 ${participantName.trim() ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30" : "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"}`}>
+                                        {isJoining ? "Join Now" : "Start Meeting"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -464,8 +407,8 @@ function HomeComponent() {
 
             <ScheduleModal
                 isOpen={showScheduleModal}
-                onClose={() => { setShowScheduleModal(false); setMeetingToEdit(null); }}
-                onSuccess={() => { setRefreshSchedule(prev => prev + 1); setMeetingToEdit(null); }}
+                onClose={handleCloseSchedule}
+                onSuccess={handleScheduleSuccess}
                 meetingToEdit={meetingToEdit}
             />
         </div>
