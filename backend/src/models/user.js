@@ -16,15 +16,15 @@ const userSchema = new Schema({
     },
     username: {
         type: String,
-        required: false,        // ← Make optional until final registration
+        required: false,        
         unique: true,
-        sparse: true,           // Allows null/undefined without unique conflict
+        sparse: true,           
         trim: true
     },
     password: {
         type: String,
-        required: false,        // ← Set only after OTP verification
-        select: false           // Don't return in queries by default (security)
+        required: false,        
+        select: false           
     },
     token: { type: String },
     otp: { type: String },
@@ -39,7 +39,7 @@ const userSchema = new Schema({
             date: { type: Date, default: Date.now }
         }
     ]
-}, { timestamps: true }); // Optional: adds createdAt/updatedAt
+}, { timestamps: true });
 
 const User = mongoose.model("User", userSchema);
 

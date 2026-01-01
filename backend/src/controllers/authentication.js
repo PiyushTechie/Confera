@@ -12,18 +12,16 @@ const login = async (req, res) => {
     }
 
     try {
-        const user = await User.findOne({ username });
+        const user = await User.findOne({ username }).select('+password');
         if (!user) {
             return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
         }
 
-        // --- FIX: Check if user has a password (Google users won't have one) ---
         if (!user.password) {
             return res.status(400).json({ 
                 message: "This account uses Google Login. Please sign in with Google." 
             });
         }
-        // -----------------------------------------------------------------------
         
         if (user.isVerified === false) {
              return res.status(403).json({ message: "Email not verified. Please verify your OTP." });
@@ -40,7 +38,6 @@ const login = async (req, res) => {
             return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid Credentials" });
         }
     } catch (error) {
-        // Log the actual error to your terminal so you can see it
         console.error("Login Error:", error); 
         return res.status(500).json({ message: `Something went wrong: ${error.message}` });
     }
@@ -51,7 +48,6 @@ const register = async (req, res) => {
     const { name, username, password, email } = req.body;
 
     try {
-        // --- UPDATED: Check if Username OR Email already exists ---
         const existingUser = await User.findOne({ 
             $or: [{ username: username }, { email: email }] 
         });
@@ -66,8 +62,8 @@ const register = async (req, res) => {
             name: name,
             username: username,
             password: hashedPassword,
-            email: email,       // Save the email
-            isVerified: false   // Default to false until OTP is entered
+            email: email,       
+            isVerified: false   
         });
 
         await newUser.save();
