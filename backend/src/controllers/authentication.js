@@ -17,7 +17,14 @@ const login = async (req, res) => {
             return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
         }
 
-        // --- NEW: Check if email is verified before allowing login ---
+        // --- FIX: Check if user has a password (Google users won't have one) ---
+        if (!user.password) {
+            return res.status(400).json({ 
+                message: "This account uses Google Login. Please sign in with Google." 
+            });
+        }
+        // -----------------------------------------------------------------------
+        
         if (user.isVerified === false) {
              return res.status(403).json({ message: "Email not verified. Please verify your OTP." });
         }
@@ -33,9 +40,12 @@ const login = async (req, res) => {
             return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid Credentials" });
         }
     } catch (error) {
-        return res.status(500).json({ message: `Something went wrong: ${error}` });
+        // Log the actual error to your terminal so you can see it
+        console.error("Login Error:", error); 
+        return res.status(500).json({ message: `Something went wrong: ${error.message}` });
     }
 };
+
 
 const register = async (req, res) => {
     const { name, username, password, email } = req.body;
