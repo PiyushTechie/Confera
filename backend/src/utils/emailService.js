@@ -13,7 +13,7 @@ const sendEmail = async (toEmail, subject, htmlContent) => {
 
   sendSmtpEmail.subject = subject;
   sendSmtpEmail.htmlContent = htmlContent;
-  sendSmtpEmail.sender = { name: "Confera Team", email: "confera.noreply@gmail.com" }; // Change to your verified sender
+  sendSmtpEmail.sender = { name: "Confera Team", email: "confera.noreply@gmail.com" };
   sendSmtpEmail.to = [{ email: toEmail }];
 
   try {

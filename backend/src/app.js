@@ -103,7 +103,7 @@ setInterval(() => {
       socketRateMap.delete(key);
     }
   }
-}, 10 * 60 * 1000);
+}, RATE_LIMIT.windowMs); // ← Use the same 10-second window
 
 const rooms = {};
 
