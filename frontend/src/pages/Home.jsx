@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
 import brandLogo from "../assets/BrandLogo.png";
 import ScheduleModal from "../components/ScheduleModal";
-import ScheduledList from "../components/ScheduledList";
+import ScheduledList from "../components/ScheduledList"; // Ensure this file exists
 import {
     Video, Plus, Calendar, ScreenShare, Mic, MicOff, VideoOff,
     X, Copy, Check, User, LogOut, ArrowRight, Lock, ChevronDown, Settings, Clock
 } from "lucide-react";
 
-// --- PROFILE MENU COMPONENT (Unchanged) ---
+// --- PROFILE MENU COMPONENT ---
 const ProfileMenu = ({ user, handleLogout }) => {
     const [isOpen, setIsOpen] = useState(false);
     const menuRef = useRef(null);
@@ -22,7 +22,12 @@ const ProfileMenu = ({ user, handleLogout }) => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const getInitials = (name) => name ? name.charAt(0).toUpperCase() : "U";
+    const getInitials = (name) => (name ? name.charAt(0).toUpperCase() : "U");
+
+    // Safe access to user properties
+    const displayName = user?.name || "Guest";
+    const displayUsername = user?.username || "user";
+    const displayEmail = user?.email || "";
 
     return (
         <div className="relative" ref={menuRef}>
@@ -31,15 +36,14 @@ const ProfileMenu = ({ user, handleLogout }) => {
                 className="flex items-center gap-3 p-1.5 pr-3 rounded-full hover:bg-white/50 border border-transparent hover:border-indigo-100 transition-all"
             >
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
-                    {getInitials(user?.name)}
+                    {getInitials(displayName)}
                 </div>
                 <div className="hidden md:flex flex-col items-start">
-                    {/* Display Name or Fallback */}
                     <span className="text-sm font-bold text-slate-700 leading-none">
-                        {user?.name || "User"} 
+                        {displayName} 
                     </span>
                     <span className="text-[10px] text-slate-500 font-medium">
-                        @{user?.username || "username"}
+                        @{displayUsername}
                     </span>
                 </div>
                 <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
@@ -48,8 +52,8 @@ const ProfileMenu = ({ user, handleLogout }) => {
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 z-50">
                     <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                        <p className="text-sm font-bold text-slate-800">{user?.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                        <p className="text-sm font-bold text-slate-800">{displayName}</p>
+                        <p className="text-xs text-slate-500 truncate">{displayEmail}</p>
                     </div>
                     <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
                         <LogOut size={16} /> Sign Out
@@ -60,7 +64,7 @@ const ProfileMenu = ({ user, handleLogout }) => {
     );
 };
 
-// --- ACTION CARD (Unchanged) ---
+// --- ACTION CARD ---
 const ActionCard = ({ icon: Icon, title, desc, colorClass, onClick }) => (
     <button 
         onClick={onClick}
@@ -79,15 +83,17 @@ function HomeComponent() {
     let navigate = useNavigate();
     const { addToUserHistory, userData } = useContext(AuthContext);
 
-    // --- FIX: INSTANTLY READ LOCAL STORAGE ---
-    // This lazy initializer runs only once on mount, preventing the "Guest" flash.
+    // --- SAFELY INITIALIZE USER ---
     const [currentUser, setCurrentUser] = useState(() => {
         if (userData) return userData;
-        const stored = localStorage.getItem("userData");
-        return stored ? JSON.parse(stored) : null;
+        try {
+            const stored = localStorage.getItem("userData");
+            return stored ? JSON.parse(stored) : null;
+        } catch (e) {
+            return null;
+        }
     });
 
-    // Keep state in sync if AuthContext updates later
     useEffect(() => {
         if (userData) setCurrentUser(userData);
     }, [userData]);
@@ -253,7 +259,6 @@ function HomeComponent() {
                                 </button>
                             </div>
                             
-                            {/* --- THE NEW SCHEDULED LIST IS USED HERE --- */}
                             <ScheduledList 
                                 refreshTrigger={refreshSchedule}
                                 onEditClick={handleEditMeeting}
@@ -264,10 +269,8 @@ function HomeComponent() {
                 </div>
             </main>
 
-            {/* ... (Modals Logic remains same as previous code - omitted for brevity but include them here) ... */}
-            {/* Make sure to keep the Modal rendering logic (JoinModal, PreviewModal, ScheduleModal) here */}
              {showJoinInputModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-md">
                         <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Join Meeting</h3><button onClick={() => setShowJoinInputModal(false)}><X size={20}/></button></div>
                         <input className="w-full bg-slate-50 border p-3 rounded-xl mb-3" placeholder="Meeting ID" value={meetingCode} onChange={e=>setMeetingCode(e.target.value)} autoFocus/>
@@ -289,7 +292,7 @@ function HomeComponent() {
                             </div>
                          </div>
                          <div className="w-full md:w-1/3 p-6 bg-white flex flex-col justify-center">
-                             <h2 className="text-2xl font-bold mb-4">Ready to join?</h2>
+                             <h2 className="text-2xl font-bold mb-4">Ready?</h2>
                              <input className="w-full border p-3 rounded-xl mb-4 font-bold" value={participantName} onChange={e=>setParticipantName(e.target.value)} placeholder="Your Name" />
                              {!isJoining && <input className="w-full border p-3 rounded-xl mb-4" value={passcode} onChange={e=>setPasscode(e.target.value)} placeholder="Passcode (Optional)" />}
                              <button onClick={startMeeting} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">Start Meeting</button>
