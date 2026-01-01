@@ -15,18 +15,15 @@ const OtpInput = ({ formik, length = 6 }) => {
 
     const handleChange = (e, index) => {
         const value = e.target.value;
-        if (isNaN(value)) return; // Only numbers allowed
-
+        if (isNaN(value)) return;
         const currentOtp = formik.values.otp.split('');
         
-        // Handle last character entered (in case user types fast)
         const lastChar = value.substring(value.length - 1);
         currentOtp[index] = lastChar;
         
         const newOtp = currentOtp.join('');
         formik.setFieldValue('otp', newOtp);
 
-        // Move focus to next box
         if (lastChar && index < length - 1 && inputRefs.current[index + 1]) {
             inputRefs.current[index + 1].focus();
         }
@@ -34,14 +31,13 @@ const OtpInput = ({ formik, length = 6 }) => {
 
     const handleKeyDown = (e, index) => {
         if (e.key === 'Backspace' && !formik.values.otp[index] && index > 0 && inputRefs.current[index - 1]) {
-            // Move focus back if empty
             inputRefs.current[index - 1].focus();
         }
     };
 
     const handlePaste = (e) => {
         e.preventDefault();
-        const data = e.clipboardData.getData('text').slice(0, length).replace(/[^0-9]/g, ''); // Clean non-numbers
+        const data = e.clipboardData.getData('text').slice(0, length).replace(/[^0-9]/g, '');
         formik.setFieldValue('otp', data);
         if (inputRefs.current[length - 1]) inputRefs.current[length - 1].focus();
     };
@@ -76,7 +72,6 @@ export default function Authentication() {
     const [error, setError] = React.useState("");
     const [message, setMessage] = React.useState("");
     
-    // 0: Login, 1: Register, 2: OTP Verify, 3: Forgot Pass, 4: Reset Pass
     const [formState, setFormState] = React.useState(0); 
     const [open, setOpen] = React.useState(false);
 
@@ -85,30 +80,29 @@ export default function Authentication() {
 
     const { handleRegister, handleLogin } = React.useContext(AuthContext);
 
-    // --- Validation Schemas ---
-    const loginSchema = Yup.object().shape({
-        username: Yup.string().required("Required"),
-        password: Yup.string().required("Required"),
+    const loginSchema = Yup.object({
+        username: Yup.string().trim().required("Username cannot be empty"),
+        password: Yup.string().required("Password is required"),
     });
 
-    const registerSchema = Yup.object().shape({
-        name: Yup.string().required("Required"),
-        username: Yup.string().required("Required"),
-        email: Yup.string().email("Invalid email").required("Required"),
-        password: Yup.string().min(6, "Min 6 chars").required("Required"),
+    const registerSchema = Yup.object({
+        name: Yup.string().trim().required("Full name is required"),
+        username: Yup.string().trim().min(3, "Min 3 chars").required("Username is required"),
+        email: Yup.string().email("Invalid email").required("Email is required"),
+        password: Yup.string().min(6, "Min 6 chars").required("Password is required"),
     });
 
-    const otpSchema = Yup.object().shape({
-        otp: Yup.string().length(6, "Enter 6 digits").required("Required"),
+    const otpSchema = Yup.object({
+        otp: Yup.string().matches(/^\d{6}$/, "Must be 6 digits").required("OTP is required"),
     });
 
-    const forgotSchema = Yup.object().shape({
-        email: Yup.string().email("Invalid email").required("Required"),
+    const forgotSchema = Yup.object({
+        email: Yup.string().email("Invalid email").required("Email is required"),
     });
 
-    const resetSchema = Yup.object().shape({
-        otp: Yup.string().length(6, "Enter 6 digits").required("Required"),
-        newPassword: Yup.string().min(6, "Min 6 chars").required("Required"),
+    const resetSchema = Yup.object({
+        otp: Yup.string().matches(/^\d{6}$/, "Must be 6 digits").required("OTP is required"),
+        newPassword: Yup.string().min(6, "Min 6 chars").required("New password is required"),
     });
 
     const getSchema = () => {
@@ -182,7 +176,6 @@ export default function Authentication() {
         },
     });
 
-    // Reset errors when switching states
     React.useEffect(() => {
         formik.setErrors({});
         setError("");
@@ -231,7 +224,7 @@ export default function Authentication() {
 
     return (
         <div className="h-screen flex bg-white text-slate-900 font-sans overflow-hidden">
-            {/* Background Image Section - Unchanged but ensured full height */}
+            {/* Background Image Section */}
             <div className="hidden lg:flex w-2/3 relative items-center justify-center overflow-hidden h-full">
                 <div className="absolute inset-0 bg-indigo-900/40 z-10" />
                 <img
@@ -242,12 +235,12 @@ export default function Authentication() {
                 <div className="relative z-20 p-12 text-center">
                     <h2 className="text-4xl font-bold mb-4 text-white drop-shadow-xl">Welcome to Cenfora</h2>
                     <p className="text-lg text-indigo-50 max-w-lg mx-auto drop-shadow-md font-medium">
-                        Secure, high-quality video conferencing.
+                        Cenfora is a robust, high-quality video conferencing solution engineered for secure communication, low-latency performance, and seamless collaboration in modern digital workflows.
                     </p>
                 </div>
             </div>
 
-            {/* Form Section - TIGHTLY PACKED */}
+            {/* Form Section */}
             <div className="w-full lg:w-1/3 flex flex-col items-center justify-center p-6 h-full relative bg-white overflow-y-auto">
                 
                 {/* Notification */}
@@ -278,8 +271,6 @@ export default function Authentication() {
                     </div>
 
                     <form onSubmit={formik.handleSubmit} className="space-y-4">
-                        
-                        {/* --- REGISTER FIELDS --- */}
                         {formState === 1 && (
                             <div className="space-y-3">
                                 <InputField id="name" label="Full Name" icon={<User size={18}/>} placeholder="John Doe" formik={formik} />
@@ -288,17 +279,14 @@ export default function Authentication() {
                             </div>
                         )}
 
-                        {/* --- LOGIN FIELDS --- */}
                         {formState === 0 && (
                             <InputField id="username" label="Username" icon={<User size={18}/>} placeholder="johndoe" formik={formik} />
                         )}
 
-                        {/* --- PASSWORD --- */}
                         {(formState === 0 || formState === 1) && (
                             <InputField id="password" type="password" label="Password" icon={<Lock size={18}/>} placeholder="••••••" formik={formik} />
                         )}
 
-                        {/* --- OTP 6-BOX INPUT --- */}
                         {(formState === 2 || formState === 4) && (
                            <div className="text-center">
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Enter 6-digit OTP</label>
@@ -306,17 +294,14 @@ export default function Authentication() {
                            </div>
                         )}
 
-                        {/* --- FORGOT --- */}
                         {formState === 3 && (
                             <InputField id="email" label="Email Address" icon={<Mail size={18}/>} placeholder="john@example.com" formik={formik} />
                         )}
 
-                        {/* --- RESET PASS --- */}
                         {formState === 4 && (
                             <InputField id="newPassword" type="password" label="New Password" icon={<Lock size={18}/>} placeholder="New secure password" formik={formik} />
                         )}
 
-                        {/* --- LINKS --- */}
                         <div className="flex justify-between items-center text-xs font-semibold">
                             {formState === 0 && (
                                 <button type="button" onClick={() => setFormState(3)} className="text-indigo-600 hover:text-indigo-500 ml-auto">
@@ -330,7 +315,6 @@ export default function Authentication() {
                             )}
                         </div>
 
-                        {/* --- ERROR --- */}
                         {error && (
                             <div className="flex items-center gap-2 text-red-600 text-xs bg-red-50 p-2 rounded border border-red-200">
                                 <XCircle className="w-4 h-4" />
@@ -338,14 +322,23 @@ export default function Authentication() {
                             </div>
                         )}
 
-                        {/* --- SUBMIT --- */}
                         <StyledWrapper>
                             <button className="button" type="submit" disabled={isLoading || isGoogleLoading}>
-                                {isLoading ? <Loader color="#ffffff" size={20} /> : <span className="text">{getButtonText()}</span>}
+                                {isLoading ? (
+                                    <Loader color="#ffffff" size={24} />
+                                ) : (
+                                    <>
+                                        <span className="text">{getButtonText()}</span>
+                                        <span className="svg">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width={50} height={20} viewBox="0 0 38 15" fill="none">
+                                                <path fill="white" d="M10 7.519l-.939-.344h0l.939.344zm14.386-1.205l-.981-.192.981.192zm1.276 5.509l.537.843.148-.094.107-.139-.792-.611zm4.819-4.304l-.385-.923h0l.385.923zm7.227.707a1 1 0 0 0 0-1.414L31.343.448a1 1 0 0 0-1.414 0 1 1 0 0 0 0 1.414l5.657 5.657-5.657 5.657a1 1 0 0 0 1.414 1.414l6.364-6.364zM1 7.519l.554.833.029-.019.094-.061.361-.23 1.277-.77c1.054-.609 2.397-1.32 3.629-1.787.617-.234 1.17-.392 1.623-.455.477-.066.707-.008.788.034.025.013.031.021.039.034a.56.56 0 0 1 .058.235c.029.327-.047.906-.39 1.842l1.878.689c.383-1.044.571-1.949.505-2.705-.072-.815-.45-1.493-1.16-1.865-.627-.329-1.358-.332-1.993-.244-.659.092-1.367.305-2.056.566-1.381.523-2.833 1.297-3.921 1.925l-1.341.808-.385.245-.104.068-.028.018c-.011.007-.011.007.543.84zm8.061-.344c-.198.54-.328 1.038-.36 1.484-.032.441.024.94.325 1.364.319.45.786.64 1.21.697.403.054.824-.001 1.21-.09.775-.179 1.694-.566 2.633-1.014l3.023-1.554c2.115-1.122 4.107-2.168 5.476-2.524.329-.086.573-.117.742-.115s.195.038.161.014c-.15-.105.085-.139-.076.685l1.963.384c.192-.98.152-2.083-.74-2.707-.405-.283-.868-.37-1.28-.376s-.849.069-1.274.179c-1.65.43-3.888 1.621-5.909 2.693l-2.948 1.517c-.92.439-1.673.743-2.221.87-.276.064-.429.065-.492.057-.043-.006.066.003.155.127.07.099.024.131.038-.063.014-.187.078-.49.243-.94l-1.878-.689zm14.343-1.053c-.361 1.844-.474 3.185-.413 4.161.059.95.294 1.72.811 2.215.567.544 1.242.546 1.664.459a2.34 2.34 0 0 0 .502-.167l.15-.076.049-.028.018-.011c.013-.008.013-.008-.524-.852l-.536-.844.019-.012c-.038.018-.064.027-.084.032-.037.008.053-.013.125.056.021.02-.151-.135-.198-.895-.046-.734.034-1.887.38-3.652l-1.963-.384zm2.257 5.701l.791.611.024-.031.08-.101.311-.377 1.093-1.213c.922-.954 2.005-1.894 2.904-2.27l-.771-1.846c-1.31.547-2.637 1.758-3.572 2.725l-1.184 1.314-.341.414-.093.117-.025.032c-.01.013-.01.013.781.624zm5.204-3.381c.989-.413 1.791-.42 2.697-.307.871.108 2.083.385 3.437.385v-2c-1.197 0-2.041-.226-3.19-.369-1.114-.139-2.297-.146-3.715.447l.771 1.846z" />
+                                            </svg>
+                                        </span>
+                                    </>
+                                )}
                             </button>
                         </StyledWrapper>
 
-                        {/* --- BACK BUTTON --- */}
                         {(formState > 1) && (
                             <button 
                                 type="button" 
@@ -357,7 +350,6 @@ export default function Authentication() {
                         )}
                     </form>
 
-                    {/* --- GOOGLE --- */}
                     {(formState === 0 || formState === 1) && (
                         <div className="mt-4">
                             <div className="relative mb-4">
@@ -387,7 +379,6 @@ export default function Authentication() {
     );
 }
 
-// Compact Input Field
 const InputField = ({ id, label, icon, type = "text", placeholder, formik }) => (
     <div>
         <label htmlFor={id} className="block text-xs font-bold text-slate-700 mb-1">{label}</label>
@@ -413,33 +404,60 @@ const InputField = ({ id, label, icon, type = "text", placeholder, formik }) => 
 const StyledWrapper = styled.div`
   .button {
     width: 100%;
-    height: 48px; 
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #4f46e5;
-    border: 4px solid #c7d2fe; 
+    padding: 12px 24px;
+    background-color: #4f46e5; 
+    border: 6px solid #c7d2fe; 
     color: white;
+    gap: 8px;
     border-radius: 50px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
   }
   .button:disabled {
-    opacity: 0.8;
+    opacity: 0.7;
     cursor: not-allowed;
+    background-color: #6366f1;
   }
   .text {
-    font-size: 0.95em;
+    font-size: 1.2rem;
     font-weight: 700;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     text-transform: uppercase;
   }
+  .svg {
+    padding-top: 5px;
+    height: 100%;
+    width: fit-content;
+    display: flex;
+    align-items: center;
+  }
+  .svg svg {
+    width: 40px;
+    height: 24px;
+  }
   .button:hover:not(:disabled) {
-    background-color: #4338ca;
-    border-color: #a5b4fc; 
+    border: 6px solid #a5b4fc; 
+    background-color: #4338ca; 
   }
   .button:active:not(:disabled) {
-    border-width: 2px;
+    border: 4px solid #c7d2fe;
     transform: scale(0.99);
+  }
+  .button:hover:not(:disabled) .svg svg {
+    animation: jello-vertical 0.9s both;
+    transform-origin: left;
+  }
+
+  @keyframes jello-vertical {
+    0% { transform: scale3d(1, 1, 1); }
+    30% { transform: scale3d(0.75, 1.25, 1); }
+    40% { transform: scale3d(1.25, 0.75, 1); }
+    50% { transform: scale3d(0.85, 1.15, 1); }
+    65% { transform: scale3d(1.05, 0.95, 1); }
+    75% { transform: scale3d(0.95, 1.05, 1); }
+    100% { transform: scale3d(1, 1, 1); }
   }
 `;
