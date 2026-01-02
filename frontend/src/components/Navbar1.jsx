@@ -51,7 +51,7 @@ const Navbar = ({ user, handleLogout }) => {
     const navigate = useNavigate();
 
     return (
-        <nav className="w-full px-8 py-3 bg-white border-b border-slate-200 flex items-center justify-between sticky top-0 z-40">
+        <nav className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-slate-200/60 px-2 lg:px-8 py-3 lg:py-4">
             <div className="flex items-center gap-2 cursor-pointer ml-4" onClick={() => navigate("/home")}>
                 <img 
                     src={brandLogo} 
