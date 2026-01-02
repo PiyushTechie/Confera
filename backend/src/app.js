@@ -103,10 +103,9 @@ setInterval(() => {
       socketRateMap.delete(key);
     }
   }
-}, RATE_LIMIT.windowMs); // ← Use the same 10-second window
+}, RATE_LIMIT.windowMs);
 
 const rooms = {};
-
 
 io.on("connection", (socket) => {
   console.log("SOCKET CONNECTED::", socket.id);
@@ -158,17 +157,18 @@ io.on("connection", (socket) => {
       rooms[path] = {
         users: [],
         waiting: [],
-        hostId: socket.id,
+        hostId: null,
         passcode: passcode || null,
         isLocked: false,
       };
     }
 
     const room = rooms[path];
-
     if (!room.hostId) {
-      room.hostId = socket.id;
-      if (passcode) room.passcode = passcode;
+       if (socket.user?.role === "user") {
+           room.hostId = socket.id;
+           if (passcode) room.passcode = passcode; 
+       }
     }
 
     room.waiting = room.waiting.filter(
@@ -183,6 +183,7 @@ io.on("connection", (socket) => {
       isMuted: false,
       isVideoOff: false,
       isHandRaised: false,
+      isHost: room.hostId === socket.id
     };
 
     room.users.push(userData);
@@ -203,7 +204,6 @@ io.on("connection", (socket) => {
     }
   });
 
-
   socket.on("toggle-lock", () => {
     if (isAuthorizedHost()) {
       const room = rooms[socket.roomPath];
@@ -218,7 +218,6 @@ io.on("connection", (socket) => {
       const user = rooms[path].users.find((u) => u.socketId === socket.id);
       if (user) {
         user.isHandRaised = isRaised;
-        
         io.to(path).emit("hand-toggled", { 
             socketId: socket.id, 
             isRaised,
@@ -315,6 +314,13 @@ io.on("connection", (socket) => {
   });
 
   const handleUserLeave = () => {
+    // 1. Cleanup Rate Limits
+    const keysToDelete = [];
+    for (const key of socketRateMap.keys()) {
+        if (key.startsWith(socket.id)) keysToDelete.push(key);
+    }
+    keysToDelete.forEach(k => socketRateMap.delete(k));
+
     const path = socket.roomPath; 
     
     if (!path || !rooms[path]) return;
@@ -333,6 +339,8 @@ io.on("connection", (socket) => {
           
           io.to(path).emit("update-host-id", room.hostId);
           io.to(room.hostId).emit("update-waiting-list", room.waiting);
+        } else {
+            room.hostId = null; 
         }
       }
     }
@@ -350,10 +358,11 @@ io.on("connection", (socket) => {
 
   socket.on("leave-room", () => {
     handleUserLeave();
+    socket.leave(socket.roomPath);
+    socket.roomPath = null;
   });
 
-  });
-
+});
 
 const start = async () => {
   try {
