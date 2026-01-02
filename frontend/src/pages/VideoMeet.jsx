@@ -85,7 +85,7 @@ export default function VideoMeetComponent() {
   const { url: meetingCode } = useParams();
   const { bypassLobby = false, isAudioOn = true, isVideoOn = true, username = "Guest", isHost = false, passcode = null } = location.state || {};
 
-  // Refs & State
+  // Refs
   const socketRef = useRef(null);
   const socketIdRef = useRef(null);
   const connectionsRef = useRef({});
@@ -95,6 +95,8 @@ export default function VideoMeetComponent() {
   const audioAnalysersRef = useRef({});
   const chatContainerRef = useRef(null);
   const pendingIce = useRef({});
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
   
   // State
   const [loading, setLoading] = useState(true);
@@ -140,8 +142,6 @@ export default function VideoMeetComponent() {
   const [showCaptions, setShowCaptions] = useState(false);
   const [remoteCaption, setRemoteCaption] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef(null);
-  const recordedChunksRef = useRef([]);
   const [toasts, setToasts] = useState([]);
   
   // Devices
@@ -313,6 +313,38 @@ export default function VideoMeetComponent() {
   const handleStopVideoAll = () => { if(window.confirm("Stop all video?")) { socketRef.current.emit("stop-video-all"); addToast("Stopped videos"); } };
   const handleTransferHost = (id) => { if(window.confirm("Transfer host rights?")) { socketRef.current.emit("transfer-host", id); addToast("Host transferred"); } };
   const handleEndCall = () => { if(amIHost && window.confirm("End meeting for everyone?")) { socketRef.current.emit("end-meeting-for-all"); setTimeout(cleanupAndLeave, 100); } else cleanupAndLeave(); };
+  
+  // --- FIXED: ADDED handleToggleRecord ---
+  const handleToggleRecord = () => {
+    if (isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      addToast("Recording saved", "success");
+    } else {
+      const stream = displayStreamRef.current || localStreamRef.current;
+      if (!stream) return addToast("No stream to record", "error");
+      const options = { mimeType: "video/webm; codecs=vp9" };
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunksRef.current.push(event.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.style.display = "none"; a.href = url; a.download = `recording-${new Date().toISOString()}.webm`;
+        document.body.appendChild(a); a.click();
+        window.URL.revokeObjectURL(url); recordedChunksRef.current = [];
+      };
+      mediaRecorderRef.current = mediaRecorder; // Ensure ref is set
+      mediaRecorder.start();
+      setIsRecording(true);
+      addToast("Recording started", "info");
+    }
+  };
+
+  const toggleCaptions = () => {
+    if (!showCaptions) { startListening(); setShowCaptions(true); addToast("Captions enabled", "success"); } 
+    else { stopListening(); setShowCaptions(false); addToast("Captions disabled", "info"); }
+  };
+
   const handleScreen = async () => { if(isMobile) return addToast("Not supported on mobile", "error"); if(!screen) { try { const display = await navigator.mediaDevices.getDisplayMedia({video:true}); displayStreamRef.current = display; const track = display.getVideoTracks()[0]; Object.values(connectionsRef.current).forEach(pc => { const sender = pc.getSenders().find(s => s.track.kind === "video"); if(sender) sender.replaceTrack(track); }); track.onended = () => handleScreen(); setScreen(true); } catch(err){ console.log("Cancelled"); } } else { displayStreamRef.current?.getTracks().forEach(t => t.stop()); displayStreamRef.current = null; const track = localStreamRef.current?.getVideoTracks()[0]; Object.values(connectionsRef.current).forEach(pc => { const sender = pc.getSenders().find(s => s.track.kind === "video"); if(sender) sender.replaceTrack(track); }); setScreen(false); } };
   const handleVideo = () => { const track = localStreamRef.current?.getVideoTracks()[0]; if(track) { track.enabled = !video; setVideo(!video); socketRef.current.emit("toggle-video", {isVideoOff: video}); } };
   const handleAudio = () => { if(!isAudioConnected) { setShowSettings(true); return; } const track = localStreamRef.current?.getAudioTracks()[0]; if(track) { track.enabled = !audio; setAudio(!audio); socketRef.current.emit("toggle-audio", {isMuted: audio}); } };
@@ -320,19 +352,6 @@ export default function VideoMeetComponent() {
   const handleTileClick = (id) => setPinnedUserId(id === pinnedUserId ? null : id);
   const handleCopyLink = () => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); addToast("Link copied"); };
   const handleDeviceChange = async (type, deviceId) => { setSelectedDevices(prev => ({...prev, [type]: deviceId})); };
-  
-  // --- ADDED MISSING FUNCTION ---
-  const toggleCaptions = () => {
-    if (!showCaptions) {
-        startListening();
-        setShowCaptions(true);
-        addToast("Captions enabled", "success");
-    } else {
-        stopListening();
-        setShowCaptions(false);
-        addToast("Captions disabled", "info");
-    }
-  };
 
   useEffect(() => { if(chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight; }, [messages]);
   useEffect(() => { if(showChat) setUnreadMessages(0); }, [showChat]);
@@ -514,6 +533,7 @@ export default function VideoMeetComponent() {
                 {viewMode !== 'GRID' && !isMobile && <div className="h-28 border-t border-neutral-800 bg-neutral-900 flex overflow-x-auto p-2 gap-2">{renderSideStrip()}</div>}
             </div>
 
+            {/* --- PARTICIPANTS SIDEBAR --- */}
             {showParticipants && (
                 <div className="w-full md:w-80 bg-neutral-900 border-l border-neutral-800 flex flex-col absolute inset-0 md:static z-40 animate-in slide-in-from-right duration-200">
                     <div className="p-4 border-b border-neutral-800 flex justify-between items-center"><h3 className="font-bold">Participants ({Object.keys(userMap).length + 1})</h3><button onClick={()=>setShowParticipants(false)}><X size={20}/></button></div>
