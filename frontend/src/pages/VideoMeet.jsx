@@ -96,8 +96,8 @@ export default function VideoMeetComponent() {
   const chatContainerRef = useRef(null);
   const pendingIce = useRef({});
   
-  // --- STATE ---
-  const [loading, setLoading] = useState(true); // <--- KEY FIX: prevents rendering before init
+  // State
+  const [loading, setLoading] = useState(true);
   const [localStream, setLocalStream] = useState(null);
   const [socketInstance, setSocketInstance] = useState(null);
   const [askForUsername, setAskForUsername] = useState(false);
@@ -166,7 +166,7 @@ export default function VideoMeetComponent() {
                 } else {
                     setAskForUsername(true);
                 }
-                setLoading(false); // <--- Done loading
+                setLoading(false);
             }
         } catch (e) {
             console.error(e);
@@ -265,6 +265,10 @@ export default function VideoMeetComponent() {
     socketRef.current.on("passcode-required", () => { setIsInWaitingRoom(false); setShowPasscodeModal(true); setPasscodeError(true); socketRef.current.disconnect(); });
     socketRef.current.on("invalid-meeting", () => { addToast("Meeting not found!", "error"); setTimeout(cleanupAndLeave, 2000); });
     socketRef.current.on("meeting-ended", () => { if (!amIHost) { addToast("Host ended meeting", "error"); setTimeout(cleanupAndLeave, 1500); } });
+    socketRef.current.on("force-mute", () => { if (localStreamRef.current) localStreamRef.current.getAudioTracks()[0].enabled = false; setAudio(false); socketRef.current.emit("toggle-audio", { isMuted: true }); addToast("Host muted everyone", "info"); });
+    socketRef.current.on("force-stop-video", () => { if (localStreamRef.current) localStreamRef.current.getVideoTracks()[0].enabled = false; setVideo(false); socketRef.current.emit("toggle-video", { isVideoOff: true }); addToast("Host stopped all video", "info"); });
+    socketRef.current.on("update-host-id", (hostId) => setRoomHostId(hostId));
+    socketRef.current.on("lock-update", (isLocked) => { setIsMeetingLocked(isLocked); addToast(isLocked ? "Meeting Locked 🔒" : "Meeting Unlocked 🔓", "info"); });
   };
 
   const createPeer = (targetId) => {
@@ -291,6 +295,9 @@ export default function VideoMeetComponent() {
 
   const cleanupAndLeave = () => {
       if(localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
+      if(displayStreamRef.current) displayStreamRef.current.getTracks().forEach(t => t.stop());
+      if(audioContextRef.current) audioContextRef.current.close();
+      Object.values(connectionsRef.current).forEach(pc => pc.close());
       if(socketRef.current) { socketRef.current.emit("leave-room"); socketRef.current.disconnect(); }
       navigate("/");
   };
@@ -312,9 +319,19 @@ export default function VideoMeetComponent() {
   const handleAdmit = (id) => { socketRef.current.emit("admit-user", id); addToast("Admitted"); };
   const handleTileClick = (id) => setPinnedUserId(id === pinnedUserId ? null : id);
   const handleCopyLink = () => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); addToast("Link copied"); };
-  const handleDeviceChange = async (type, deviceId) => {
-      // (Simplified for brevity, use previous implementation if detailed switching needed)
-      setSelectedDevices(prev => ({...prev, [type]: deviceId}));
+  const handleDeviceChange = async (type, deviceId) => { setSelectedDevices(prev => ({...prev, [type]: deviceId})); };
+  
+  // --- ADDED MISSING FUNCTION ---
+  const toggleCaptions = () => {
+    if (!showCaptions) {
+        startListening();
+        setShowCaptions(true);
+        addToast("Captions enabled", "success");
+    } else {
+        stopListening();
+        setShowCaptions(false);
+        addToast("Captions disabled", "info");
+    }
   };
 
   useEffect(() => { if(chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight; }, [messages]);
