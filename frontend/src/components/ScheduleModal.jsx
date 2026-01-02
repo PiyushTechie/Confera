@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { X, Calendar, Clock, Type, Loader2 } from "lucide-react";
-import server from "../environment"; // Corrected Import path
+import { X, Calendar, Clock, Type, Loader2, CalendarDays } from "lucide-react";
+
+// Using the same environment variable pattern as ScheduledList for consistency
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
 export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdit }) {
   const [formData, setFormData] = useState({ title: "", date: "", time: "" });
@@ -35,6 +37,7 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
 
     try {
       const token = localStorage.getItem("token");
+      
       // Convert YYYY-MM-DD back to DD-MM-YYYY for backend
       const [year, month, day] = formData.date.split("-");
       const backendDate = `${day}-${month}-${year}`;
@@ -43,9 +46,9 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       if (meetingToEdit) {
-        await axios.put(`${server}/api/schedule/update/${meetingToEdit._id}`, payload, config);
+        await axios.put(`${BACKEND_URL}/api/v1/meeting/schedule/${meetingToEdit._id}`, payload, config);
       } else {
-        await axios.post(`${server}/api/schedule/create`, payload, config);
+        await axios.post(`${BACKEND_URL}/api/v1/meeting/schedule/create`, payload, config);
       }
 
       if (onSuccess) onSuccess();
@@ -53,7 +56,7 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
       setFormData({ title: "", date: "", time: "" }); // Reset
     } catch (error) {
       console.error("Schedule error:", error);
-      alert("Something went wrong. Please try again.");
+      alert("Something went wrong. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -63,85 +66,100 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+      {/* Backdrop with Blur */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
         onClick={onClose}
       />
 
-      {/* Modal Content */}
-      <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden transform transition-all scale-100">
+      {/* Modal Content - White Theme */}
+      <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl relative overflow-hidden transform transition-all scale-100 border border-slate-100">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-800/50">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            {meetingToEdit ? <Calendar className="text-blue-400" size={20}/> : <Calendar className="text-green-400" size={20}/>}
-            {meetingToEdit ? "Edit Meeting Details" : "Schedule New Meeting"}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              {meetingToEdit ? "Edit Meeting" : "Schedule Meeting"}
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              {meetingToEdit ? "Update your upcoming session details." : "Plan a new session for your team."}
+            </p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors"
+          >
             <X size={20} />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          
+          {/* Title Input */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <Type size={14} /> Meeting Title
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 ml-1">
+              <Type size={14} className="text-indigo-500" /> Meeting Title
             </label>
-            <input
-              name="title"
-              type="text"
-              required
-              className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-white placeholder-neutral-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              placeholder="e.g. Project Sprint Review"
-              value={formData.title}
-              onChange={handleChange}
-            />
+            <div className="relative group">
+              <input
+                name="title"
+                type="text"
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                placeholder="e.g. Weekly Sprint Sync"
+                value={formData.title}
+                onChange={handleChange}
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-5">
+            {/* Date Input */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                <Calendar size={14} /> Date
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 ml-1">
+                <CalendarDays size={14} className="text-indigo-500" /> Date
               </label>
               <input
                 name="date"
                 type="date"
                 required
-                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all [color-scheme:dark]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 value={formData.date}
                 onChange={handleChange}
                 min={new Date().toISOString().split("T")[0]}
               />
             </div>
             
+            {/* Time Input */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                <Clock size={14} /> Time
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 ml-1">
+                <Clock size={14} className="text-indigo-500" /> Time
               </label>
               <input
                 name="time"
                 type="time"
                 required
-                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all [color-scheme:dark]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 value={formData.time}
                 onChange={handleChange}
               />
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-all mt-2 ${
-              loading 
-                ? "bg-neutral-800 text-gray-400 cursor-not-allowed" 
-                : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/30 hover:shadow-blue-900/50"
-            }`}
-          >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : (meetingToEdit ? "Save Changes" : "Confirm Schedule")}
-          </button>
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg transform active:scale-95 ${
+                loading 
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none" 
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:-translate-y-0.5"
+              }`}
+            >
+              {loading ? <Loader2 className="animate-spin" size={20} /> : (meetingToEdit ? "Save Changes" : "Confirm Schedule")}
+            </button>
+          </div>
         </form>
       </div>
     </div>
