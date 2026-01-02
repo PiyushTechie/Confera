@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { X, Calendar, Clock, Type, Loader2, CalendarDays } from "lucide-react";
+import { X, Type, Loader2, CalendarDays, Clock } from "lucide-react";
 
-// Using the same environment variable pattern as ScheduledList for consistency
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+// Matches your backend URL
+const BACKEND_URL = "https://confera-backend-nixq.onrender.com";
 
 export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdit }) {
   const [formData, setFormData] = useState({ title: "", date: "", time: "" });
@@ -46,17 +46,20 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       if (meetingToEdit) {
-        await axios.put(`${BACKEND_URL}/api/v1/meeting/schedule/${meetingToEdit._id}`, payload, config);
+        // FIXED PATH: matches your previous snippet
+        await axios.put(`${BACKEND_URL}/api/schedule/update/${meetingToEdit._id}`, payload, config);
       } else {
-        await axios.post(`${BACKEND_URL}/api/v1/meeting/schedule/create`, payload, config);
+        // FIXED PATH: matches your previous snippet
+        await axios.post(`${BACKEND_URL}/api/schedule/create`, payload, config);
       }
 
       if (onSuccess) onSuccess();
       onClose();
-      setFormData({ title: "", date: "", time: "" }); // Reset
+      setFormData({ title: "", date: "", time: "" }); 
     } catch (error) {
       console.error("Schedule error:", error);
-      alert("Something went wrong. Please check your connection.");
+      // Show actual error message from backend if available
+      alert(error.response?.data?.message || "Something went wrong. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -66,16 +69,13 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop with Blur */}
       <div 
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" 
         onClick={onClose}
       />
 
-      {/* Modal Content - White Theme */}
       <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl relative overflow-hidden transform transition-all scale-100 border border-slate-100">
         
-        {/* Header */}
         <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
           <div>
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -93,10 +93,7 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          
-          {/* Title Input */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 ml-1">
               <Type size={14} className="text-indigo-500" /> Meeting Title
@@ -106,7 +103,7 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
                 name="title"
                 type="text"
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-all"
                 placeholder="e.g. Weekly Sprint Sync"
                 value={formData.title}
                 onChange={handleChange}
@@ -115,7 +112,6 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
           </div>
 
           <div className="grid grid-cols-2 gap-5">
-            {/* Date Input */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 ml-1">
                 <CalendarDays size={14} className="text-indigo-500" /> Date
@@ -124,14 +120,13 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
                 name="date"
                 type="date"
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium focus:outline-none focus:border-indigo-500 transition-all"
                 value={formData.date}
                 onChange={handleChange}
                 min={new Date().toISOString().split("T")[0]}
               />
             </div>
             
-            {/* Time Input */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2 ml-1">
                 <Clock size={14} className="text-indigo-500" /> Time
@@ -140,7 +135,7 @@ export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdi
                 name="time"
                 type="time"
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-800 font-medium focus:outline-none focus:border-indigo-500 transition-all"
                 value={formData.time}
                 onChange={handleChange}
               />
