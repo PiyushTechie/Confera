@@ -1594,6 +1594,276 @@ export default function VideoMeetComponent() {
                 </div>
               </>
             )}
+
+            {/* ---------------- RIGHT SIDEBAR ---------------- */}
+            {(showParticipants || showChat || showInfo) && (
+              <div className="fixed inset-0 z-40 bg-black/50 md:static md:w-80 md:bg-neutral-900 md:border-l md:border-neutral-800 flex flex-col md:h-auto md:translate-x-0">
+                {/* Mobile Overlay Closure */}
+                <div
+                  className="md:hidden flex-1"
+                  onClick={() => {
+                    setShowParticipants(false);
+                    setShowChat(false);
+                    setShowInfo(false);
+                  }}
+                />
+
+                <div className="bg-neutral-900 h-2/3 md:h-full w-full flex flex-col rounded-t-2xl md:rounded-none overflow-hidden">
+                  {/* Header */}
+                  <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
+                    <h3 className="font-bold text-lg">
+                      {showParticipants
+                        ? "Participants"
+                        : showChat
+                        ? "In-Call Messages"
+                        : "Meeting Details"}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowParticipants(false);
+                        setShowChat(false);
+                        setShowInfo(false);
+                      }}
+                      className="p-1 hover:bg-neutral-800 rounded-full"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* CONTENT: INFO */}
+                  {showInfo && (
+                    <div className="p-6 space-y-6">
+                      <div>
+                        <label className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                          Meeting Link
+                        </label>
+                        <div className="flex gap-2 mt-2">
+                          <div className="bg-neutral-800 p-3 rounded-lg text-sm text-gray-300 truncate flex-1">
+                            {window.location.href}
+                          </div>
+                          <button
+                            onClick={handleCopyLink}
+                            className="bg-blue-600 p-3 rounded-lg hover:bg-blue-700 text-white"
+                          >
+                            {copied ? <Check size={20} /> : <Copy size={20} />}
+                          </button>
+                        </div>
+                      </div>
+                      {passcode && (
+                        <div>
+                          <label className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                            Passcode
+                          </label>
+                          <div className="mt-2 bg-neutral-800 p-3 rounded-lg text-sm text-gray-300">
+                            {passcode}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* CONTENT: PARTICIPANTS */}
+                  {showParticipants && (
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                      {/* Waiting Room Section */}
+                      {amIHost && waitingUsers.length > 0 && (
+                        <div className="mb-4 bg-neutral-800 rounded-xl p-3 border border-yellow-600/30">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-yellow-500 uppercase">
+                              Waiting Room ({waitingUsers.length})
+                            </span>
+                          </div>
+                          {waitingUsers.map((u) => (
+                            <div
+                              key={u.socketId}
+                              className="flex items-center justify-between py-2"
+                            >
+                              <span className="text-sm font-medium">
+                                {u.username}
+                              </span>
+                              <button
+                                onClick={() => handleAdmit(u.socketId)}
+                                className="text-xs bg-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-700"
+                              >
+                                Admit
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Active Participants */}
+                      <div className="space-y-1">
+                        {/* Me */}
+                        <div className="flex items-center justify-between p-2 hover:bg-neutral-800 rounded-lg group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-xs">
+                              {userName.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {userName} (You)
+                              </p>
+                              <p className="text-[10px] text-gray-400">
+                                {amIHost ? "Host" : "Participant"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {audio ? (
+                              <Mic size={14} className="text-green-500" />
+                            ) : (
+                              <MicOff size={14} className="text-red-500" />
+                            )}
+                            {video ? (
+                              <Video size={14} className="text-white" />
+                            ) : (
+                              <VideoOff size={14} className="text-red-500" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Others */}
+                        {Object.values(userMap)
+                          .filter((u) => u.socketId !== socketRef.current?.id)
+                          .map((user) => (
+                            <div
+                              key={user.socketId}
+                              className="flex items-center justify-between p-2 hover:bg-neutral-800 rounded-lg group"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${getAvatarColor(
+                                    user.username
+                                  )}`}
+                                >
+                                  {user.username.charAt(0)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {user.username}
+                                  </p>
+                                  <p className="text-[10px] text-gray-400">
+                                    {user.socketId === roomHostId
+                                      ? "Host"
+                                      : "Participant"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {user.isHandRaised && (
+                                  <Hand
+                                    size={14}
+                                    className="text-yellow-500"
+                                  />
+                                )}
+                                {user.isMuted ? (
+                                  <MicOff size={14} className="text-red-500" />
+                                ) : (
+                                  <Mic size={14} className="text-gray-400" />
+                                )}
+                                {user.isVideoOff ? (
+                                  <VideoOff
+                                    size={14}
+                                    className="text-red-500"
+                                  />
+                                ) : (
+                                  <Video size={14} className="text-gray-400" />
+                                )}
+
+                                {amIHost && (
+                                  <div className="opacity-0 group-hover:opacity-100 flex gap-1 ml-2">
+                                    <button
+                                      onClick={() =>
+                                        handleKickUser(user.socketId)
+                                      }
+                                      title="Kick"
+                                      className="p-1 hover:bg-red-500/20 text-red-500 rounded"
+                                    >
+                                      <UserMinus size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleTransferHost(user.socketId)
+                                      }
+                                      title="Make Host"
+                                      className="p-1 hover:bg-yellow-500/20 text-yellow-500 rounded"
+                                    >
+                                      <Crown size={14} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CONTENT: CHAT */}
+                  {showChat && (
+                    <>
+                      <div
+                        ref={chatContainerRef}
+                        className="flex-1 overflow-y-auto p-4 space-y-4"
+                      >
+                        {messages.length === 0 && (
+                          <div className="text-center text-gray-500 text-sm mt-10">
+                            No messages yet.
+                          </div>
+                        )}
+                        {messages.map((m, i) => (
+                          <div
+                            key={i}
+                            className={`flex flex-col ${
+                              m.isMe ? "items-end" : "items-start"
+                            }`}
+                          >
+                            <div
+                              className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
+                                m.isMe
+                                  ? "bg-blue-600 text-white rounded-tr-none"
+                                  : "bg-neutral-800 text-gray-200 rounded-tl-none"
+                              }`}
+                            >
+                              <p className="font-bold text-[10px] opacity-50 mb-1">
+                                {m.sender}
+                              </p>
+                              {m.text}
+                            </div>
+                            <span className="text-[10px] text-gray-500 mt-1">
+                              {new Date(m.timestamp).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-4 border-t border-neutral-800">
+                        <div className="flex gap-2">
+                          <input
+                            className="flex-1 bg-neutral-800 border border-neutral-700 rounded-full px-4 text-sm focus:outline-none focus:border-blue-500"
+                            placeholder="Type a message..."
+                            value={currentMessage}
+                            onChange={(e) => setCurrentMessage(e.target.value)}
+                            onKeyDown={(e) =>
+                              e.key === "Enter" && handleSendMessage()
+                            }
+                          />
+                          <button
+                            onClick={handleSendMessage}
+                            className="bg-blue-600 p-2.5 rounded-full hover:bg-blue-700 text-white"
+                          >
+                            <Send size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* DESKTOP FOOTER */}
