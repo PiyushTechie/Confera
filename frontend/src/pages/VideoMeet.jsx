@@ -29,7 +29,6 @@ import {
   Settings,
   Volume2,
   Power,
-  Crown,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -41,16 +40,13 @@ import {
 } from "lucide-react";
 import server from "../environment";
 import useSpeechRecognition from "../hooks/useSpeechRecognition";
-
 const server_url = server;
-
 const peerConfig = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
   ],
 };
-
 /* --------------------- AVATAR HELPERS --------------------- */
 const getAvatarColor = (name) => {
   const colors = [
@@ -75,11 +71,9 @@ const getAvatarColor = (name) => {
   }
   return colors[Math.abs(hash) % colors.length];
 };
-
 const AvatarFallback = ({ username, className = "" }) => {
   const initial = (username || "Guest").charAt(0).toUpperCase();
   const colorClass = getAvatarColor(username || "Guest");
-
   return (
     <div
       className={`w-full h-full flex flex-col items-center justify-center bg-neutral-800/80 backdrop-blur-md ${className}`}
@@ -94,7 +88,6 @@ const AvatarFallback = ({ username, className = "" }) => {
     </div>
   );
 };
-
 /* --------------------- SMART VIDEO PLAYER --------------------- */
 const VideoPlayer = ({
   stream,
@@ -106,26 +99,20 @@ const VideoPlayer = ({
 }) => {
   const videoRef = useRef(null);
   const [isTrackMuted, setIsTrackMuted] = useState(false);
-
   useEffect(() => {
     const videoEl = videoRef.current;
     if (videoEl && stream) {
       videoEl.srcObject = stream;
       videoEl.play().catch((e) => console.warn("Autoplay blocked", e));
-
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        // Initial check: if track is disabled or muted, show avatar
         setIsTrackMuted(!videoTrack.enabled || videoTrack.muted);
-
         const handleMute = () => setIsTrackMuted(true);
         const handleUnmute = () => setIsTrackMuted(false);
         const handleEnded = () => setIsTrackMuted(true);
-
         videoTrack.addEventListener("mute", handleMute);
         videoTrack.addEventListener("unmute", handleUnmute);
         videoTrack.addEventListener("ended", handleEnded);
-
         return () => {
           videoTrack.removeEventListener("mute", handleMute);
           videoTrack.removeEventListener("unmute", handleUnmute);
@@ -136,7 +123,6 @@ const VideoPlayer = ({
       setIsTrackMuted(true);
     }
   }, [stream]);
-
   useEffect(() => {
     if (
       videoRef.current &&
@@ -148,11 +134,9 @@ const VideoPlayer = ({
         .catch((err) => console.warn("Audio Sink Error:", err));
     }
   }, [audioOutputId]);
-
   if (isTrackMuted) {
     return <AvatarFallback username={username} className={className} />;
   }
-
   return (
     <video
       ref={videoRef}
@@ -163,12 +147,10 @@ const VideoPlayer = ({
     />
   );
 };
-
 export default function VideoMeetComponent() {
   const navigate = useNavigate();
   const location = useLocation();
   const { url: meetingCode } = useParams();
-
   const {
     bypassLobby = false,
     isAudioOn = true,
@@ -177,36 +159,30 @@ export default function VideoMeetComponent() {
     isHost = false,
     passcode = null,
   } = location.state || {};
-
   const socketRef = useRef(null);
   const socketIdRef = useRef(null);
   const connectionsRef = useRef({});
   const localStreamRef = useRef(null);
-
   const [localStream, setLocalStream] = useState(null);
   const [socketInstance, setSocketInstance] = useState(null);
   const displayStreamRef = useRef(null);
   const chatContainerRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioAnalysersRef = useRef({});
-
   const [askForUsername, setAskForUsername] = useState(false);
   const [userName, setUsername] = useState(username || "Guest");
   const [video, setVideo] = useState(isVideoOn ?? true);
   const [audio, setAudio] = useState(isAudioOn ?? true);
   const [screen, setScreen] = useState(false);
-
   const [videos, setVideos] = useState([]);
   const [userMap, setUserMap] = useState({});
   const [isInWaitingRoom, setIsInWaitingRoom] = useState(false);
   const [waitingUsers, setWaitingUsers] = useState([]);
   const [roomHostId, setRoomHostId] = useState(null);
-
   const amIHost =
     roomHostId && socketIdRef.current
       ? roomHostId === socketIdRef.current
       : isHost;
-
   const [showSettings, setShowSettings] = useState(false);
   const [devices, setDevices] = useState({
     audioInputs: [],
@@ -219,49 +195,40 @@ export default function VideoMeetComponent() {
     audioOutput: "",
   });
   const [isAudioConnected, setIsAudioConnected] = useState(true);
-
   const [viewMode, setViewMode] = useState("GRID");
   const [activeSpeakerId, setActiveSpeakerId] = useState(null);
   const [pinnedUserId, setPinnedUserId] = useState(null);
   const [gridPage, setGridPage] = useState(0);
   const GRID_PAGE_SIZE = 4;
-
   const [showInfo, setShowInfo] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [unreadMessages, setUnreadMessages] = useState(0);
-
   const [isMeetingLocked, setIsMeetingLocked] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState("");
   const [passcodeError, setPasscodeError] = useState(false);
-
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojis, setActiveEmojis] = useState({});
-
   const [showCaptions, setShowCaptions] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
   const [toasts, setToasts] = useState([]);
   const [remoteCaption, setRemoteCaption] = useState(null);
-
   const {
     startListening,
     stopListening,
     captions: localCaption,
   } = useSpeechRecognition(socketInstance, meetingCode, userName);
-
   const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "👏", "🎉"];
   const pendingIce = useRef({});
-
   /* --------------------- TOAST SYSTEM --------------------- */
   const addToast = (msg, type = "info") => {
     const id = Date.now();
@@ -271,7 +238,6 @@ export default function VideoMeetComponent() {
       4000
     );
   };
-
   /* --------------------- ACTIONS (RECORDING/CAPTIONS) --------------------- */
   const handleToggleRecord = () => {
     if (isRecording) {
@@ -281,14 +247,11 @@ export default function VideoMeetComponent() {
     } else {
       const stream = displayStreamRef.current || localStreamRef.current;
       if (!stream) return addToast("No stream to record", "error");
-
       const options = { mimeType: "video/webm; codecs=vp9" };
       const mediaRecorder = new MediaRecorder(stream, options);
-
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) recordedChunksRef.current.push(event.data);
       };
-
       mediaRecorder.onstop = () => {
         const blob = new Blob(recordedChunksRef.current, {
           type: "video/webm",
@@ -303,13 +266,11 @@ export default function VideoMeetComponent() {
         window.URL.revokeObjectURL(url);
         recordedChunksRef.current = [];
       };
-
       mediaRecorder.start();
       setIsRecording(true);
       addToast("Recording started", "info");
     }
   };
-
   const toggleCaptions = () => {
     if (!showCaptions) {
       startListening();
@@ -321,7 +282,6 @@ export default function VideoMeetComponent() {
       addToast("Captions disabled", "info");
     }
   };
-
   /* --------------------- MEDIA --------------------- */
   const getMedia = async () => {
     try {
@@ -342,7 +302,6 @@ export default function VideoMeetComponent() {
       addToast("Camera/Mic access denied", "error");
     }
   };
-
   const getDeviceList = async () => {
     try {
       const deviceInfos = await navigator.mediaDevices.enumerateDevices();
@@ -355,7 +314,6 @@ export default function VideoMeetComponent() {
       console.error("Error fetching devices:", err);
     }
   };
-
   const handleDeviceChange = async (type, deviceId) => {
     setSelectedDevices((prev) => ({ ...prev, [type]: deviceId }));
     if (type === "audioOutput") return;
@@ -367,7 +325,6 @@ export default function VideoMeetComponent() {
     };
     if (type === "audioInput" && video) constraints.video = true;
     if (type === "videoInput" && isAudioConnected) constraints.audio = true;
-
     try {
       const newStream = await navigator.mediaDevices.getUserMedia(constraints);
       const newTrack =
@@ -400,7 +357,6 @@ export default function VideoMeetComponent() {
       console.error("Device switch failed", err);
     }
   };
-
   const toggleAudioConnection = async () => {
     if (isAudioConnected) {
       localStreamRef.current.getAudioTracks().forEach((t) => {
@@ -409,7 +365,7 @@ export default function VideoMeetComponent() {
       });
       setIsAudioConnected(false);
       setAudio(false);
-      socketRef.current.emit("toggle-audio", { isMuted: true });
+      socketRef.current?.emit("toggle-audio", { isMuted: true });
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -431,13 +387,12 @@ export default function VideoMeetComponent() {
         });
         setIsAudioConnected(true);
         setAudio(true);
-        socketRef.current.emit("toggle-audio", { isMuted: false });
+        socketRef.current?.emit("toggle-audio", { isMuted: false });
       } catch (e) {
         console.error("Audio Reconnect Failed", e);
       }
     }
   };
-
   /* ------------------ ACTIVE SPEAKER ------------------ */
   useEffect(() => {
     if (!audioContextRef.current) return;
@@ -464,7 +419,6 @@ export default function VideoMeetComponent() {
       if (!currentSocketIds.includes(id)) delete audioAnalysersRef.current[id];
     });
   }, [videos]);
-
   useEffect(() => {
     const interval = setInterval(() => {
       if (!audioContextRef.current) return;
@@ -490,7 +444,6 @@ export default function VideoMeetComponent() {
     }, 500);
     return () => clearInterval(interval);
   }, [activeSpeakerId]);
-
   /* ------------------ SOCKET & PEER ------------------ */
   const createPeer = (targetId) => {
     const pc = new RTCPeerConnection(peerConfig);
@@ -520,7 +473,6 @@ export default function VideoMeetComponent() {
     };
     return pc;
   };
-
   const initiateOffer = async (targetId) => {
     const pc = connectionsRef.current[targetId];
     if (!pc) return;
@@ -536,20 +488,16 @@ export default function VideoMeetComponent() {
       console.error(err);
     }
   };
-
   const connectSocket = () => {
     if (socketRef.current && socketRef.current.connected) return;
-
     const token = localStorage.getItem("token");
     socketRef.current = io(server_url, {
       auth: { token: token },
       transports: ["websocket", "polling"],
     });
-
     socketRef.current.on("connect", () => {
       setSocketInstance(socketRef.current);
       socketIdRef.current = socketRef.current.id;
-
       const payload = {
         path: meetingCode,
         username: userName,
@@ -557,7 +505,6 @@ export default function VideoMeetComponent() {
         isVideoOff: !video,
         isMuted: !audio,
       };
-
       if (isHost) {
         socketRef.current.emit("join-call", payload);
       } else {
@@ -565,7 +512,6 @@ export default function VideoMeetComponent() {
         setIsInWaitingRoom(true);
       }
     });
-
     socketRef.current.on("connect_error", (err) => {
       console.error("Socket Connection Error:", err.message);
       if (
@@ -575,7 +521,6 @@ export default function VideoMeetComponent() {
         addToast("Connection refused: " + err.message, "error");
       }
     });
-
     socketRef.current.on("passcode-required", () => {
       setIsInWaitingRoom(false);
       setShowPasscodeModal(true);
@@ -586,14 +531,12 @@ export default function VideoMeetComponent() {
       addToast("Meeting not found!", "error");
       setTimeout(cleanupAndLeave, 2000);
     });
-
     socketRef.current.on("meeting-ended", () => {
       if (!amIHost) {
         addToast("Host ended the meeting.", "error");
         setTimeout(cleanupAndLeave, 1500);
       }
     });
-
     socketRef.current.on("force-mute", () => {
       if (localStreamRef.current) {
         const t = localStreamRef.current.getAudioTracks()[0];
@@ -603,7 +546,6 @@ export default function VideoMeetComponent() {
       }
       addToast("Host muted everyone", "info");
     });
-
     socketRef.current.on("force-stop-video", () => {
       if (localStreamRef.current) {
         const t = localStreamRef.current.getVideoTracks()[0];
@@ -614,7 +556,6 @@ export default function VideoMeetComponent() {
       addToast("Host stopped all video", "info");
     });
     socketRef.current.on("update-host-id", (hostId) => setRoomHostId(hostId));
-
     socketRef.current.on("lock-update", (isLocked) => {
       setIsMeetingLocked(isLocked);
       addToast(
@@ -623,7 +564,6 @@ export default function VideoMeetComponent() {
       );
       if (navigator.vibrate) navigator.vibrate(200);
     });
-
     socketRef.current.on("admitted", () => {
       setIsInWaitingRoom(false);
       socketRef.current.emit("join-call", {
@@ -649,20 +589,16 @@ export default function VideoMeetComponent() {
       initiateOffer(user.socketId);
       addToast(`${user.username} joined`, "info");
     });
-
     socketRef.current.on("hand-toggled", ({ socketId, isRaised, username }) => {
       if (socketId === socketRef.current.id) setIsHandRaised(isRaised);
-
       if (isRaised && socketId !== socketRef.current.id) {
         addToast(`${username || "Someone"} raised their hand ✋`, "info");
       }
-
       setUserMap((prev) => ({
         ...prev,
         [socketId]: { ...prev[socketId], isHandRaised: isRaised },
       }));
     });
-
     socketRef.current.on("audio-toggled", ({ socketId, isMuted }) => {
       setUserMap((prev) => ({
         ...prev,
@@ -685,14 +621,12 @@ export default function VideoMeetComponent() {
         });
       }, 3000);
     });
-
     socketRef.current.on("receive-caption", (data) => {
       if (showCaptions) {
         setRemoteCaption(data);
         setTimeout(() => setRemoteCaption(null), 4000);
       }
     });
-
     socketRef.current.on("signal", async (fromId, msg) => {
       const signal = JSON.parse(msg);
       let pc = connectionsRef.current[fromId];
@@ -738,7 +672,6 @@ export default function VideoMeetComponent() {
       setMessages((prev) => [...prev, { ...data, isMe }]);
     });
   };
-
   const cleanupAndLeave = () => {
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -746,27 +679,22 @@ export default function VideoMeetComponent() {
     if (displayStreamRef.current) {
       displayStreamRef.current.getTracks().forEach((t) => t.stop());
     }
-
     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
       audioContextRef.current.close();
     }
     audioContextRef.current = null;
-
     Object.values(connectionsRef.current).forEach((pc) => pc.close());
-
     if (socketRef.current) {
       socketRef.current.emit("leave-room");
       socketRef.current.disconnect();
     }
-
     navigate("/");
   };
-
   /* ------------------ ACTIONS ------------------ */
   const handleToggleHand = () => {
     const newState = !isHandRaised;
     setIsHandRaised(newState);
-    socketRef.current.emit("toggle-hand", { isRaised: newState });
+    socketRef.current?.emit("toggle-hand", { isRaised: newState });
     if (isMobile) setShowMobileMenu(false);
   };
   const handleSendEmoji = (emoji) => {
@@ -780,7 +708,7 @@ export default function VideoMeetComponent() {
         return newState;
       });
     }, 3000);
-    socketRef.current.emit("send-emoji", { emoji });
+    socketRef.current?.emit("send-emoji", { emoji });
   };
   const handleSendMessage = () => {
     if (!currentMessage.trim() || !socketRef.current) return;
@@ -802,51 +730,46 @@ export default function VideoMeetComponent() {
       connectSocket();
     }
   };
-
   const handleToggleLock = () => {
-    socketRef.current.emit("toggle-lock");
+    socketRef.current?.emit("toggle-lock");
     if (isMobile) setShowMobileMenu(false);
   };
-
   const handleTransferHost = (targetId) => {
     if (
       window.confirm("Make this user the Host? You will lose admin controls.")
     ) {
-      socketRef.current.emit("transfer-host", targetId);
+      socketRef.current?.emit("transfer-host", targetId);
       addToast("Host transferred", "success");
     }
   };
-
   const handleKickUser = (targetId) => {
     if (window.confirm("Remove this participant?")) {
-      socketRef.current.emit("kick-user", targetId);
+      socketRef.current?.emit("kick-user", targetId);
       addToast("User removed", "error");
     }
   };
   const handleMuteAll = () => {
     if (window.confirm("Mute everyone?")) {
-      socketRef.current.emit("mute-all");
+      socketRef.current?.emit("mute-all");
       addToast("Muted everyone", "info");
     }
   };
   const handleStopVideoAll = () => {
     if (window.confirm("Stop everyone's video?")) {
-      socketRef.current.emit("stop-video-all");
+      socketRef.current?.emit("stop-video-all");
       addToast("Stopped all videos", "info");
     }
   };
-
   const handleEndCall = () => {
     if (amIHost) {
       if (window.confirm("Do you want to end the meeting for everyone?")) {
-        socketRef.current.emit("end-meeting-for-all");
+        socketRef.current?.emit("end-meeting-for-all");
         setTimeout(() => cleanupAndLeave(), 100);
       }
     } else {
       cleanupAndLeave();
     }
   };
-
   const handleScreen = async () => {
     if (isMobile) {
       addToast("Not supported on mobile.", "error");
@@ -879,16 +802,14 @@ export default function VideoMeetComponent() {
       setScreen(false);
     }
   };
-
   const handleVideo = () => {
     const track = localStreamRef.current?.getVideoTracks()[0];
     if (track) {
       track.enabled = !video;
       setVideo(!video);
-      socketRef.current.emit("toggle-video", { isVideoOff: video });
+      socketRef.current?.emit("toggle-video", { isVideoOff: video });
     }
   };
-
   const handleAudio = () => {
     if (!isAudioConnected) {
       setShowSettings(true);
@@ -898,12 +819,11 @@ export default function VideoMeetComponent() {
     if (track) {
       track.enabled = !audio;
       setAudio(!audio);
-      socketRef.current.emit("toggle-audio", { isMuted: audio });
+      socketRef.current?.emit("toggle-audio", { isMuted: audio });
     }
   };
-
   const handleAdmit = (socketId) => {
-    socketRef.current.emit("admit-user", socketId);
+    socketRef.current?.emit("admit-user", socketId);
     addToast("User admitted", "success");
   };
   const handleTileClick = (id) => {
@@ -916,10 +836,8 @@ export default function VideoMeetComponent() {
     setTimeout(() => setCopied(false), 2000);
     addToast("Link copied to clipboard", "success");
   };
-
   useEffect(() => {
     let isMounted = true;
-
     getMedia().then(() => {
       if (isMounted) {
         if (bypassLobby || (username && username !== "Guest")) {
@@ -929,10 +847,8 @@ export default function VideoMeetComponent() {
         }
       }
     });
-
     return () => {
       isMounted = false;
-
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -947,17 +863,18 @@ export default function VideoMeetComponent() {
       }
     };
   }, []);
-
   useEffect(() => {
-    if (chatContainerRef.current)
+    if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop =
         chatContainerRef.current.scrollHeight;
+    }
     if (
       !showChat &&
       messages.length > 0 &&
       !messages[messages.length - 1].isMe
-    )
+    ) {
       setUnreadMessages((prev) => prev + 1);
+    }
   }, [messages]);
   useEffect(() => {
     if (showChat) setUnreadMessages(0);
@@ -976,7 +893,6 @@ export default function VideoMeetComponent() {
     setAskForUsername(false);
     connectSocket();
   };
-
   const getMainSocketId = () => {
     if (pinnedUserId) return pinnedUserId;
     if (
@@ -989,14 +905,13 @@ export default function VideoMeetComponent() {
     return "local";
   };
 
+  /* ------------------ RENDER FUNCTIONS ------------------ */
   const renderMainSpotlight = () => {
     const mainId = getMainSocketId();
     const isLocal = mainId === "local" || mainId === socketIdRef.current;
     const emojiToShow =
       activeEmojis[mainId] || (isLocal && activeEmojis[socketIdRef.current]);
-
     let user, stream, isCamOff, displayName, isThisHost;
-
     if (isLocal) {
       user = {
         username: userName,
@@ -1016,12 +931,10 @@ export default function VideoMeetComponent() {
       displayName = user.username;
       isThisHost = mainId === roomHostId;
     }
-
     if (isCamOff) {
       return (
         <div className="relative w-full h-full flex items-center justify-center bg-black/90">
           <AvatarFallback username={displayName} />
-
           {showCaptions && (remoteCaption || localCaption) && (
             <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-40">
               <p className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">
@@ -1032,9 +945,7 @@ export default function VideoMeetComponent() {
               </p>
             </div>
           )}
-
           <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
-            {/* MIC STATUS INDICATOR */}
             <div className="mr-2">
               {user.isMuted ? (
                 <MicOff size={16} className="text-red-500" />
@@ -1044,12 +955,9 @@ export default function VideoMeetComponent() {
                 <Mic size={16} className="text-white/70" />
               )}
             </div>
-
             <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
               {displayName}
-              {isThisHost && (
-                <Crown size={16} className="text-yellow-400 fill-yellow-400" />
-              )}
+              {isThisHost && <span className="text-yellow-400 text-sm">(Host)</span>}
             </span>
             {user.isHandRaised && (
               <Hand size={20} className="text-yellow-500 animate-pulse" />
@@ -1068,7 +976,6 @@ export default function VideoMeetComponent() {
         </div>
       );
     }
-
     return (
       <div className="relative w-full h-full flex items-center justify-center bg-black/90">
         <VideoPlayer
@@ -1079,7 +986,6 @@ export default function VideoMeetComponent() {
           audioOutputId={selectedDevices.audioOutput}
           username={displayName}
         />
-
         {showCaptions && (remoteCaption || localCaption) && (
           <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-40">
             <p className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">
@@ -1090,9 +996,7 @@ export default function VideoMeetComponent() {
             </p>
           </div>
         )}
-
         <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
-          {/* MIC STATUS INDICATOR */}
           <div className="mr-2">
             {user.isMuted ? (
               <MicOff size={16} className="text-red-500" />
@@ -1102,12 +1006,9 @@ export default function VideoMeetComponent() {
               <Mic size={16} className="text-white/70" />
             )}
           </div>
-
           <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
             {displayName}
-            {isThisHost && (
-              <Crown size={16} className="text-yellow-400 fill-yellow-400" />
-            )}
+            {isThisHost && <span className="text-yellow-400 text-sm">(Host)</span>}
           </span>
           {user.isHandRaised && (
             <Hand size={20} className="text-yellow-500 animate-pulse" />
@@ -1139,7 +1040,6 @@ export default function VideoMeetComponent() {
         mainId === "local" ? socketIdRef.current || "local" : mainId;
       return pId !== mId;
     });
-
     return stripParticipants.map((p) => {
       const pId = p.isLocal ? socketIdRef.current || "local" : p.socketId;
       const user = p.isLocal
@@ -1153,7 +1053,6 @@ export default function VideoMeetComponent() {
       const isCamOff = user.isVideoOff;
       const displayName = p.isLocal ? `${userName} (You)` : user.username;
       const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
-
       return (
         <div
           key={pId}
@@ -1179,7 +1078,6 @@ export default function VideoMeetComponent() {
             />
           )}
           <div className="absolute bottom-1 left-1 bg-black/60 px-1.5 rounded text-[10px] truncate max-w-[90%] flex items-center gap-1">
-            {/* MIC INDICATOR */}
             {user.isMuted ? (
               <MicOff size={10} className="text-red-500" />
             ) : activeSpeakerId === pId ? (
@@ -1188,9 +1086,7 @@ export default function VideoMeetComponent() {
               <Mic size={10} className="text-white/70" />
             )}
             {displayName}
-            {isThisHost && (
-              <Crown size={10} className="text-yellow-400 fill-yellow-400" />
-            )}
+            {isThisHost && <span className="text-yellow-400 text-[8px]">(Host)</span>}
           </div>
           {user.isHandRaised && (
             <div className="absolute top-1 right-1 text-yellow-500">
@@ -1207,26 +1103,18 @@ export default function VideoMeetComponent() {
       { socketId: "local", stream: localStream, isLocal: true },
       ...videos.map((v) => ({ ...v, isLocal: false })),
     ];
-
-    // FIX: Define totalPages so pagination buttons work on desktop
     const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
-
-    // Mobile: Auto scroll, no pagination limits
     const visibleParticipants = isMobile
       ? allParticipants
       : allParticipants.slice(
           gridPage * GRID_PAGE_SIZE,
           (gridPage + 1) * GRID_PAGE_SIZE
         );
-
     const count = visibleParticipants.length;
     let gridClass = "grid-cols-1";
-
-    // Zoom-style layouts
     if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
     if (count >= 3) gridClass = "grid-cols-2";
     if (!isMobile && count >= 5) gridClass = "grid-cols-2 lg:grid-cols-3";
-
     return (
       <div className="relative w-full h-full bg-black p-2 flex flex-col items-center overflow-y-auto pb-28">
         <div
@@ -1252,14 +1140,12 @@ export default function VideoMeetComponent() {
             const emojiToShow =
               activeEmojis[p.socketId] ||
               (p.isLocal && activeEmojis[socketIdRef.current]);
-
             const showCaptionOnThisTile =
               showCaptions &&
               ((p.isLocal && localCaption) ||
                 (!p.isLocal &&
                   remoteCaption &&
                   remoteCaption.username === user.username));
-
             return (
               <div
                 key={pId}
@@ -1283,7 +1169,6 @@ export default function VideoMeetComponent() {
                     username={displayName}
                   />
                 )}
-
                 {showCaptionOnThisTile && (
                   <div className="absolute bottom-10 left-2 right-2 bg-black/70 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-center transition-all animate-in slide-in-from-bottom-2 z-40">
                     <p className="text-white text-xs md:text-sm font-medium leading-tight">
@@ -1291,32 +1176,19 @@ export default function VideoMeetComponent() {
                     </p>
                   </div>
                 )}
-
-                {/* Name Label with higher Z-index */}
                 <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1 z-50 max-w-[85%] truncate">
-                  {/* MIC INDICATOR */}
                   <div className="mr-1">
                     {user.isMuted ? (
                       <MicOff size={12} className="text-red-500" />
                     ) : activeSpeakerId === pId ? (
-                      <Mic
-                        size={12}
-                        className="text-green-500 animate-pulse"
-                      />
+                      <Mic size={12} className="text-green-500 animate-pulse" />
                     ) : (
                       <Mic size={12} className="text-white/70" />
                     )}
                   </div>
-
                   <span className="truncate">{displayName}</span>
-                  {isThisHost && (
-                    <Crown
-                      size={10}
-                      className="text-yellow-400 fill-yellow-400 flex-shrink-0"
-                    />
-                  )}
+                  {isThisHost && <span className="text-yellow-400 text-[10px]">(Host)</span>}
                 </div>
-
                 {user.isHandRaised && (
                   <div className="absolute top-2 right-2 bg-yellow-500 p-1.5 rounded-full text-black shadow-lg animate-bounce z-50">
                     <Hand size={14} />
@@ -1333,7 +1205,6 @@ export default function VideoMeetComponent() {
             );
           })}
         </div>
-
         {!isMobile && totalPages > 1 && (
           <>
             {gridPage > 0 && (
@@ -1594,18 +1465,145 @@ export default function VideoMeetComponent() {
                 </div>
               </>
             )}
+
+            {/* PARTICIPANTS PANEL */}
+            {showParticipants && (
+              <div className="fixed inset-y-0 right-0 w-80 bg-neutral-900 border-l border-neutral-800 z-50 flex flex-col">
+                <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                  <h3 className="font-bold text-lg">
+                    Participants ({Object.keys(userMap).length + 1})
+                  </h3>
+                  <button onClick={() => setShowParticipants(false)}>
+                    <X size={24} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {/* Local user */}
+                  <div className="flex items-center gap-3 p-3 bg-neutral-800 rounded-lg">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                      {userName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        {userName} (You){amIHost && " (Host)"}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {audio ? "Mic on" : "Muted"} • {video ? "Cam on" : "Cam off"}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Remote users */}
+                  {Object.values(userMap).map((user) => (
+                    <div key={user.socketId} className="flex items-center justify-between p-3 bg-neutral-800 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full ${getAvatarColor(user.username)} flex items-center justify-center text-white font-bold`}>
+                          {user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {user.username}
+                            {user.socketId === roomHostId && " (Host)"}
+                          </p>
+                          <div className="flex gap-2 text-xs text-gray-400">
+                            {user.isMuted ? "🔇" : "🎤"}
+                            {user.isVideoOff ? "📹 off" : "📹 on"}
+                            {user.isHandRaised && " ✋"}
+                          </div>
+                        </div>
+                      </div>
+                      {amIHost && user.socketId !== socketIdRef.current && (
+                        <button
+                          onClick={() => handleKickUser(user.socketId)}
+                          className="text-red-400"
+                        >
+                          <UserMinus size={18} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* Waiting room for host */}
+                {amIHost && waitingUsers.length > 0 && (
+                  <div className="p-4 border-t border-neutral-800">
+                    <p className="text-sm font-bold mb-2">Waiting ({waitingUsers.length})</p>
+                    {waitingUsers.map((u) => (
+                      <div key={u.socketId} className="flex justify-between items-center p-2 bg-neutral-800 rounded mb-2">
+                        <span>{u.username}</span>
+                        <button
+                          onClick={() => handleAdmit(u.socketId)}
+                          className="text-green-400"
+                        >
+                          <UserCheck size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CHAT PANEL */}
+            {showChat && (
+              <div className="fixed inset-y-0 right-0 w-80 bg-neutral-900 border-l border-neutral-800 z-50 flex flex-col">
+                <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                  <h3 className="font-bold text-lg">Chat</h3>
+                  <button onClick={() => setShowChat(false)}>
+                    <X size={24} />
+                  </button>
+                </div>
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex ${msg.isMe ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                          msg.isMe ? "bg-blue-600" : "bg-neutral-800"
+                        }`}
+                      >
+                        {!msg.isMe && (
+                          <p className="text-xs text-gray-400 mb-1">{msg.sender}</p>
+                        )}
+                        <p>{msg.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }}
+                  className="p-4 border-t border-neutral-800 flex gap-2"
+                >
+                  <input
+                    type="text"
+                    value={currentMessage}
+                    onChange={(e) => setCurrentMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-neutral-800 rounded-full px-4 py-2 outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!currentMessage.trim()}
+                    className="bg-blue-600 disabled:opacity-50 rounded-full p-2"
+                  >
+                    <Send size={20} />
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
 
           {/* DESKTOP FOOTER */}
           <div className="hidden md:flex h-20 bg-neutral-900 border-t border-neutral-800 items-center justify-center z-20 px-4 gap-4 relative">
-            {/* ... desktop buttons ... */}
             <button
               onClick={() => setShowSettings(true)}
               className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 absolute left-4"
             >
               <Settings size={24} />
             </button>
-
             <button
               onClick={handleAudio}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1619,7 +1617,6 @@ export default function VideoMeetComponent() {
               </div>
               <span className="text-[10px] text-gray-400 font-medium">Mic</span>
             </button>
-
             <button
               onClick={handleVideo}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1633,7 +1630,6 @@ export default function VideoMeetComponent() {
               </div>
               <span className="text-[10px] text-gray-400 font-medium">Cam</span>
             </button>
-
             <button
               onClick={handleToggleHand}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1651,8 +1647,6 @@ export default function VideoMeetComponent() {
                 Hand
               </span>
             </button>
-
-            {/* Emoji Picker */}
             <div className="relative">
               <button
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -1679,7 +1673,6 @@ export default function VideoMeetComponent() {
                 </div>
               )}
             </div>
-
             <button
               onClick={handleScreen}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1695,8 +1688,6 @@ export default function VideoMeetComponent() {
                 Share
               </span>
             </button>
-
-            {/* CAPTION & RECORD BUTTONS */}
             <button
               onClick={toggleCaptions}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1715,7 +1706,6 @@ export default function VideoMeetComponent() {
                 Caps
               </span>
             </button>
-
             <button
               onClick={handleToggleRecord}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1732,7 +1722,6 @@ export default function VideoMeetComponent() {
               </div>
               <span className="text-[10px] text-gray-400 font-medium">Rec</span>
             </button>
-
             <button
               onClick={handleEndCall}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1742,8 +1731,6 @@ export default function VideoMeetComponent() {
               </div>
               <span className="text-[10px] text-red-500 font-bold">End</span>
             </button>
-
-            {/* LOCK BUTTON */}
             <button
               onClick={handleToggleLock}
               className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1762,7 +1749,6 @@ export default function VideoMeetComponent() {
                 {isMeetingLocked ? "Unlock" : "Lock"}
               </span>
             </button>
-
             <div className="absolute right-6 gap-3 flex">
               <button
                 onClick={() => setShowInfo(!showInfo)}
@@ -1775,7 +1761,7 @@ export default function VideoMeetComponent() {
                 className="p-3 rounded-xl bg-neutral-800 relative"
               >
                 <Users size={24} />
-                {amIHost && waitingUsers && waitingUsers.length > 0 && (
+                {amIHost && waitingUsers.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     {waitingUsers.length}
                   </span>
@@ -1795,7 +1781,7 @@ export default function VideoMeetComponent() {
             </div>
           </div>
 
-          {/* MOBILE SLIDER (FOOTER) */}
+          {/* MOBILE FOOTER */}
           <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center justify-between px-4 z-50">
             <div className="flex w-full items-center justify-between overflow-x-auto no-scrollbar gap-6 px-2">
               <button
@@ -1811,7 +1797,6 @@ export default function VideoMeetComponent() {
                 </div>
                 <span className="text-[10px] text-gray-400">Mic</span>
               </button>
-
               <button
                 onClick={handleVideo}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1825,7 +1810,6 @@ export default function VideoMeetComponent() {
                 </div>
                 <span className="text-[10px] text-gray-400">Cam</span>
               </button>
-
               <button
                 onClick={handleToggleHand}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1841,7 +1825,6 @@ export default function VideoMeetComponent() {
                 </div>
                 <span className="text-[10px] text-gray-400">Hand</span>
               </button>
-
               <button
                 onClick={() => setShowChat(!showChat)}
                 className="flex flex-col items-center gap-1 min-w-[50px] relative"
@@ -1854,7 +1837,6 @@ export default function VideoMeetComponent() {
                 )}
                 <span className="text-[10px] text-gray-400">Chat</span>
               </button>
-
               <button
                 onClick={() => setShowParticipants(!showParticipants)}
                 className="flex flex-col items-center gap-1 min-w-[50px] relative"
@@ -1867,7 +1849,6 @@ export default function VideoMeetComponent() {
                 )}
                 <span className="text-[10px] text-gray-400">People</span>
               </button>
-
               <button
                 onClick={handleScreen}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1877,15 +1858,10 @@ export default function VideoMeetComponent() {
                     screen ? "bg-blue-600" : "bg-neutral-800"
                   }`}
                 >
-                  {screen ? (
-                    <MonitorOff size={24} />
-                  ) : (
-                    <ScreenShare size={24} />
-                  )}
+                  {screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}
                 </div>
                 <span className="text-[10px] text-gray-400">Share</span>
               </button>
-
               <button
                 onClick={toggleCaptions}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1901,7 +1877,6 @@ export default function VideoMeetComponent() {
                 </div>
                 <span className="text-[10px] text-gray-400">Caps</span>
               </button>
-
               <button
                 onClick={handleToggleRecord}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1917,7 +1892,6 @@ export default function VideoMeetComponent() {
                 </div>
                 <span className="text-[10px] text-gray-400">Rec</span>
               </button>
-
               <button
                 onClick={() => setShowMobileMenu(true)}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1927,7 +1901,6 @@ export default function VideoMeetComponent() {
                 </div>
                 <span className="text-[10px] text-gray-400">More</span>
               </button>
-
               <button
                 onClick={handleEndCall}
                 className="flex flex-col items-center gap-1 min-w-[50px]"
@@ -1956,7 +1929,6 @@ export default function VideoMeetComponent() {
                     <X size={24} />
                   </button>
                 </div>
-
                 <button
                   onClick={() => {
                     setShowInfo(true);
@@ -1966,7 +1938,6 @@ export default function VideoMeetComponent() {
                 >
                   <Info size={24} /> Meeting Info
                 </button>
-
                 {amIHost && (
                   <>
                     <button
@@ -1994,16 +1965,11 @@ export default function VideoMeetComponent() {
                       }}
                       className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"
                     >
-                      {isMeetingLocked ? (
-                        <Unlock size={24} />
-                      ) : (
-                        <Lock size={24} />
-                      )}{" "}
+                      {isMeetingLocked ? <Unlock size={24} /> : <Lock size={24} />}
                       {isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}
                     </button>
                   </>
                 )}
-
                 <div className="flex justify-between bg-neutral-800 p-4 rounded-xl">
                   {EMOJI_LIST.map((emoji) => (
                     <button
