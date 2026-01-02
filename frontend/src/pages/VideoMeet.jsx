@@ -167,7 +167,9 @@ const VideoPlayer = ({
 export default function VideoMeetComponent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { url: meetingCode } = useParams();
+  const { url: meetingCodeParam } = useParams();
+  // CLEAN THE MEETING CODE: Remove extra spaces to ensure devices join the exact same room
+  const meetingCode = meetingCodeParam ? meetingCodeParam.trim() : "";
 
   const {
     bypassLobby = false,
@@ -562,7 +564,9 @@ export default function VideoMeetComponent() {
         socketRef.current.emit("join-call", payload);
       } else {
         socketRef.current.emit("request-join", payload);
-        setIsInWaitingRoom(true);
+        // We set waiting room in the connect() function to avoid flicker,
+        // but redundant safety check here:
+        if (!amIHost) setIsInWaitingRoom(true);
       }
     });
 
@@ -974,6 +978,8 @@ export default function VideoMeetComponent() {
   }, []);
   const connect = () => {
     setAskForUsername(false);
+    // Explicitly set waiting room state before socket connection for new devices (guests)
+    if (!isHost) setIsInWaitingRoom(true);
     connectSocket();
   };
 
@@ -1648,6 +1654,10 @@ export default function VideoMeetComponent() {
                             {copied ? <Check size={20} /> : <Copy size={20} />}
                           </button>
                         </div>
+                        {/* Display the internal Room Code to help debug room mismatch */}
+                        <p className="text-[10px] text-gray-500 mt-2 text-center">
+                          Room ID: {meetingCode}
+                        </p>
                       </div>
                       {passcode && (
                         <div>
