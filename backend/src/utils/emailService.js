@@ -3,10 +3,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Create API instance
 const apiInstance = new TransactionalEmailsApi();
 
-// Set the API key correctly
 apiInstance.authentications['apiKey'].apiKey = process.env.BREVO_API_KEY;
 
 if (!process.env.BREVO_API_KEY) {
@@ -20,7 +18,7 @@ const sendEmail = async (toEmail, subject, htmlContent) => {
   sendSmtpEmail.htmlContent = htmlContent;
   sendSmtpEmail.sender = {
     name: "Confera Team",
-    email: "confera.noreply@gmail.com" // CHANGE THIS — see below
+    email: "confera.noreply@gmail.com"
   };
   sendSmtpEmail.to = [{ email: toEmail }];
 
@@ -33,7 +31,7 @@ const sendEmail = async (toEmail, subject, htmlContent) => {
     if (error.body) {
       console.error('Brevo error response:', error.body);
     }
-    throw error; // Re-throw so controller can catch it
+    throw error;
   }
 };
 
