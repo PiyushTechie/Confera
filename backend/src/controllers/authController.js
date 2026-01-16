@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/user.js';
 import sendEmail from '../utils/emailService.js';
 
-// Helper: Generate and Save OTP
 const generateAndSaveOtp = async (user) => {
   const otp = otpGenerator.generate(6, {
     upperCaseAlphabets: false,
@@ -22,8 +21,6 @@ const generateAndSaveOtp = async (user) => {
   return otp;
 };
 
-// --- CONTROLLERS ---
-
 export const sendOtp = async (req, res) => {
   const { email } = req.body;
 
@@ -39,8 +36,7 @@ export const sendOtp = async (req, res) => {
   try {
     let user = await User.findOne({ email });
 
-    // Create temporary user if doesn't exist
-    if (!user) {
+  if (!user) {
       user = new User({
         email,
         isVerified: false
@@ -49,7 +45,6 @@ export const sendOtp = async (req, res) => {
       console.log(`Temporary user created for signup: ${email}`);
     }
 
-    // Prevent spam if already verified and no active OTP
     if (user.isVerified && !user.otp) {
       return res.status(400).json({ message: "Email already verified. Please log in." });
     }
@@ -94,7 +89,6 @@ export const verifyOtp = async (req, res) => {
     const isMatch = await bcrypt.compare(otp, user.otp);
     if (!isMatch) return res.status(400).json({ message: "Invalid OTP" });
 
-    // Clear OTP and mark verified
     user.otp = undefined;
     user.otpExpires = undefined;
     user.isVerified = true;
@@ -122,7 +116,6 @@ export const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user || !user.isVerified) {
-      // Security: don't reveal existence
       return res.status(200).json({ message: "If account exists, reset OTP has been sent." });
     }
 
