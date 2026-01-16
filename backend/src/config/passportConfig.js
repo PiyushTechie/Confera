@@ -1,6 +1,6 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { User } from "../models/user.js"; // Ensure capitalization matches your file (User.js)
+import { User } from "../models/user.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -29,18 +29,16 @@ passport.use(
                 if (!user) {
                     user = new User({
                         name: profile.displayName,
-                        username: email, // Using email as username for Google users
-                        email: email,    // <--- CRITICAL: Save the actual email field
-                        password: "",    // No password for Google users
-                        isVerified: true // <--- CRITICAL: Auto-verify Google users
+                        username: email, 
+                        email: email,    
+                        password: "",    
+                        isVerified: true 
                     });
                     await user.save();
                 } else {
-                    // Optional: If user exists but isVerified is false (and emails match), 
-                    // verify them now since they proved ownership via Google.
                     if (!user.isVerified) {
                         user.isVerified = true;
-                        if (!user.email) user.email = email; // Backfill email if missing
+                        if (!user.email) user.email = email;
                         await user.save();
                     }
                 }
