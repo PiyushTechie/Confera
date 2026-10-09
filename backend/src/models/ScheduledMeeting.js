@@ -4,8 +4,8 @@ const scheduledMeetingSchema = new mongoose.Schema({
   title: { type: String, required: true },
   hostId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   meetingCode: { type: String, required: true, unique: true },
-  date: { type: String, required: true }, // Format: "YYYY-MM-DD"
-  time: { type: String, required: true }, // Format: "HH:mm"
+  date: { type: String, required: true },
+  time: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
 });
 

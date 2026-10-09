@@ -9,7 +9,7 @@ const ScheduledList = ({ refreshTrigger, onEditClick, onRefresh, onOpenSchedule,
     const [copiedId, setCopiedId] = useState(null);
     const navigate = useNavigate();
 
-    const BACKEND_URL = "https://confera-backend-nixq.onrender.com";
+    const BACKEND_URL = "http://localhost:8000";
 
     useEffect(() => {
         fetchScheduledMeetings();

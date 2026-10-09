@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// Fixed: Removed /api from the path
-const API_URL = 'https://confera-backend-nixq.onrender.com/auth';
+const API_URL = 'http://localhost:8000/auth';
 
 export const sendOtp = async (email) => {
   return await axios.post(`${API_URL}/send-otp`, { email });

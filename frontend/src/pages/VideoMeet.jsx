@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import io from "socket.io-client";
+import { Toaster, toast } from "react-hot-toast";
 import {
   Mic,
   MicOff,
@@ -14,213 +15,356 @@ import {
   X,
   Send,
   Copy,
-  Check,
   Users,
-  ShieldAlert,
-  UserMinus,
   Lock,
   Hand,
   Smile,
   Unlock,
   Pin,
-  Settings,
-  Volume2,
-  Power,
   Crown,
   ChevronLeft,
   ChevronRight,
   Loader2,
-  MoreHorizontal,
+  MoreVertical,
   Captions,
   Disc,
+  LogOut,
+  ChevronUp,
+  Check,
+  BarChart2,
+  PenTool,
+  Layers,
+  BatteryCharging,
+  Shield,
+  UserPlus,
+  ShieldAlert,
+  Keyboard,
+  Search,
+  Video as VideoIcon,
+  Volume2,
+  Settings,
+  AlertTriangle,
 } from "lucide-react";
 import server from "../environment";
 import useSpeechRecognition from "../hooks/useSpeechRecognition";
-
+import waitingIllustration from "../assets/waiting-illustration.png";
 const server_url = server;
+import { MediasoupClient } from "../lib/MediasoupClient";
 
-const peerConfig = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ],
-};
-
-/* --------------------- AVATAR HELPERS --------------------- */
-const getAvatarColor = (name) => {
+const getUserColor = (socketId = "") => {
   const colors = [
-    "bg-red-600", "bg-orange-600", "bg-amber-600", "bg-green-600",
-    "bg-emerald-600", "bg-teal-600", "bg-cyan-600", "bg-blue-600",
-    "bg-indigo-600", "bg-violet-600", "bg-purple-600", "bg-fuchsia-600",
-    "bg-pink-600", "bg-rose-600",
+    "#22c55e",
+    "#3b82f6",
+    "#a855f7",
+    "#ec4899",
+    "#f97316",
+    "#14b8a6",
   ];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
+  for (let i = 0; i < socketId.length; i++)
+    hash = socketId.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
 };
 
-const AvatarFallback = ({ username, className = "" }) => {
-  const initial = (username || "Guest").charAt(0).toUpperCase();
-  const colorClass = getAvatarColor(username || "Guest");
-
-  return (
-    <div className={`w-full h-full flex flex-col items-center justify-center bg-neutral-800/80 backdrop-blur-md ${className}`}>
-      <div className={`${colorClass} rounded-full flex items-center justify-center text-white font-bold shadow-2xl aspect-square w-[35%] max-w-[150px] min-w-[80px] border-4 border-white/10`}>
-        <span className="text-[clamp(2rem,6vw,5rem)] leading-none">{initial}</span>
-      </div>
-    </div>
-  );
+const getAvatarColor = (name) => {
+  const colors = [
+    "bg-red-600",
+    "bg-orange-600",
+    "bg-amber-600",
+    "bg-green-600",
+    "bg-emerald-600",
+    "bg-teal-600",
+    "bg-cyan-600",
+    "bg-blue-600",
+    "bg-indigo-600",
+    "bg-violet-600",
+    "bg-purple-600",
+    "bg-fuchsia-600",
+    "bg-pink-600",
+    "bg-rose-600",
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++)
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
 };
 
-/* --------------------- SMART VIDEO PLAYER --------------------- */
-const VideoPlayer = ({ stream, isLocal, isMirrored, className, audioOutputId, username }) => {
-  const videoRef = useRef(null);
-  const [isTrackMuted, setIsTrackMuted] = useState(false);
 
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (videoEl && stream) {
-      videoEl.srcObject = stream;
-      videoEl.play().catch((e) => console.warn("Autoplay blocked", e));
+const ToggleSwitch = ({ checked, onChange }) => (
+  <button
+    onClick={onChange}
+    className={`w-10 h-5 rounded-full relative transition-colors duration-200 ease-in-out cursor-pointer ${checked ? "bg-[#8ab4f8]" : "bg-[#5f6368]"}`}
+  >
+    <div
+      className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-transform duration-200 ${checked ? "translate-x-6" : "translate-x-1"}`}
+    ></div>
+  </button>
+);
 
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        setIsTrackMuted(!videoTrack.enabled || videoTrack.muted);
+import AvatarFallback from "../components/Meeting/AvatarFallback";
+import VideoPlayer from "../components/Meeting/VideoPlayer";
+import WaitingRoom from "../components/Meeting/WaitingRoom";
+import CollaborativeWhiteboard from "../components/Meeting/CollaborativeWhiteboard";
+import { MeetingContext } from "../../contexts/MeetingContext";
+import LeftMeetingScreen from "../components/Meeting/Screens/LeftMeetingScreen";
+import JoinMeetingScreen from "../components/Meeting/Screens/JoinMeetingScreen";
+import PasscodeModal from "../components/Meeting/Screens/PasscodeModal";
+import ParticipantsPanel from "../components/Meeting/Sidebars/ParticipantsPanel";
+import ChatPanel from "../components/Meeting/Sidebars/ChatPanel";
+import InfoPanel from "../components/Meeting/Sidebars/InfoPanel";
+import HostControlsPanel from "../components/Meeting/Sidebars/HostControlsPanel";
+import BottomControlBar from "../components/Meeting/BottomControlBar";
+import VideoGrid from "../components/Meeting/Grid/VideoGrid";
 
-        const handleMute = () => setIsTrackMuted(true);
-        const handleUnmute = () => setIsTrackMuted(false);
-        const handleEnded = () => setIsTrackMuted(true);
-
-        videoTrack.addEventListener("mute", handleMute);
-        videoTrack.addEventListener("unmute", handleUnmute);
-        videoTrack.addEventListener("ended", handleEnded);
-
-        return () => {
-          videoTrack.removeEventListener("mute", handleMute);
-          videoTrack.removeEventListener("unmute", handleUnmute);
-          videoTrack.removeEventListener("ended", handleEnded);
-        };
-      }
-    } else if (!stream) {
-      setIsTrackMuted(true);
-    }
-  }, [stream]);
-
-  useEffect(() => {
-    if (videoRef.current && audioOutputId && typeof videoRef.current.setSinkId === "function") {
-      videoRef.current.setSinkId(audioOutputId).catch((err) => console.warn("Audio Sink Error:", err));
-    }
-  }, [audioOutputId]);
-
-  if (isTrackMuted) {
-    return <AvatarFallback username={username} className={className} />;
-  }
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      muted={isLocal}
-      playsInline
-      className={`${className} ${isMirrored ? "-scale-x-100" : ""}`}
-    />
-  );
-};
 
 export default function VideoMeetComponent() {
   const navigate = useNavigate();
   const location = useLocation();
   const { url: meetingCodeParam } = useParams();
-  // 1. SANITIZE: Remove extra spaces to match rooms correctly
-  const meetingCode = meetingCodeParam ? meetingCodeParam.trim() : "";
+  const meetingCode = meetingCodeParam
+    ? meetingCodeParam.trim().toLowerCase()
+    : "";
 
   const {
     bypassLobby = false,
     isAudioOn = true,
     isVideoOn = true,
     username = "Guest",
-    isHost = false,
     passcode = null,
+    isGuest = false,
+    isHost = false,
   } = location.state || {};
-
+  const hasToken = Boolean(localStorage.getItem("token"));
   const socketRef = useRef(null);
   const socketIdRef = useRef(null);
   const connectionsRef = useRef({});
   const localStreamRef = useRef(null);
-
   const [localStream, setLocalStream] = useState(null);
   const [socketInstance, setSocketInstance] = useState(null);
   const displayStreamRef = useRef(null);
   const chatContainerRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioAnalysersRef = useRef({});
-
   const [askForUsername, setAskForUsername] = useState(false);
-  const [userName, setUsername] = useState(username || "Guest");
+  const [userName, setUsername] = useState(() => {
+    if (hasToken && (!username || username === "Guest")) return "User";
+    return username || "Guest";
+  });
+  const isMountedRef = useRef(true);
   const [video, setVideo] = useState(isVideoOn ?? true);
   const [audio, setAudio] = useState(isAudioOn ?? true);
   const [screen, setScreen] = useState(false);
-
   const [videos, setVideos] = useState([]);
   const [userMap, setUserMap] = useState({});
+  const userMapRef = useRef(userMap);
+  useEffect(() => {
+    userMapRef.current = userMap;
+  }, [userMap]);
   const [isInWaitingRoom, setIsInWaitingRoom] = useState(false);
   const [waitingUsers, setWaitingUsers] = useState([]);
   const [roomHostId, setRoomHostId] = useState(null);
-
-  const amIHost = roomHostId && socketIdRef.current ? roomHostId === socketIdRef.current : isHost;
-
+  const [amIHost, setAmIHost] = useState(isHost || false);
   const [showSettings, setShowSettings] = useState(false);
-  const [devices, setDevices] = useState({ audioInputs: [], videoInputs: [], audioOutputs: [] });
-  const [selectedDevices, setSelectedDevices] = useState({ audioInput: "", videoInput: "", audioOutput: "" });
+  const [devices, setDevices] = useState({
+    audioInputs: [],
+    videoInputs: [],
+    audioOutputs: [],
+  });
+  const [selectedDevices, setSelectedDevices] = useState({
+    audioInput: location.state?.selectedAudioInput || "",
+    videoInput: location.state?.selectedVideoInput || "",
+    audioOutput: "",
+  });
   const [isAudioConnected, setIsAudioConnected] = useState(true);
-
-  const [viewMode, setViewMode] = useState("GRID");
   const [activeSpeakerId, setActiveSpeakerId] = useState(null);
   const [pinnedUserId, setPinnedUserId] = useState(null);
   const [gridPage, setGridPage] = useState(0);
-  const GRID_PAGE_SIZE = 4;
-
+  const GRID_PAGE_SIZE = 16;
+  const [isAskingToJoin, setIsAskingToJoin] = useState(false);
+  
+  // UI Toggles
   const [showInfo, setShowInfo] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showHostSidebar, setShowHostSidebar] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showPolls, setShowPolls] = useState(false);
+  const [showWhiteboard, setShowWhiteboard] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [activeDropdown, setActiveDropdown] = useState(null);
+
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [unreadMessages, setUnreadMessages] = useState(0);
-
   const [isMeetingLocked, setIsMeetingLocked] = useState(false);
+  const [isScreenShareLocked, setIsScreenShareLocked] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState("");
   const [passcodeError, setPasscodeError] = useState(false);
-
   const [isHandRaised, setIsHandRaised] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojis, setActiveEmojis] = useState({});
-
   const [showCaptions, setShowCaptions] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
-  const [toasts, setToasts] = useState([]);
   const [remoteCaption, setRemoteCaption] = useState(null);
+  const [handQueue, setHandQueue] = useState([]);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [activeReactions, setActiveReactions] = useState({});
+  const [floatingReactions, setFloatingReactions] = useState([]);
+  const [isAudioOnly, setIsAudioOnly] = useState(false);
+  const [showMeetingReadyCard, setShowMeetingReadyCard] = useState(true);
+  const [hasLeftMeeting, setHasLeftMeeting] = useState(false);
+  const [countdown, setCountdown] = useState(60);
 
-  const { startListening, stopListening, captions: localCaption } = useSpeechRecognition(socketInstance, meetingCode, userName);
+  const addFloatingReaction = (emoji, socketId) => {
+    const senderName = socketId === "Me" ? "You" : userMapRef.current[socketId]?.username || "Someone";
+    const id = Date.now() + Math.random();
+    const leftPos = Math.floor(Math.random() * 20) + 5;
+    setFloatingReactions((prevReactions) => [...prevReactions, { id, emoji, senderName, left: leftPos }]);
+    setTimeout(() => {
+      setFloatingReactions((prevReactions) => prevReactions.filter((r) => r.id !== id));
+    }, 4000);
+  };
+  const {
+    startListening,
+    stopListening,
+    captions: localCaption,
+  } = useSpeechRecognition(socketInstance, meetingCode, userName);
   const EMOJI_LIST = ["👍", "❤️", "😂", "😮", "👏", "🎉"];
+  const getRoomId = () => meetingCode.trim().toLowerCase();
   const pendingIce = useRef({});
+  const roomHostIdRef = useRef(null);
+  const screenRef = useRef(false);           
+  const isAudioConnectedRef = useRef(true);
+  const mediasoupClientRef = useRef(null);
+  const [showLeaveMenu, setShowLeaveMenu] = useState(false);
+  const [activePoll, setActivePoll] = useState(null);
+  const [isCreatingPoll, setIsCreatingPoll] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState(["", ""]);
+  const [hasVoted, setHasVoted] = useState(false);
+  
+  
+  
+  
+const amIHostRef = useRef(amIHost);
+const waitingUsersRef = useRef(waitingUsers);
 
-  /* --------------------- TOAST SYSTEM --------------------- */
-  const addToast = (msg, type = "info") => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, msg, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+useEffect(() => {
+  amIHostRef.current = amIHost;
+}, [amIHost]);
+
+useEffect(() => {
+  waitingUsersRef.current = waitingUsers;
+}, [waitingUsers]);
+
+  const [securitySettings, setSecuritySettings] = useState({
+    isMeetingLocked: false,
+    isScreenShareLocked: false,
+    isChatLocked: false,
+    isMicLocked: false,
+    isCamLocked: false,
+    isReactionsLocked: false,
+    isWhiteboardLocked: false,
+  });
+
+  const toggleSecuritySetting = (settingKey) => {
+    if (!amIHost) return;
+    const newSettings = { ...securitySettings, [settingKey]: !securitySettings[settingKey] };
+    setSecuritySettings(newSettings);
+    
+    if (socketRef.current) {
+      socketRef.current.emit("update-security", newSettings);
+    }
   };
 
-  /* --------------------- ACTIONS (RECORDING/CAPTIONS) --------------------- */
+  const [confirmAction, setConfirmAction] = useState(null);
+
+  useEffect(() => {
+    roomHostIdRef.current = roomHostId;
+  }, [roomHostId]);
+  
+
+  const getCurrentTime = () =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const addToast = (msg, type = "info") => {
+    switch (type) {
+      case "error":
+        toast.error(msg);
+        break;
+      case "success":
+        toast.success(msg);
+        break;
+      default:
+        toast(msg, { icon: "ℹ️" });
+        break;
+    }
+  };
+
+  const togglePiP = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        const videoElements = Array.from(document.getElementsByTagName("video"));
+        
+        if (videoElements.length > 0) {
+          const targetVideo = videoElements.find(v => !v.muted) || videoElements[0];
+          await targetVideo.requestPictureInPicture();
+          
+          setShowMoreMenu(false);
+        } else {
+          addToast("No video available to pop out", "error");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      addToast("PiP failed: Your browser might block this action", "error");
+    }
+  };
+
+  const toggleAudioOnly = () => {
+    const newState = !isAudioOnly;
+    setIsAudioOnly(newState);
+    setVideos((prev) =>
+      prev.map((v) => {
+        if (v.stream && !v.isLocal) {
+          v.stream.getVideoTracks().forEach((t) => (t.enabled = !newState));
+        }
+        return v;
+      }),
+    );
+    addToast(newState ? "Audio Only Mode Active" : "Video Enabled", "info");
+  };
+
+  const handleToggleWhiteboard = (open = true) => {
+    if (typeof open !== "boolean") open = true;
+    if (open && !amIHost && securitySettings.isWhiteboardLocked) {
+      addToast("The host has disabled the whiteboard.", "error");
+      return;
+    }
+    setShowMoreMenu(false);
+    try {
+      const roomId = meetingCode.trim().toLowerCase();
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("whiteboard-toggle", { roomId, isOpen: open });
+      }
+    } catch (e) {
+      console.warn("Whiteboard toggle emit failed", e);
+    }
+    setShowWhiteboard(open);
+  };
+
+  const handleSpotlightUser = (targetId) => {
+    if (amIHost) {
+      socketRef.current.emit("spotlight-user", targetId);
+    }
+  };
+
   const handleToggleRecord = () => {
     if (isRecording) {
       mediaRecorderRef.current.stop();
@@ -229,16 +373,15 @@ export default function VideoMeetComponent() {
     } else {
       const stream = displayStreamRef.current || localStreamRef.current;
       if (!stream) return addToast("No stream to record", "error");
-
       const options = { mimeType: "video/webm; codecs=vp9" };
       const mediaRecorder = new MediaRecorder(stream, options);
-
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) recordedChunksRef.current.push(event.data);
       };
-
       mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+        const blob = new Blob(recordedChunksRef.current, {
+          type: "video/webm",
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.style.display = "none";
@@ -249,13 +392,11 @@ export default function VideoMeetComponent() {
         window.URL.revokeObjectURL(url);
         recordedChunksRef.current = [];
       };
-
       mediaRecorder.start();
       setIsRecording(true);
       addToast("Recording started", "info");
     }
   };
-
   const toggleCaptions = () => {
     if (!showCaptions) {
       startListening();
@@ -267,23 +408,35 @@ export default function VideoMeetComponent() {
       addToast("Captions disabled", "info");
     }
   };
-
-  /* --------------------- MEDIA --------------------- */
   const getMedia = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const isMobileDevice = /Mobi|Android|iPhone/i.test(navigator.userAgent) || window.innerWidth < 768;
+      const videoConstraints = isMobileDevice 
+        ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } }
+        : true;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: selectedDevices.videoInput ? { ...(isMobileDevice ? videoConstraints : {}), deviceId: { exact: selectedDevices.videoInput } } : videoConstraints,
+        audio: selectedDevices.audioInput ? { deviceId: { exact: selectedDevices.audioInput } } : true,
+      });
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       if (!video) stream.getVideoTracks().forEach((t) => (t.enabled = false));
       if (!audio) stream.getAudioTracks().forEach((t) => (t.enabled = false));
       localStreamRef.current = stream;
       setLocalStream(stream);
-      if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioContextRef.current)
+        audioContextRef.current = new (
+          window.AudioContext || window.webkitAudioContext
+        )();
       await getDeviceList();
     } catch (err) {
       console.error("Media error:", err);
       addToast("Camera/Mic access denied", "error");
     }
   };
-
   const getDeviceList = async () => {
     try {
       const deviceInfos = await navigator.mediaDevices.enumerateDevices();
@@ -296,37 +449,52 @@ export default function VideoMeetComponent() {
       console.error("Error fetching devices:", err);
     }
   };
-
+  
   const handleDeviceChange = async (type, deviceId) => {
-    setSelectedDevices((prev) => ({ ...prev, [type]: deviceId }));
-    if (type === "audioOutput") return;
-    const constraints = {
-      audio: type === "audioInput" ? { deviceId: { exact: deviceId } } : undefined,
-      video: type === "videoInput" ? { deviceId: { exact: deviceId } } : undefined,
-    };
-    if (type === "audioInput" && video) constraints.video = true;
-    if (type === "videoInput" && isAudioConnected) constraints.audio = true;
+  setSelectedDevices((prev) => ({ ...prev, [type]: deviceId }));
+  if (type === "audioOutput") return;
 
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      const newTrack = type === "audioInput" ? newStream.getAudioTracks()[0] : newStream.getVideoTracks()[0];
-      const oldTrack = type === "audioInput" ? localStreamRef.current.getAudioTracks()[0] : localStreamRef.current.getVideoTracks()[0];
-      if (oldTrack) {
-        localStreamRef.current.removeTrack(oldTrack);
-        oldTrack.stop();
-      }
-      localStreamRef.current.addTrack(newTrack);
-      setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
-      Object.values(connectionsRef.current).forEach((pc) => {
-        const sender = pc.getSenders().find((s) => s.track && s.track.kind === (type === "audioInput" ? "audio" : "video"));
-        if (sender) sender.replaceTrack(newTrack);
-      });
-      if (type === "audioInput") newTrack.enabled = audio;
-      if (type === "videoInput") newTrack.enabled = video;
-    } catch (err) {
-      console.error("Device switch failed", err);
-    }
+  const isMobileDevice = /Mobi|Android|iPhone/i.test(navigator.userAgent) || window.innerWidth < 768;
+  const videoConstraints = isMobileDevice ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } } : {};
+
+  const constraints = {
+    audio: type === "audioInput" ? { deviceId: { exact: deviceId } } : undefined,
+    video: type === "videoInput" ? { ...videoConstraints, deviceId: { exact: deviceId } } : undefined,
   };
+
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+    const newTrack =
+      type === "audioInput"
+        ? newStream.getAudioTracks()[0]
+        : newStream.getVideoTracks()[0];
+
+    if (type === "audioInput") newTrack.enabled = audio;
+    if (type === "videoInput") newTrack.enabled = video;
+
+    const oldTrack =
+      type === "audioInput"
+        ? localStreamRef.current.getAudioTracks()[0]
+        : localStreamRef.current.getVideoTracks()[0];
+
+    if (oldTrack) {
+      localStreamRef.current.removeTrack(oldTrack);
+      oldTrack.stop();
+    }
+
+    localStreamRef.current.addTrack(newTrack);
+    setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+
+    Object.values(connectionsRef.current).forEach((pc) => {
+      const sender = pc.getSenders().find(
+        (s) => s.track && s.track.kind === (type === "audioInput" ? "audio" : "video")
+      );
+      if (sender) sender.replaceTrack(newTrack);
+    });
+  } catch (err) {
+    console.error("Device switch failed", err);
+  }
+};
 
   const toggleAudioConnection = async () => {
     if (isAudioConnected) {
@@ -335,22 +503,32 @@ export default function VideoMeetComponent() {
         t.stop();
       });
       setIsAudioConnected(false);
+      isAudioConnectedRef.current = false;
       setAudio(false);
       socketRef.current.emit("toggle-audio", { isMuted: true });
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { deviceId: selectedDevices.audioInput ? { exact: selectedDevices.audioInput } : undefined },
+          audio: {
+            deviceId: selectedDevices.audioInput
+              ? { exact: selectedDevices.audioInput }
+              : undefined,
+          },
         });
-        const newTrack = stream.getAudioTracks()[0];
+        const newTrack = stream.getAudioTracks();
         localStreamRef.current.addTrack(newTrack);
         setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
         Object.values(connectionsRef.current).forEach((pc) => {
-          const sender = pc.getSenders().find((s) => s.track && s.track.kind === "audio");
-          if (sender) sender.replaceTrack(newTrack);
-          else pc.addTrack(newTrack, localStreamRef.current);
+          const audioTrack = Array.isArray(newTrack) ? newTrack[0] : newTrack;
+        const sender = pc
+          .getSenders()
+          .find((s) => s.track && s.track.kind === "audio");
+
+        if (sender) sender.replaceTrack(audioTrack);
+        else pc.addTrack(audioTrack, localStreamRef.current);
         });
         setIsAudioConnected(true);
+        isAudioConnectedRef.current = true;
         setAudio(true);
         socketRef.current.emit("toggle-audio", { isMuted: false });
       } catch (e) {
@@ -359,13 +537,64 @@ export default function VideoMeetComponent() {
     }
   };
 
-  /* ------------------ ACTIVE SPEAKER ------------------ */
+  useEffect(() => {
+    if (!socketRef.current) return;
+
+    const handleSecurityUpdate = (newSettings) => {
+      setSecuritySettings(newSettings);
+      if (amIHost) return;
+
+      if (newSettings.isMicLocked && audio) {
+        const track = localStreamRef.current?.getAudioTracks()[0];
+        if (track) track.enabled = false;
+        setAudio(false);
+        socketRef.current.emit("toggle-audio", { isMuted: true });
+        addToast("Host muted all microphones", "error");
+      }
+      
+      if (newSettings.isCamLocked && video) {
+        const track = localStreamRef.current?.getVideoTracks()[0];
+        if (track) track.enabled = false;
+        setVideo(false);
+        socketRef.current.emit("toggle-video", { isVideoOff: true });
+        addToast("Host disabled all cameras", "error");
+      }
+
+      if (newSettings.isScreenShareLocked && screen) {
+        displayStreamRef.current?.getTracks().forEach((t) => t.stop());
+        displayStreamRef.current = null;
+        const camTrack = localStreamRef.current?.getVideoTracks()[0];
+        Object.values(connectionsRef.current).forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
+          if (sender && camTrack) sender.replaceTrack(camTrack);
+        });
+        setScreen(false);
+        if (pinnedUserId === "local" || pinnedUserId === socketRef.current.id) {
+          setPinnedUserId(null);
+          socketRef.current.emit("spotlight-user", null);
+        }
+        addToast("Host disabled screen sharing", "error");
+      }
+    };
+
+    socketRef.current.on("security-updated", handleSecurityUpdate);
+    return () => socketRef.current.off("security-updated", handleSecurityUpdate);
+  }, [audio, video, screen, amIHost, pinnedUserId]);
+
+
   useEffect(() => {
     if (!audioContextRef.current) return;
     videos.forEach((v) => {
-      if (v.stream && v.stream.active && v.stream.getAudioTracks().length > 0 && !audioAnalysersRef.current[v.socketId]) {
+      if (
+        v.stream &&
+        v.stream.active &&
+        v.stream.getAudioTracks().length > 0 &&
+        !audioAnalysersRef.current[v.socketId]
+      ) {
         try {
-          const source = audioContextRef.current.createMediaStreamSource(v.stream);
+          const source = audioContextRef.current.createMediaStreamSource(
+            v.stream,
+          );
           const analyser = audioContextRef.current.createAnalyser();
           analyser.fftSize = 512;
           source.connect(analyser);
@@ -378,96 +607,125 @@ export default function VideoMeetComponent() {
       if (!currentSocketIds.includes(id)) delete audioAnalysersRef.current[id];
     });
   }, [videos]);
+  
+  useEffect(() => {
+    if (localCaption && socketRef.current) {
+      socketRef.current.emit("send-caption", {
+        roomId: meetingCode.trim().toLowerCase(),
+        caption: localCaption,
+        username: userName,
+      });
+    }
+  }, [localCaption, meetingCode, userName]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (!audioContextRef.current) return;
       let maxVolume = 0;
       let loudestSpeaker = null;
-      Object.entries(audioAnalysersRef.current).forEach(([socketId, analyser]) => {
-        try {
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-          const volume = sum / dataArray.length;
-          if (volume > 20 && volume > maxVolume) {
-            maxVolume = volume;
-            loudestSpeaker = socketId;
-          }
-        } catch (e) {}
-      });
-      if (loudestSpeaker && loudestSpeaker !== activeSpeakerId) setActiveSpeakerId(loudestSpeaker);
+      Object.entries(audioAnalysersRef.current).forEach(
+        ([socketId, analyser]) => {
+          try {
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const volume = sum / dataArray.length;
+            if (volume > 20 && volume > maxVolume) {
+              maxVolume = volume;
+              loudestSpeaker = socketId;
+            }
+          } catch (e) {}
+        },
+      );
+      if (loudestSpeaker && loudestSpeaker !== activeSpeakerId)
+        setActiveSpeakerId(loudestSpeaker);
     }, 500);
     return () => clearInterval(interval);
   }, [activeSpeakerId]);
 
-  /* ------------------ SOCKET & PEER ------------------ */
-  const createPeer = (targetId) => {
-    const pc = new RTCPeerConnection(peerConfig);
-    pc.targetId = targetId;
-    connectionsRef.current[targetId] = pc;
-    const videoTrack = screen && displayStreamRef.current ? displayStreamRef.current.getVideoTracks()[0] : localStreamRef.current?.getVideoTracks()[0];
-    const audioTrack = localStreamRef.current?.getAudioTracks()[0];
-    if (videoTrack) pc.addTrack(videoTrack, localStreamRef.current);
-    if (audioTrack && isAudioConnected) pc.addTrack(audioTrack, localStreamRef.current);
-    pc.onicecandidate = (e) => {
-      if (e.candidate) socketRef.current.emit("signal", targetId, JSON.stringify({ ice: e.candidate }));
-    };
-    pc.ontrack = (e) => {
-      setVideos((prev) => {
-        if (prev.some((v) => v.socketId === pc.targetId)) return prev;
-        return [...prev, { socketId: pc.targetId, stream: e.streams[0] }];
-      });
-    };
-    return pc;
-  };
-
-  const initiateOffer = async (targetId) => {
-    const pc = connectionsRef.current[targetId];
-    if (!pc) return;
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socketRef.current.emit("signal", targetId, JSON.stringify({ sdp: pc.localDescription }));
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // WebRTC logic moved to MediasoupClient
 
   const connectSocket = () => {
-    if (socketRef.current && socketRef.current.connected) return;
+    console.log("🚨 connectSocket called");
+    console.log("🚨 isHost:", isHost);
+    console.log("🚨 isGuest:", isGuest);
+    console.log("🚨 bypassLobby:", bypassLobby);
+    console.log("🚨 hasToken:", hasToken);
+    console.log("🚨 username:", username);
+    console.log("🚨 location.state:", location.state);
 
+    if (socketRef.current) return;
     const token = localStorage.getItem("token");
     socketRef.current = io(server_url, {
-      auth: { token: token },
-      transports: ["websocket", "polling"],
+      auth: { token },
+      transports: ["websocket"],
     });
 
     socketRef.current.on("connect", () => {
-      setSocketInstance(socketRef.current);
-      socketIdRef.current = socketRef.current.id;
+       console.log("🚨 TAKING PATH - isHost:", isHost);
+  socketIdRef.current = socketRef.current.id;
+  const payload = {
+    path: meetingCode.trim().toLowerCase(),
+    username: userName,
+    passcode: passcodeInput || passcode,
+  };
 
-      const payload = {
-        path: meetingCode,
-        username: userName,
-        passcode: passcodeInput || passcode,
-        isVideoOff: !video,
-        isMuted: !audio,
-      };
-
-      if (isHost) {
-        socketRef.current.emit("join-call", payload);
-      } else {
-        socketRef.current.emit("request-join", payload);
-        // Safety: If for some reason we aren't waiting locally, ensure it
-        if (!amIHost) setIsInWaitingRoom(true);
-      }
+  if (isHost) {
+    // 1. The user clicked "New Meeting"
+    socketRef.current.emit("create-meeting", {
+      path: getRoomId(),
+      passcode: payload.passcode,
+      username: userName,
     });
 
+    socketRef.current.once("meeting-created", () => {
+      setAmIHost(true);
+      setIsInWaitingRoom(false);
+      socketRef.current.emit("join-call", {
+        path: payload.path,
+        username: userName,
+        passcode: payload.passcode,
+      });
+    });
+
+    socketRef.current.once("room-already-active", () => {
+      // Host dropped connection and is rejoining their own room
+      setAmIHost(true);
+      setIsInWaitingRoom(false); 
+      socketRef.current.emit("join-call", {
+        path: payload.path,
+        username: userName,
+        passcode: payload.passcode,
+      });
+    });
+    
+  } else {
+    // 2. This is a participant joining an existing meeting
+    setIsInWaitingRoom(true);
+
+    if (isGuest) {
+      socketRef.current.emit("guest-request-join", {
+        meetingCode: getRoomId(),
+        username: userName,
+        passcode: passcodeInput || passcode,
+      });
+    } else {
+      socketRef.current.emit("request-join", {
+        path: getRoomId(),
+        username: userName,
+        passcode: payload.passcode,
+      });
+    }
+  }
+});
+    
     socketRef.current.on("connect_error", (err) => {
       console.error("Socket Connection Error:", err.message);
-      if (err.message === "Socket token missing" || err.message === "Invalid or expired socket token") {
+      if (
+        err.message === "Socket token missing" ||
+        err.message === "Invalid or expired socket token"
+      ) {
         addToast("Connection refused: " + err.message, "error");
       }
     });
@@ -478,87 +736,186 @@ export default function VideoMeetComponent() {
       setPasscodeError(true);
       socketRef.current.disconnect();
     });
+    
+    socketRef.current.on("meeting-locked", () => {
+      addToast("This meeting is locked", "error");
+      setTimeout(cleanupAndLeave, 2000);
+    });
+    
     socketRef.current.on("invalid-meeting", () => {
       addToast("Meeting not found!", "error");
       setTimeout(cleanupAndLeave, 2000);
     });
-
+    
+    
+    
+    socketRef.current.on("guest-rejected", () => {
+      addToast("Host rejected your request", "error");
+      setTimeout(cleanupAndLeave, 1500);
+    });
+    
     socketRef.current.on("meeting-ended", () => {
-      if (!amIHost) {
+      const currentHostId = roomHostIdRef.current;
+      const myId = socketRef.current?.id;
+      if (currentHostId !== myId) {
         addToast("Host ended the meeting.", "error");
-        setTimeout(cleanupAndLeave, 1500);
+        setTimeout(() => cleanupAndLeave(), 1500);
       }
     });
+    
+    
+    const handleAdmitted = () => {
+  console.log("✅ USER ADMITTED -> JOINING CALL");
 
-    socketRef.current.on("force-mute", () => {
-      if (localStreamRef.current) {
-        const t = localStreamRef.current.getAudioTracks()[0];
-        if (t) t.enabled = false;
-        setAudio(false);
-        socketRef.current.emit("toggle-audio", { isMuted: true });
-      }
-      addToast("Host muted everyone", "info");
-    });
+  setIsInWaitingRoom(false);
 
-    socketRef.current.on("force-stop-video", () => {
-      if (localStreamRef.current) {
-        const t = localStreamRef.current.getVideoTracks()[0];
-        if (t) t.enabled = false;
-        setVideo(false);
-        socketRef.current.emit("toggle-video", { isVideoOff: true });
-      }
-      addToast("Host stopped all video", "info");
-    });
-    socketRef.current.on("update-host-id", (hostId) => setRoomHostId(hostId));
+  socketRef.current.emit("join-call", {
+    path: meetingCode.trim().toLowerCase(),
+    username: userName,
+    passcode: passcodeInput || passcode,
+  });
+};
 
-    socketRef.current.on("lock-update", (isLocked) => {
-      setIsMeetingLocked(isLocked);
-      addToast(isLocked ? "Meeting has been Locked 🔒" : "Meeting is Unlocked 🔓", "info");
-      if (navigator.vibrate) navigator.vibrate(200);
-    });
+socketRef.current.on("guest-admitted", handleAdmitted);
+socketRef.current.on("admitted", handleAdmitted);
 
-    socketRef.current.on("admitted", () => {
-      setIsInWaitingRoom(false);
-      socketRef.current.emit("join-call", {
-        path: meetingCode,
-        username: userName,
-        passcode: passcodeInput || passcode,
-        isVideoOff: !video,
-        isMuted: !audio,
+socketRef.current.on("update-waiting-list", (users) => {
+console.log("WAITING LIST RECEIVED:", users);
+
+  // Safeguard: Force it into an array in case the backend sends a single object
+  const waitingArray = Array.isArray(users) ? users : [users];
+
+  // Use the refs to read the fresh state instead of the trapped initial state
+  if (amIHostRef.current && waitingArray.length > waitingUsersRef.current.length) {
+    addToast("Someone is waiting to join", "info");
+  }
+
+  // Update the actual state using the sanitized array
+  setWaitingUsers(waitingArray);
+});
+
+    socketRef.current.on("all-users", async (users) => {
+      const newUsers = {};
+      users.forEach((u) => {
+        newUsers[u.socketId] = u;
       });
-      addToast("You have been admitted!", "success");
+      setUserMap((prev) => ({ ...prev, ...newUsers }));
+
+      if (!mediasoupClientRef.current) {
+        try {
+          const mc = new MediasoupClient(socketRef.current, meetingCode.trim().toLowerCase(), (producerSocketId, track, kind, appData) => {
+              const stream = new MediaStream([track]);
+              setVideos((prev) => {
+                const existingIndex = prev.findIndex((v) => v.socketId === producerSocketId);
+                if (existingIndex > -1) {
+                    const existingStream = prev[existingIndex].stream;
+                    if (existingStream) existingStream.addTrack(track);
+                    return [...prev];
+                } else {
+                    return [...prev, { socketId: producerSocketId, stream }];
+                }
+              });
+          });
+          mediasoupClientRef.current = mc;
+          await mc.init();
+  
+          const videoTrack = localStreamRef.current?.getVideoTracks()[0];
+          const audioTrack = localStreamRef.current?.getAudioTracks()[0];
+  
+          if (videoTrack) await mc.produce(videoTrack, { type: 'video' });
+          if (audioTrack && isAudioConnectedRef.current) await mc.produce(audioTrack, { type: 'audio' });
+  
+          socketRef.current.emit('getProducers', async (res) => {
+              if (res.producers && !res.error) {
+                  for (const p of res.producers) {
+                      await mc.consume(p.producerId, p.socketId, p.appData);
+                  }
+              }
+          });
+        } catch (err) {
+          console.error("Mediasoup init error", err);
+        }
+      }
     });
-    socketRef.current.on("update-waiting-list", (users) => {
-      if (amIHost) setWaitingUsers(users);
-    });
-    socketRef.current.on("all-users", (users) => {
-      users.forEach((u) => setUserMap((prev) => ({ ...prev, [u.socketId]: u })));
-    });
+
     socketRef.current.on("user-joined", (user) => {
-      setUserMap((prev) => ({ ...prev, [user.socketId]: user }));
-      createPeer(user.socketId);
-      initiateOffer(user.socketId);
+      if (user.socketId === socketRef.current.id) return;
+      const completeUser = {
+        ...user,
+        isHandRaised: false,
+        isVideoOff: false, 
+        isMuted: false,
+      };
+      setUserMap((prev) => ({ ...prev, [user.socketId]: completeUser }));
       addToast(`${user.username} joined`, "info");
     });
 
-    socketRef.current.on("hand-toggled", ({ socketId, isRaised, username }) => {
-      if (socketId === socketRef.current.id) setIsHandRaised(isRaised);
-      if (isRaised && socketId !== socketRef.current.id) {
-        addToast(`${username || "Someone"} raised their hand ✋`, "info");
+    socketRef.current.on("poll-started", (poll) => {
+      setActivePoll(poll);
+      setShowPolls(true);
+      addToast("A new poll has started!", "info");
+    });
+    socketRef.current.on("poll-updated", (updatedPoll) => {
+      setActivePoll(updatedPoll);
+    });
+    socketRef.current.on("poll-ended", () => {
+      setActivePoll(null);
+      setShowPolls(false);
+      addToast("Poll ended", "info");
+    });
+    socketRef.current.on("whiteboard-toggle", (isOpen) => {
+      setShowWhiteboard(!!isOpen);
+    });
+    
+    socketRef.current.on("spotlight-user", (userId) => {
+      setPinnedUserId(userId);
+      if (userId) {
+        addToast("A participant's screen was pinned", "info");
       }
-      setUserMap((prev) => ({
-        ...prev,
-        [socketId]: { ...prev[socketId], isHandRaised: isRaised },
-      }));
+    });
+    
+    socketRef.current.on("hand-toggled", ({ socketId, isRaised, username }) => {
+      if (socketId === socketRef.current.id) {
+        setIsHandRaised(isRaised);
+        return;
+      }
+      
+      setUserMap((prev) => {
+        const targetUser = prev[socketId];
+        
+        if (isRaised && targetUser) {
+          addToast(`${targetUser.username} raised their hand ✋`, "info");
+        }
+        
+        if (!targetUser) return prev;
+        return {
+          ...prev,
+          [socketId]: { ...targetUser, isHandRaised: isRaised },
+        };
+      });
     });
 
     socketRef.current.on("audio-toggled", ({ socketId, isMuted }) => {
-      setUserMap((prev) => ({ ...prev, [socketId]: { ...prev[socketId], isMuted: isMuted } }));
+      if (socketId === socketRef.current.id) return;
+      setUserMap((prev) => {
+        if (!prev[socketId]) return prev;
+        return { ...prev, [socketId]: { ...prev[socketId], isMuted: isMuted } };
+      });
     });
     socketRef.current.on("video-toggled", ({ socketId, isVideoOff }) => {
-      setUserMap((prev) => ({ ...prev, [socketId]: { ...prev[socketId], isVideoOff: isVideoOff } }));
+      if (socketId === socketRef.current.id) return;
+      setUserMap((prev) => {
+        if (!prev[socketId]) return prev;
+        return {
+          ...prev,
+          [socketId]: { ...prev[socketId], isVideoOff: isVideoOff },
+        };
+      });
     });
     socketRef.current.on("emoji-received", ({ socketId, emoji }) => {
+      if (socketId !== socketIdRef.current) {
+        addFloatingReaction(emoji, socketId);
+      }
       setActiveEmojis((prev) => ({ ...prev, [socketId]: emoji }));
       setTimeout(() => {
         setActiveEmojis((prev) => {
@@ -568,93 +925,254 @@ export default function VideoMeetComponent() {
         });
       }, 3000);
     });
-
+    socketRef.current.on("reaction-received", ({ socketId, reaction }) => {
+      if (socketId !== socketIdRef.current) {
+        addFloatingReaction(reaction, socketId);
+      }
+      setActiveReactions((prev) => ({ ...prev, [socketId]: reaction }));
+      setTimeout(() => {
+        setActiveReactions((prev) => {
+          const newState = { ...prev };
+          delete newState[socketId];
+          return newState;
+        });
+      }, 5000);
+    });
     socketRef.current.on("receive-caption", (data) => {
       if (showCaptions) {
         setRemoteCaption(data);
         setTimeout(() => setRemoteCaption(null), 4000);
       }
     });
+    socketRef.current.on("hand-queue-update", (queue) => {
+      setHandQueue(queue);
+    });
+    socketRef.current.on("hand-lowered", () => {
+      setIsHandRaised(false);
+      addToast("Host lowered your hand", "info");
+    });
+    socketRef.current.on("denied", () => {
+      addToast("Host denied your entry", "error");
+      cleanupAndLeave();
+    });
+    socketRef.current.on("kicked", () => {
+      addToast("You have been removed from the meeting", "error");
+      setTimeout(cleanupAndLeave, 1500);
+    });
+    socketRef.current.on("force-mute", () => {
+      if (localStreamRef.current) {
+        const t = localStreamRef.current.getAudioTracks();
+        if (t) t.enabled = false;
+        setAudio(false);
+        socketRef.current.emit("toggle-audio", { isMuted: true });
+      }
+      addToast("Host muted everyone", "info");
+    });
 
-    socketRef.current.on("signal", async (fromId, msg) => {
-      const signal = JSON.parse(msg);
-      let pc = connectionsRef.current[fromId];
-      if (!pc) pc = createPeer(fromId);
-      if (signal.sdp) {
-        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        if (signal.sdp.type === "offer") {
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          socketRef.current.emit("signal", fromId, JSON.stringify({ sdp: pc.localDescription }));
-        }
-        if (pendingIce.current[fromId]) {
-          pendingIce.current[fromId].forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)));
-          delete pendingIce.current[fromId];
-        }
-      } else if (signal.ice) {
-        if (pc.remoteDescription) await pc.addIceCandidate(new RTCIceCandidate(signal.ice));
-        else {
-          pendingIce.current[fromId] = pendingIce.current[fromId] || [];
-          pendingIce.current[fromId].push(signal.ice);
-        }
+    socketRef.current.on("force-stop-video", () => {
+      if (localStreamRef.current) {
+        const t = localStreamRef.current.getVideoTracks();
+        if (t) t.enabled = false;
+        setVideo(false);
+        socketRef.current.emit("toggle-video", { isVideoOff: true });
+      }
+      addToast("Host stopped all video", "info");
+    });
+
+socketRef.current.on("update-host-id", (hostId) => {
+      setRoomHostId(hostId);
+      if (hostId === socketRef.current?.id || hostId === socketIdRef.current) {
+        setAmIHost(true);
+      } else {
+        setAmIHost(false);
       }
     });
-    socketRef.current.on("user-left", (id) => {
-      connectionsRef.current[id]?.close();
-      delete connectionsRef.current[id];
-      setVideos((v) => v.filter((x) => x.socketId !== id));
+
+    socketRef.current.on("lock-update", (isLocked) => {
+      setIsMeetingLocked(isLocked);
+      addToast(
+        isLocked ? "Meeting has been Locked 🔒" : "Meeting is Unlocked 🔓",
+        "info",
+      );
+      if (navigator.vibrate) navigator.vibrate(200);
+    });
+    socketRef.current.on("newProducer", async ({ producerId, socketId, kind, appData }) => {
+        if (mediasoupClientRef.current) {
+            await mediasoupClientRef.current.consume(producerId, socketId, appData);
+        }
+    });
+    
+    socketRef.current.on("producerClosed", ({ producerId }) => {
+        // Track removal handled by video stream mapping
+    });
+    socketRef.current.on("user-left", (data) => {
+      const leftSocketId = data.socketId || data;
+      const leftUsername = data.username || "Guest";
+      setVideos((v) => v.filter((x) => x.socketId !== leftSocketId));
       setUserMap((prev) => {
         const copy = { ...prev };
-        delete copy[id];
+        delete copy[leftSocketId];
         return copy;
       });
+      addToast(`${leftUsername} left`, "info");
     });
     socketRef.current.on("receive-message", (data) => {
       const isMe = data.socketId === socketRef.current.id;
       setMessages((prev) => [...prev, { ...data, isMe }]);
     });
+    socketRef.current.on("screen-lock-update", (isLocked) => {
+      setIsScreenShareLocked(isLocked);
+      addToast(
+        isLocked ? "Host disabled screen sharing" : "Screen sharing enabled",
+        "info",
+      );
+      if (isLocked && screen && !amIHost) {
+        handleScreen();
+      }
+    });
   };
 
   const cleanupAndLeave = () => {
-    if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
-    if (displayStreamRef.current) displayStreamRef.current.getTracks().forEach((t) => t.stop());
-    if (audioContextRef.current && audioContextRef.current.state !== "closed") audioContextRef.current.close();
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => {
+        t.enabled = false;
+        t.stop();
+      });
+    }
+    
+    if (localStream) {
+      localStream.getTracks().forEach((t) => {
+        t.enabled = false;
+        t.stop();
+      });
+    }
+
+    if (displayStreamRef.current) {
+      displayStreamRef.current.getTracks().forEach((t) => {
+        t.enabled = false;
+        t.stop();
+      });
+    }
+
+    if (mediasoupClientRef.current) {
+        mediasoupClientRef.current.close();
+        mediasoupClientRef.current = null;
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      audioContextRef.current.close();
+    }
     audioContextRef.current = null;
-    Object.values(connectionsRef.current).forEach((pc) => pc.close());
+
+    Object.values(connectionsRef.current).forEach((pc) => {
+      pc.close();
+    });
+    connectionsRef.current = {};
+
     if (socketRef.current) {
       socketRef.current.emit("leave-room");
       socketRef.current.disconnect();
     }
-    navigate("/");
+    
+    setHasLeftMeeting(true);
   };
 
-  /* ------------------ ACTIONS ------------------ */
   const handleToggleHand = () => {
     const newState = !isHandRaised;
     setIsHandRaised(newState);
     socketRef.current.emit("toggle-hand", { isRaised: newState });
-    if (isMobile) setShowMobileMenu(false);
+    setShowMoreMenu(false);
+    
+    if (newState) {
+      addToast("You raised your hand ✋", "info");
+    }
   };
+
   const handleSendEmoji = (emoji) => {
+    if (!amIHost && securitySettings.isReactionsLocked) {
+      addToast("The host has disabled reactions.", "error");
+      return;
+    }
+
     setShowEmojiPicker(false);
-    if (isMobile) setShowMobileMenu(false);
-    setActiveEmojis((prev) => ({ ...prev, [socketIdRef.current]: emoji }));
+    setShowMoreMenu(false);
+    
+    addFloatingReaction(emoji, "Me");
+    
+    setActiveReactions((prev) => ({ ...prev, [socketIdRef.current]: emoji }));
     setTimeout(() => {
-      setActiveEmojis((prev) => {
+      setActiveReactions((prev) => {
         const newState = { ...prev };
         delete newState[socketIdRef.current];
         return newState;
       });
     }, 3000);
-    socketRef.current.emit("send-emoji", { emoji });
+    socketRef.current.emit("send-reaction", { reaction: emoji });
   };
   const handleSendMessage = () => {
+    if (!amIHost && securitySettings.isChatLocked) {
+      addToast("The host has disabled the chat.", "error");
+      return;
+    }
+
     if (!currentMessage.trim() || !socketRef.current) return;
-    const msg = { text: currentMessage, sender: userName, socketId: socketRef.current.id, timestamp: new Date().toISOString() };
+    const msg = {
+      text: currentMessage,
+      sender: userName,
+      socketId: socketRef.current.id,
+      timestamp: new Date().toISOString(),
+    };
     socketRef.current.emit("send-message", msg);
     setMessages((prev) => [...prev, { ...msg, isMe: true }]);
     setCurrentMessage("");
   };
+  const handleCreatePollSubmit = () => {
+    if (!pollQuestion.trim() || pollOptions.some((opt) => !opt.trim())) {
+      addToast("Please fill the question and all options", "error");
+      return;
+    }
+    const poll = {
+      id: Date.now().toString(),
+      question: pollQuestion,
+      options: pollOptions,
+      votes: new Array(pollOptions.length).fill(0),
+      votedUsers: [],
+    };
+    socketRef.current.emit("start-poll", {
+      roomId: meetingCode.trim().toLowerCase(),
+      poll,
+    });
+    setActivePoll(poll);
+    setIsCreatingPoll(false);
+    setHasVoted(false);
+    setShowPolls(true);
+  };
+
+  const handleVote = (optionIndex) => {
+    if (hasVoted) return;
+    socketRef.current.emit("vote-poll", {
+      roomId: meetingCode.trim().toLowerCase(),
+      optionIndex,
+      socketId: socketRef.current.id,
+    });
+    setHasVoted(true);
+
+    setActivePoll((prev) => {
+      const newVotes = [...prev.votes];
+      newVotes[optionIndex] += 1;
+      return { ...prev, votes: newVotes };
+    });
+  };
+
+  const handleEndPoll = () => {
+    socketRef.current.emit("end-poll", {
+      roomId: meetingCode.trim().toLowerCase(),
+    });
+    setActivePoll(null);
+    setShowPolls(false);
+    addToast("Poll ended", "info");
+  };
+
   const handleSubmitPasscode = (e) => {
     e.preventDefault();
     if (passcodeInput.trim()) {
@@ -663,38 +1181,69 @@ export default function VideoMeetComponent() {
       connectSocket();
     }
   };
-
+  
   const handleToggleLock = () => {
     socketRef.current.emit("toggle-lock");
-    if (isMobile) setShowMobileMenu(false);
   };
-
+  
+  const handleToggleScreenLock = () => {
+    socketRef.current.emit("toggle-screen-lock");
+  };
+  
   const handleTransferHost = (targetId) => {
-    if (window.confirm("Make this user the Host? You will lose admin controls.")) {
-      socketRef.current.emit("transfer-host", targetId);
-      addToast("Host transferred", "success");
-    }
+    setConfirmAction({
+      title: "Transfer Host",
+      message: "Make this user the Host? You will lose admin controls.",
+      onConfirm: () => {
+        socketRef.current.emit("transfer-host", targetId);
+        addToast("Host transferred", "success");
+      }
+    });
   };
-
+  
   const handleKickUser = (targetId) => {
-    if (window.confirm("Remove this participant?")) {
-      socketRef.current.emit("kick-user", targetId);
-      addToast("User removed", "error");
-    }
+    setConfirmAction({
+      title: "Remove Participant",
+      message: "Are you sure you want to remove this participant from the meeting?",
+      onConfirm: () => {
+        socketRef.current.emit("kick-user", targetId);
+        addToast("User removed", "error");
+      }
+    });
   };
+  
   const handleMuteAll = () => {
-    if (window.confirm("Mute everyone?")) {
-      socketRef.current.emit("mute-all");
-      addToast("Muted everyone", "info");
-    }
-  };
-  const handleStopVideoAll = () => {
-    if (window.confirm("Stop everyone's video?")) {
-      socketRef.current.emit("stop-video-all");
-      addToast("Stopped all videos", "info");
-    }
+    setConfirmAction({
+      title: "Mute Everyone",
+      message: "Are you sure you want to mute all participants? They will be locked and cannot unmute themselves.",
+      onConfirm: () => {
+        socketRef.current.emit("mute-all"); 
+        
+        const newSettings = { ...securitySettings, isMicLocked: true };
+        setSecuritySettings(newSettings);
+        socketRef.current.emit("update-security", newSettings);
+        
+        addToast("Muted and locked everyone's mic", "success");
+      }
+    });
   };
 
+  const handleStopVideoAll = () => {
+    setConfirmAction({
+      title: "Stop All Video",
+      message: "Are you sure you want to stop everyone's video? They will be locked and cannot turn it back on.",
+      onConfirm: () => {
+        socketRef.current.emit("stop-video-all"); 
+        
+        const newSettings = { ...securitySettings, isCamLocked: true };
+        setSecuritySettings(newSettings);
+        socketRef.current.emit("update-security", newSettings);
+        
+        addToast("Stopped and locked all videos", "success");
+      }
+    });
+  };
+  
   const handleEndCall = () => {
     if (amIHost) {
       if (window.confirm("Do you want to end the meeting for everyone?")) {
@@ -705,64 +1254,126 @@ export default function VideoMeetComponent() {
       cleanupAndLeave();
     }
   };
-
+  
+  const handleHostLeaveClick = () => {
+    if (amIHost) {
+      setShowLeaveMenu(!showLeaveMenu);
+    } else {
+      cleanupAndLeave();
+    }
+  };
+  const handleHostEndForAll = () => {
+    setShowLeaveMenu(false);
+    socketRef.current.emit("end-meeting-for-all");
+    setTimeout(() => cleanupAndLeave(), 100);
+  };
+  const handleHostLeaveSilently = () => {
+    setShowLeaveMenu(false);
+    cleanupAndLeave();
+  };
+  
   const handleScreen = async () => {
     if (isMobile) {
       addToast("Not supported on mobile.", "error");
       return;
     }
+    if (!amIHost && securitySettings.isScreenShareLocked && !screen) {
+      addToast("The host has disabled screen sharing.", "error");
+      return;
+    }
+
     if (!screen) {
       try {
-        const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const display = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true,
+        });
         displayStreamRef.current = display;
         const track = display.getVideoTracks()[0];
-        Object.values(connectionsRef.current).forEach((pc) => {
-          const sender = pc.getSenders().find((s) => s.track.kind === "video");
-          if (sender) sender.replaceTrack(track);
-        });
+        if (mediasoupClientRef.current) {
+            await mediasoupClientRef.current.produce(track, { type: 'screen' });
+        }
         track.onended = () => handleScreen();
         setScreen(true);
+        screenRef.current = true;
+        setPinnedUserId("local"); 
+        
+        if (socketRef.current) {
+          socketRef.current.emit("spotlight-user", socketRef.current.id);
+        }
+        
+        addToast("Screen sharing started", "success");
       } catch (err) {
-        console.log("Cancelled");
+        console.log("Screen share cancelled or failed:", err);
+        addToast("Screen share cancelled", "info");
       }
     } else {
       displayStreamRef.current?.getTracks().forEach((t) => t.stop());
       displayStreamRef.current = null;
       const camTrack = localStreamRef.current?.getVideoTracks()[0];
       Object.values(connectionsRef.current).forEach((pc) => {
-        const sender = pc.getSenders().find((s) => s.track.kind === "video");
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === "video");
         if (sender) sender.replaceTrack(camTrack);
       });
       setScreen(false);
+      screenRef.current = false;
+      if (pinnedUserId === "local" || pinnedUserId === socketRef.current?.id) {
+        setPinnedUserId(null);
+      }
+      
+      if (socketRef.current) {
+        socketRef.current.emit("spotlight-user", null);
+      }
+      
+      addToast("Screen sharing stopped", "info");
     }
   };
-
+  
   const handleVideo = () => {
-    const track = localStreamRef.current?.getVideoTracks()[0];
-    if (track) {
-      track.enabled = !video;
-      setVideo(!video);
-      socketRef.current.emit("toggle-video", { isVideoOff: video });
+    if (!amIHost && securitySettings.isCamLocked && !video) {
+      addToast("The host has disabled cameras.", "error");
+      return;
     }
+
+    const track = localStreamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+
+    const newState = !video;
+    track.enabled = newState;
+
+    setVideo(newState);
+    socketRef.current.emit("toggle-video", { isVideoOff: !newState });
   };
 
   const handleAudio = () => {
+    if (!amIHost && securitySettings.isMicLocked && !audio) {
+      addToast("The host has disabled microphones.", "error");
+      return;
+    }
+
     if (!isAudioConnected) {
       setShowSettings(true);
       return;
     }
+
     const track = localStreamRef.current?.getAudioTracks()[0];
-    if (track) {
-      track.enabled = !audio;
-      setAudio(!audio);
-      socketRef.current.emit("toggle-audio", { isMuted: audio });
-    }
+    if (!track) return;
+
+    const newState = !audio;
+    track.enabled = newState;
+
+    setAudio(newState);
+    socketRef.current.emit("toggle-audio", { isMuted: !newState });
   };
 
   const handleAdmit = (socketId) => {
     socketRef.current.emit("admit-user", socketId);
     addToast("User admitted", "success");
   };
+  const handleDeny = (socketId) => { 
+   socketRef.current.emit("deny-user", socketId); 
+   addToast("User denied entry", "info"); 
+};
   const handleTileClick = (id) => {
     if (pinnedUserId === id) setPinnedUserId(null);
     else setPinnedUserId(id);
@@ -775,291 +1386,425 @@ export default function VideoMeetComponent() {
   };
 
   useEffect(() => {
-    let isMounted = true;
-    getMedia().then(() => {
-      if (isMounted) {
-        if (bypassLobby || (username && username !== "Guest")) {
-          connectSocket();
-        } else {
-          setAskForUsername(true);
+    isMountedRef.current = true; 
+    getMedia().then(() => { 
+        if (!isMountedRef.current && localStreamRef.current) {
+             localStreamRef.current.getTracks().forEach(t => t.stop());
+             return;
         }
-      }
+
+        if (isMountedRef.current && localStreamRef.current) { 
+            if (isHost) {
+                setIsInWaitingRoom(false);
+                setAskForUsername(false);
+                connectSocket();
+            } else if (bypassLobby || isGuest || (username && username !== "Guest") || hasToken) { 
+                setIsInWaitingRoom(true);
+                connectSocket(); 
+            } else { 
+                setAskForUsername(true); 
+            }
+        }
     });
+
     return () => {
-      isMounted = false;
-      if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop());
+      isMountedRef.current = false;
+      
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      setLocalStream((prevStream) => {
+        if (prevStream) prevStream.getTracks().forEach(t => t.stop());
+        return null;
+      });
       if (socketRef.current) socketRef.current.disconnect();
-      if (audioContextRef.current && audioContextRef.current.state !== "closed") audioContextRef.current.close();
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close();
+      }
     };
   }, []);
 
   useEffect(() => {
-    if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    if (!showChat && messages.length > 0 && !messages[messages.length - 1].isMe) setUnreadMessages((prev) => prev + 1);
+    if (chatContainerRef.current)
+      chatContainerRef.current.scrollTop =
+        chatContainerRef.current.scrollHeight;
+    if (!showChat && messages.length > 0 && !messages[messages.length - 1].isMe)
+      setUnreadMessages((prev) => prev + 1);
   }, [messages]);
   useEffect(() => {
     if (showChat) setUnreadMessages(0);
   }, [showChat]);
   useEffect(() => {
-    const checkMobile = () => setIsMobile(/Mobi|Android|iPhone/i.test(navigator.userAgent) || window.innerWidth < 768);
+    const checkMobile = () =>
+      setIsMobile(
+        /Mobi|Android|iPhone/i.test(navigator.userAgent) ||
+          window.innerWidth < 768,
+      );
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
   
-  const connect = () => {
-    setAskForUsername(false);
-    // 2. IMMEDIATE FEEDBACK: Show waiting room immediately if you are not the host
-    if (!isHost) setIsInWaitingRoom(true);
-    connectSocket();
+  const connect = () => { 
+      if (audioContextRef.current && audioContextRef.current.state === "suspended") {
+        audioContextRef.current.resume();
+      }
+      
+      setAskForUsername(false); 
+      setIsInWaitingRoom(true); 
+      connectSocket(); 
   };
 
-  const getMainSocketId = () => {
-    if (pinnedUserId) return pinnedUserId;
-    if (activeSpeakerId && activeSpeakerId !== socketIdRef.current && videos.some((v) => v.socketId === activeSpeakerId)) return activeSpeakerId;
-    if (videos.length > 0) return videos[0].socketId;
-    return "local";
-  };
 
-  const renderMainSpotlight = () => {
-    const mainId = getMainSocketId();
-    const isLocal = mainId === "local" || mainId === socketIdRef.current;
-    const emojiToShow = activeEmojis[mainId] || (isLocal && activeEmojis[socketIdRef.current]);
-
-    let user, stream, isCamOff, displayName, isThisHost;
-
-    if (isLocal) {
-      user = { username: userName, isHandRaised: isHandRaised, isVideoOff: !video, isMuted: !audio };
-      stream = localStream;
-      isCamOff = !video;
-      displayName = `${userName} (You)`;
-      isThisHost = amIHost;
-    } else {
-      user = userMap[mainId] || { username: "Guest" };
-      const v = videos.find((v) => v.socketId === mainId);
-      stream = v?.stream;
-      isCamOff = user.isVideoOff;
-      displayName = user.username;
-      isThisHost = mainId === roomHostId;
+  useEffect(() => {
+    if (hasLeftMeeting && countdown > 0) {
+      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (hasLeftMeeting && countdown === 0) {
+      navigate("/");
     }
+  }, [hasLeftMeeting, countdown, navigate]);
 
-    if (isCamOff) {
-      return (
-        <div className="relative w-full h-full flex items-center justify-center bg-black/90">
-          <AvatarFallback username={displayName} />
-          {showCaptions && (remoteCaption || localCaption) && (
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-40">
-              <p className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">{remoteCaption ? remoteCaption.username : "You"}</p>
-              <p className="text-white text-lg font-medium leading-relaxed">{remoteCaption ? remoteCaption.caption : localCaption}</p>
-            </div>
-          )}
-          <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
-            <div className="mr-2">
-              {user.isMuted ? <MicOff size={16} className="text-red-500" /> : activeSpeakerId === mainId ? <Mic size={16} className="text-green-500 animate-pulse" /> : <Mic size={16} className="text-white/70" />}
-            </div>
-            <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
-              {displayName}
-              {isThisHost && <Crown size={16} className="text-yellow-400 fill-yellow-400" />}
-            </span>
-            {user.isHandRaised && <Hand size={20} className="text-yellow-500 animate-pulse" />}
-            {pinnedUserId === mainId && <Pin size={16} className="text-blue-400 rotate-45" />}
-          </div>
-          {emojiToShow && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
-              <span className="text-[12rem] filter drop-shadow-2xl leading-none">{emojiToShow}</span>
-            </div>
-          )}
-        </div>
-      );
-    }
+  const meetingContextValue = {
+    EMOJI_LIST,
+    GRID_PAGE_SIZE,
+    activeDropdown,
+    activeEmojis,
+    activePoll,
+    activeReactions,
+    activeSpeakerId,
+    addFloatingReaction,
+    addToast,
+    amIHost,
+    amIHostRef,
+    askForUsername,
+    audio,
+    audioAnalysersRef,
+    audioContextRef,
+    bypassLobby,
+    chatContainerRef,
+    cleanupAndLeave,
+    confirmAction,
+    connect,
+    connectSocket,
+    connectionsRef,
+    copied,
+    countdown,
+    currentMessage,
+    devices,
+    displayStreamRef,
+    floatingReactions,
+    getAvatarColor,
+    getRoomId,
+    getUserColor,
+    gridPage,
+    handQueue,
+    handleAdmit,
+    handleAdmitted,
+    handleAudio,
+    handleCopyLink,
+    handleCreatePollSubmit,
+    handleDeny,
+    handleEndCall,
+    handleEndPoll,
+    handleHostEndForAll,
+    handleHostLeaveClick,
+    handleHostLeaveSilently,
+    handleKickUser,
+    handleMuteAll,
+    handleSecurityUpdate,
+    handleSendEmoji,
+    handleSendMessage,
+    handleSpotlightUser,
+    handleStopVideoAll,
+    handleSubmitPasscode,
+    handleTileClick,
+    handleToggleHand,
+    handleToggleLock,
+    handleToggleRecord,
+    handleToggleScreenLock,
+    handleToggleWhiteboard,
+    handleTransferHost,
+    handleVideo,
+    handleVote,
+    hasLeftMeeting,
+    hasToken,
+    hasVoted,
+    isAskingToJoin,
+    isAudioConnected,
+    isAudioConnectedRef,
+    isAudioOn,
+    isAudioOnly,
+    isCreatingPoll,
+    isGuest,
+    isHandRaised,
+    isHost,
+    isInWaitingRoom,
+    isMeetingLocked,
+    isMobile,
+    isMountedRef,
+    isRecording,
+    isScreenShareLocked,
+    isVideoOn,
+    localStream,
+    localStreamRef,
+    location,
+    mediaRecorderRef,
+    mediasoupClientRef,
+    meetingCode,
+    messages,
+    navigate,
+    participantSearch,
+    passcode,
+    passcodeError,
+    passcodeInput,
+    pendingIce,
+    pinnedUserId,
+    pollOptions,
+    pollQuestion,
+    recordedChunksRef,
+    remoteCaption,
+    renderGrid,
+    renderTile,
+    roomHostId,
+    roomHostIdRef,
+    screen,
+    screenRef,
+    securitySettings,
+    selectedDevices,
+    setActiveDropdown,
+    setActiveEmojis,
+    setActivePoll,
+    setActiveReactions,
+    setActiveSpeakerId,
+    setAmIHost,
+    setAskForUsername,
+    setAudio,
+    setConfirmAction,
+    setCopied,
+    setCountdown,
+    setCurrentMessage,
+    setDevices,
+    setFloatingReactions,
+    setGridPage,
+    setHandQueue,
+    setHasLeftMeeting,
+    setHasVoted,
+    setIsAskingToJoin,
+    setIsAudioConnected,
+    setIsAudioOnly,
+    setIsCreatingPoll,
+    setIsHandRaised,
+    setIsInWaitingRoom,
+    setIsMeetingLocked,
+    setIsMobile,
+    setIsRecording,
+    setIsScreenShareLocked,
+    setLocalStream,
+    setMessages,
+    setParticipantSearch,
+    setPasscodeError,
+    setPasscodeInput,
+    setPinnedUserId,
+    setPollOptions,
+    setPollQuestion,
+    setRemoteCaption,
+    setRoomHostId,
+    setScreen,
+    setSecuritySettings,
+    setSelectedDevices,
+    setShowCaptions,
+    setShowChat,
+    setShowEmojiPicker,
+    setShowHostSidebar,
+    setShowInfo,
+    setShowInviteModal,
+    setShowLeaveMenu,
+    setShowMeetingReadyCard,
+    setShowMoreMenu,
+    setShowParticipants,
+    setShowPasscodeModal,
+    setShowPolls,
+    setShowSettings,
+    setShowWhiteboard,
+    setSocketInstance,
+    setUnreadMessages,
+    setUserMap,
+    setUsername,
+    setVideo,
+    setVideos,
+    setWaitingUsers,
+    showCaptions,
+    showChat,
+    showEmojiPicker,
+    showHostSidebar,
+    showInfo,
+    showInviteModal,
+    showLeaveMenu,
+    showMeetingReadyCard,
+    showMoreMenu,
+    showParticipants,
+    showPasscodeModal,
+    showPolls,
+    showSettings,
+    showWhiteboard,
+    socketIdRef,
+    socketInstance,
+    socketRef,
+    toggleAudioOnly,
+    toggleCaptions,
+    toggleSecuritySetting,
+    togglePiP,
+    getCurrentTime,
+    unreadMessages,
+    userMap,
+    userMapRef,
+    userName,
+    username,
+    video,
+    videos,
+    waitingUsers,
+    waitingUsersRef,
+  };
 
+  const isSidebarOpen =
+    showParticipants || showChat || showInfo || showHostSidebar;
+
+  if (hasLeftMeeting) {
     return (
-      <div className="relative w-full h-full flex items-center justify-center bg-black/90">
-        <VideoPlayer
-          stream={stream}
-          isLocal={isLocal}
-          isMirrored={isLocal && !screen}
-          className="max-w-full max-h-full object-contain shadow-2xl"
-          audioOutputId={selectedDevices.audioOutput}
-          username={displayName}
-        />
-        {showCaptions && (remoteCaption || localCaption) && (
-          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10 text-center max-w-2xl transition-all animate-in slide-in-from-bottom-2 z-40">
-            <p className="text-gray-400 text-xs font-bold mb-1 uppercase tracking-wider">{remoteCaption ? remoteCaption.username : "You"}</p>
-            <p className="text-white text-lg font-medium leading-relaxed">{remoteCaption ? remoteCaption.caption : localCaption}</p>
-          </div>
-        )}
-        <div className="absolute bottom-6 left-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 flex items-center gap-3 z-30">
-          <div className="mr-2">
-            {user.isMuted ? <MicOff size={16} className="text-red-500" /> : activeSpeakerId === mainId ? <Mic size={16} className="text-green-500 animate-pulse" /> : <Mic size={16} className="text-white/70" />}
-          </div>
-          <span className="font-bold text-white tracking-wide text-lg flex items-center gap-2">
-            {displayName}
-            {isThisHost && <Crown size={16} className="text-yellow-400 fill-yellow-400" />}
-          </span>
-          {user.isHandRaised && <Hand size={20} className="text-yellow-500 animate-pulse" />}
-          {pinnedUserId === mainId && <Pin size={16} className="text-blue-400 rotate-45" />}
-        </div>
-        {emojiToShow && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
-            <span className="text-[12rem] filter drop-shadow-2xl leading-none">{emojiToShow}</span>
-          </div>
-        )}
-      </div>
+      <MeetingContext.Provider value={meetingContextValue}>
+        <LeftMeetingScreen />
+      </MeetingContext.Provider>
     );
-  };
+  }
 
-  const renderSideStrip = () => {
-    const mainId = getMainSocketId();
-    const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map((v) => ({ ...v, isLocal: false }))];
-    const stripParticipants = allParticipants.filter((p) => {
-      const pId = p.isLocal ? socketIdRef.current || "local" : p.socketId;
-      const mId = mainId === "local" ? socketIdRef.current || "local" : mainId;
-      return pId !== mId;
-    });
-
-    return stripParticipants.map((p) => {
-      const pId = p.isLocal ? socketIdRef.current || "local" : p.socketId;
-      const user = p.isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video, isMuted: !audio } : userMap[pId] || { username: "Guest" };
-      const isCamOff = user.isVideoOff;
-      const displayName = p.isLocal ? `${userName} (You)` : user.username;
-      const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
-
-      return (
-        <div
-          key={pId}
-          onClick={() => handleTileClick(pId)}
-          className={`relative flex-shrink-0 bg-neutral-800 rounded-xl overflow-hidden cursor-pointer transition-all border-2 ${isMobile ? "w-28 h-20" : "w-full h-32"} ${activeSpeakerId === pId && !p.isLocal ? "border-green-500" : "border-transparent hover:border-neutral-500"}`}
-        >
-          {isCamOff ? (
-            <AvatarFallback username={displayName} />
-          ) : (
-            <VideoPlayer
-              stream={p.stream}
-              isLocal={p.isLocal}
-              isMirrored={p.isLocal && !screen}
-              className="w-full h-full object-cover"
-              audioOutputId={selectedDevices.audioOutput}
-              username={displayName}
-            />
-          )}
-          <div className="absolute bottom-1 left-1 bg-black/60 px-1.5 rounded text-[10px] truncate max-w-[90%] flex items-center gap-1">
-            {user.isMuted ? <MicOff size={10} className="text-red-500" /> : activeSpeakerId === pId ? <Mic size={10} className="text-green-500 animate-pulse" /> : <Mic size={10} className="text-white/70" />}
-            {displayName}
-            {isThisHost && <Crown size={10} className="text-yellow-400 fill-yellow-400" />}
-          </div>
-          {user.isHandRaised && (
-            <div className="absolute top-1 right-1 text-yellow-500">
-              <Hand size={14} />
-            </div>
-          )}
-        </div>
-      );
-    });
-  };
-
-  const renderPaginatedGrid = () => {
-    const allParticipants = [{ socketId: "local", stream: localStream, isLocal: true }, ...videos.map((v) => ({ ...v, isLocal: false }))];
-    const totalPages = Math.ceil(allParticipants.length / GRID_PAGE_SIZE);
-    const visibleParticipants = isMobile ? allParticipants : allParticipants.slice(gridPage * GRID_PAGE_SIZE, (gridPage + 1) * GRID_PAGE_SIZE);
-    const count = visibleParticipants.length;
-    let gridClass = "grid-cols-1";
-    if (count === 2) gridClass = "grid-cols-1 md:grid-cols-2";
-    if (count >= 3) gridClass = "grid-cols-2";
-    if (!isMobile && count >= 5) gridClass = "grid-cols-2 lg:grid-cols-3";
-
+  if (askForUsername && !showPasscodeModal) {
     return (
-      <div className="relative w-full h-full bg-black p-2 flex flex-col items-center overflow-y-auto pb-28">
-        <div className={`grid ${gridClass} gap-2 w-full max-w-6xl transition-all duration-300 ${!isMobile ? "h-full" : "auto-rows-fr"}`}>
-          {visibleParticipants.map((p) => {
-            const pId = p.isLocal ? socketIdRef.current || "local" : p.socketId;
-            const user = p.isLocal ? { username: userName, isHandRaised: isHandRaised, isVideoOff: !video, isMuted: !audio } : userMap[pId] || { username: "Guest" };
-            const displayName = p.isLocal ? `${userName} (You)` : user.username;
-            const isThisHost = p.isLocal ? amIHost : pId === roomHostId;
-            const isCamOff = p.isLocal ? !video : user.isVideoOff;
-            const emojiToShow = activeEmojis[p.socketId] || (p.isLocal && activeEmojis[socketIdRef.current]);
-            const showCaptionOnThisTile = showCaptions && ((p.isLocal && localCaption) || (!p.isLocal && remoteCaption && remoteCaption.username === user.username));
-
-            return (
-              <div key={pId} className={`relative bg-neutral-800 rounded-xl overflow-hidden border-2 w-full aspect-video ${isMobile ? "min-h-[150px]" : "h-full"} ${activeSpeakerId === pId && !p.isLocal ? "border-green-500" : "border-neutral-700"}`}>
-                {isCamOff ? <AvatarFallback username={displayName} /> : <VideoPlayer stream={p.stream} isLocal={p.isLocal} isMirrored={p.isLocal && !screen} className="w-full h-full object-cover" audioOutputId={selectedDevices.audioOutput} username={displayName} />}
-                {showCaptionOnThisTile && (
-                  <div className="absolute bottom-10 left-2 right-2 bg-black/70 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10 text-center transition-all animate-in slide-in-from-bottom-2 z-40">
-                    <p className="text-white text-xs md:text-sm font-medium leading-tight">{p.isLocal ? localCaption : remoteCaption.caption}</p>
-                  </div>
-                )}
-                <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1 z-50 max-w-[85%] truncate">
-                  <div className="mr-1">{user.isMuted ? <MicOff size={12} className="text-red-500" /> : activeSpeakerId === pId ? <Mic size={12} className="text-green-500 animate-pulse" /> : <Mic size={12} className="text-white/70" />}</div>
-                  <span className="truncate">{displayName}</span>
-                  {isThisHost && <Crown size={10} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />}
-                </div>
-                {user.isHandRaised && (
-                  <div className="absolute top-2 right-2 bg-yellow-500 p-1.5 rounded-full text-black shadow-lg animate-bounce z-50">
-                    <Hand size={14} />
-                  </div>
-                )}
-                {emojiToShow && (
-                  <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-in zoom-in fade-in duration-300">
-                    <span className="text-6xl md:text-8xl filter drop-shadow-lg leading-none">{emojiToShow}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {!isMobile && totalPages > 1 && (
-          <>
-            {gridPage > 0 && <button onClick={() => setGridPage((p) => p - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronLeft size={32} /></button>}
-            {gridPage < totalPages - 1 && <button onClick={() => setGridPage((p) => p + 1)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 text-white transition-all z-20"><ChevronRight size={32} /></button>}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-1 rounded-full text-xs font-medium text-gray-300">Page {gridPage + 1} / {totalPages}</div>
-          </>
-        )}
-      </div>
+      <MeetingContext.Provider value={meetingContextValue}>
+        <JoinMeetingScreen />
+      </MeetingContext.Provider>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen w-full bg-neutral-900 text-white flex flex-col font-sans overflow-hidden">
-      {/* TOAST NOTIFICATIONS */}
-      <div className="fixed top-20 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
-        {toasts.map((t) => (
-          <div key={t.id} className={`bg-neutral-800 border-l-4 ${t.type === "error" ? "border-red-500" : t.type === "success" ? "border-green-500" : "border-blue-500"} p-4 rounded shadow-2xl flex items-center gap-3 animate-in slide-in-from-right fade-in duration-300 pointer-events-auto min-w-[200px]`}>
-            {t.type === "error" ? <ShieldAlert size={20} className="text-red-500" /> : t.type === "success" ? <Check size={20} className="text-green-500" /> : <Info size={20} className="text-blue-500" />}
-            <span className="text-sm font-medium text-white">{t.msg}</span>
-          </div>
-        ))}
-      </div>
+    <MeetingContext.Provider value={meetingContextValue}>
+      <div className="h-screen w-screen bg-[#202124] text-white flex flex-col overflow-hidden font-sans">
+      <Toaster
+        position="bottom-left"
+        toastOptions={{ style: { background: "#3c4043", color: "#fff" } }}
+      />
 
-      {/* SETTINGS MODAL */}
-      {showSettings && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-neutral-800 p-6 rounded-2xl shadow-2xl max-w-md w-full border border-neutral-700">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold flex items-center gap-2"><Settings size={20} /> Audio & Video Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-white"><X size={20} /></button>
+      {isInWaitingRoom && !askForUsername && !showPasscodeModal && (
+        <WaitingRoom
+          localStream={localStream}    
+          username={userName}
+          video={video}
+          audio={audio}
+          onToggleAudio={handleAudio}
+          onToggleVideo={handleVideo}
+          onCancel={cleanupAndLeave}
+        />
+      )}
+
+      {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
+        <>
+          <div className="flex-1 flex overflow-hidden w-full">
+            <div
+              className={`flex-1 flex flex-col transition-all duration-300 ease-in-out`}
+            >
+              <VideoGrid />
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Microphone</label>
-                <select className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none" value={selectedDevices.audioInput} onChange={(e) => handleDeviceChange("audioInput", e.target.value)}>
-                  {devices.audioInputs.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId}`}</option>)}
-                </select>
+
+            <div
+              className={`bg-[#202124] flex flex-col transition-all duration-300 ease-in-out overflow-hidden z-50 ${isSidebarOpen ? "fixed md:relative inset-0 md:inset-auto w-full md:w-[360px] opacity-100 md:border border-[#3c4043] md:rounded-2xl md:my-4 md:mr-4 md:ml-2" : "w-0 opacity-0 border-0 m-0"}`}
+            >
+              <div className="h-16 flex items-center justify-between px-6 border-b border-[#3c4043] shrink-0 bg-[#202124]">
+                <h2 className="font-medium text-lg text-white">
+                  {showParticipants && "People"}
+                  {showChat && "In-call messages"}
+                  {showInfo && "Meeting details"}
+                  {showHostSidebar && "Host controls"}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowParticipants(false);
+                    setShowChat(false);
+                    setShowInfo(false);
+                    setShowHostSidebar(false);
+                  }}
+                  className="p-2 hover:bg-[#3c4043] rounded-full text-white cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Camera</label>
-                <select className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none" value={selectedDevices.videoInput} onChange={(e) => handleDeviceChange("videoInput", e.target.value)}>
-                  {devices.videoInputs.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Cam ${d.deviceId}`}</option>)}
-                </select>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#202124]">
+                
+                {showParticipants && <ParticipantsPanel />}
+
+                {showHostSidebar && <HostControlsPanel />}
+
+                {showChat && <ChatPanel />}
+
+                {showInfo && <InfoPanel />}
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Speaker</label>
-                <select className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-2.5 text-sm outline-none" value={selectedDevices.audioOutput} onChange={(e) => handleDeviceChange("audioOutput", e.target.value)} disabled={!devices.audioOutputs.length}>
-                  {devices.audioOutputs.length > 0 ? devices.audioOutputs.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Speaker ${d.deviceId}`}</option>) : <option>Default</option>}
-                </select>
-              </div>
-              <div className="pt-4 border-t border-neutral-700">
-                <button onClick={toggleAudioConnection} className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${isAudioConnected ? "bg-red-500/20 text-red-500" : "bg-green-600 text-white"}`}>
-                  {isAudioConnected ? <><Power size={18} /> Leave Audio</> : <><Volume2 size={18} /> Join Audio</>}
+            </div>
+          </div>
+
+          {showCaptions && (localCaption || remoteCaption) && (
+            <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-40 max-w-[80%] w-full flex flex-col items-center pointer-events-none">
+              
+              {remoteCaption && (
+                <div className="bg-black/70 backdrop-blur-md px-6 py-3 rounded-xl shadow-2xl mb-2 border border-white/10 animate-fade-in text-center max-w-2xl">
+                  <p className="text-[#8ab4f8] text-xs font-bold uppercase tracking-wider mb-1">
+                    {remoteCaption.username}
+                  </p>
+                  <p className="text-white text-lg md:text-xl font-medium leading-relaxed">
+                    {remoteCaption.caption}
+                  </p>
+                </div>
+              )}
+
+              {localCaption && (
+                <div className="bg-black/70 backdrop-blur-md px-6 py-3 rounded-xl shadow-2xl border border-white/10 animate-fade-in text-center max-w-2xl">
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+                    You
+                  </p>
+                  <p className="text-white text-lg md:text-xl font-medium leading-relaxed">
+                    {localCaption}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <BottomControlBar />
+        </>
+      )}
+
+      {showLeaveMenu && amIHost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[#202124] text-white p-6 rounded-lg shadow-2xl w-80 border border-gray-700">
+            <h3 className="text-xl font-normal mb-6">Leave call?</h3>
+            <div className="space-y-3">
+              <button
+                onClick={handleHostEndForAll}
+                className="w-full text-left px-4 py-3 bg-[#3c4043] hover:bg-[#45484c] rounded text-sm transition-colors mb-2 cursor-pointer"
+              >
+                End the call for everyone
+              </button>
+              <button
+                onClick={handleHostLeaveSilently}
+                className="w-full text-left px-4 py-3 bg-[#3c4043] hover:bg-[#45484c] rounded text-sm transition-colors cursor-pointer"
+              >
+                Just leave the call
+              </button>
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={() => setShowLeaveMenu(false)}
+                  className="text-[#8ab4f8] text-sm font-medium hover:bg-[#2c3036] px-4 py-2 rounded transition-colors cursor-pointer"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
@@ -1067,206 +1812,231 @@ export default function VideoMeetComponent() {
         </div>
       )}
 
-      {/* PASSCODE MODAL */}
-      {showPasscodeModal && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-neutral-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-neutral-700 text-center">
-            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500"><Lock size={32} /></div>
-            <h2 className="text-2xl font-bold mb-2">Passcode Required</h2>
-            <form onSubmit={handleSubmitPasscode}>
-              <input type="password" autoFocus className="w-full bg-neutral-900 border border-neutral-600 rounded-lg p-3 text-white mb-4" placeholder="Enter Passcode" value={passcodeInput} onChange={(e) => setPasscodeInput(e.target.value)} />
-              {passcodeError && <p className="text-red-500 text-xs mb-3 text-left">Incorrect.</p>}
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg font-bold">Submit</button>
-            </form>
-          </div>
-        </div>
-      )}
+      {showPasscodeModal && <PasscodeModal />}
 
-      {/* LOBBY / JOIN SCREEN */}
-      {askForUsername && !showPasscodeModal && (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <div className="bg-neutral-800 p-8 rounded-xl shadow-2xl w-full max-w-md border border-neutral-700">
-            <h2 className="text-2xl font-bold mb-6 text-center">Join Meeting</h2>
-            <input className="bg-neutral-700 border border-neutral-600 text-white text-sm rounded-lg block w-full p-2.5 mb-6" placeholder="Enter name" value={userName} onChange={(e) => setUsername(e.target.value)} />
-            <div className="relative mb-6 rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
-              {localStream ? <VideoPlayer stream={localStream} isLocal={true} isMirrored={true} className="w-full h-full object-cover" /> : <div className="text-gray-400 flex flex-col items-center"><Loader2 size={32} className="animate-spin mb-2" /> Loading Camera...</div>}
-            </div>
-            <button onClick={connect} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-sm px-5 py-3">Join</button>
-          </div>
-        </div>
-      )}
-
-      {/* WAITING ROOM */}
-      {isInWaitingRoom && !askForUsername && !showPasscodeModal && (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900">
-          <div className="bg-neutral-800 p-10 rounded-2xl shadow-2xl border border-neutral-700 max-w-lg w-full text-center">
-            <ShieldAlert size={40} className="text-yellow-500 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold mb-2">Waiting for Host</h2>
-            <div className="flex justify-center gap-2 mt-4">
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-100"></span>
-              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-200"></span>
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#202124] text-white p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-700 transform transition-all">
+            <h3 className="text-xl font-normal mb-2">{confirmAction.title}</h3>
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+              {confirmAction.message}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="px-5 py-2.5 rounded-full hover:bg-[#3c4043] transition-colors font-medium text-sm text-gray-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  confirmAction.onConfirm();
+                  setConfirmAction(null);
+                }}
+                className="px-5 py-2.5 bg-[#8ab4f8] text-[#202124] rounded-full hover:bg-[#d2e3fc] transition-colors font-medium text-sm shadow-md cursor-pointer"
+              >
+                Confirm
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MAIN MEETING UI */}
-      {!askForUsername && !isInWaitingRoom && !showPasscodeModal && (
-        <div className="flex flex-col h-screen relative">
-          <div className="flex-1 flex flex-col md:flex-row bg-black overflow-hidden relative">
-            {isMobile ? renderPaginatedGrid() : viewMode === "GRID" ? renderPaginatedGrid() : <>
-              <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden order-1 md:order-1">{renderMainSpotlight()}</div>
-              <div className={`flex bg-neutral-900 border-neutral-800 md:flex-col md:w-64 md:border-l md:overflow-y-auto md:order-2 md:p-3 md:gap-3 flex-row w-full overflow-x-auto p-2 gap-2 h-24 border-t order-2 md:h-auto`}>{renderSideStrip()}</div>
-            </>}
 
-            {/* 3. RESTORED SIDEBARS: Participants, Chat, Info */}
-            {(showParticipants || showChat || showInfo) && (
-              <div className="fixed inset-0 z-40 bg-black/50 md:static md:w-80 md:bg-neutral-900 md:border-l md:border-neutral-800 flex flex-col md:h-auto md:translate-x-0">
-                <div className="md:hidden flex-1" onClick={() => { setShowParticipants(false); setShowChat(false); setShowInfo(false); }} />
-                <div className="bg-neutral-900 h-2/3 md:h-full w-full flex flex-col rounded-t-2xl md:rounded-none overflow-hidden">
-                  <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
-                    <h3 className="font-bold text-lg">{showParticipants ? "Participants" : showChat ? "In-Call Messages" : "Meeting Details"}</h3>
-                    <button onClick={() => { setShowParticipants(false); setShowChat(false); setShowInfo(false); }} className="p-1 hover:bg-neutral-800 rounded-full"><X size={20} /></button>
+      {showPolls && (
+        <div className="fixed inset-0 z-50 pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#202124] w-full max-w-md rounded-2xl shadow-2xl border border-[#3c4043] flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-[#3c4043] flex justify-between items-center bg-[#303134] rounded-t-2xl">
+              <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                <BarChart2 size={20} className="text-[#8ab4f8]" />
+                {activePoll
+                  ? "Active Poll"
+                  : isCreatingPoll
+                    ? "Create a Poll"
+                    : "Polls"}
+              </h3>
+              <button
+                onClick={() => setShowPolls(false)}
+                className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              {activePoll ? (
+                <div className="space-y-4">
+                  <h4 className="text-xl text-white font-medium mb-4">
+                    {activePoll.question}
+                  </h4>
+                  <div className="space-y-3">
+                    {activePoll.options.map((option, index) => {
+                      const totalVotes = activePoll.votes.reduce(
+                        (a, b) => a + b,
+                        0,
+                      );
+                      const percentage =
+                        totalVotes === 0
+                          ? 0
+                          : Math.round(
+                              (activePoll.votes[index] / totalVotes) * 100,
+                            );
+
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handleVote(index)}
+                          disabled={hasVoted || amIHost}
+                          className="w-full relative overflow-hidden bg-[#303134] border border-[#3c4043] rounded-lg p-4 text-left hover:bg-[#3c4043] transition-colors disabled:opacity-90 disabled:cursor-default group cursor-pointer"
+                        >
+                          <div
+                            className="absolute left-0 top-0 bottom-0 bg-[#8ab4f8]/20 transition-all duration-500"
+                            style={{
+                              width: `${hasVoted || amIHost ? percentage : 0}%`,
+                            }}
+                          ></div>
+                          <div className="relative flex justify-between items-center z-10 text-white">
+                            <span>{option}</span>
+                            {(hasVoted || amIHost) && (
+                              <span className="text-sm text-gray-400">
+                                {percentage}% ({activePoll.votes[index]})
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-
-                  {showInfo && (
-                    <div className="p-6 space-y-6">
-                      <div>
-                        <label className="text-xs text-gray-400 font-bold uppercase tracking-wider">Meeting Link</label>
-                        <div className="flex gap-2 mt-2">
-                          <div className="bg-neutral-800 p-3 rounded-lg text-sm text-gray-300 truncate flex-1">{window.location.href}</div>
-                          <button onClick={handleCopyLink} className="bg-blue-600 p-3 rounded-lg hover:bg-blue-700 text-white">{copied ? <Check size={20} /> : <Copy size={20} />}</button>
-                        </div>
-                        <p className="text-[10px] text-gray-500 mt-2 text-center">Room ID: {meetingCode}</p>
-                      </div>
-                      {passcode && <div><label className="text-xs text-gray-400 font-bold uppercase tracking-wider">Passcode</label><div className="mt-2 bg-neutral-800 p-3 rounded-lg text-sm text-gray-300">{passcode}</div></div>}
-                    </div>
-                  )}
-
-                  {showParticipants && (
-                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                      {amIHost && waitingUsers.length > 0 && (
-                        <div className="mb-4 bg-neutral-800 rounded-xl p-3 border border-yellow-600/30">
-                          <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-yellow-500 uppercase">Waiting Room ({waitingUsers.length})</span></div>
-                          {waitingUsers.map((u) => (
-                            <div key={u.socketId} className="flex items-center justify-between py-2"><span className="text-sm font-medium">{u.username}</span><button onClick={() => handleAdmit(u.socketId)} className="text-xs bg-blue-600 px-3 py-1.5 rounded-full hover:bg-blue-700">Admit</button></div>
-                          ))}
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between p-2 hover:bg-neutral-800 rounded-lg group">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-xs">{userName.charAt(0)}</div>
-                            <div><p className="text-sm font-medium">{userName} (You)</p><p className="text-[10px] text-gray-400">{amIHost ? "Host" : "Participant"}</p></div>
-                          </div>
-                          <div className="flex gap-2">{audio ? <Mic size={14} className="text-green-500" /> : <MicOff size={14} className="text-red-500" />}{video ? <Video size={14} className="text-white" /> : <VideoOff size={14} className="text-red-500" />}</div>
-                        </div>
-                        {Object.values(userMap).filter((u) => u.socketId !== socketRef.current?.id).map((user) => (
-                          <div key={user.socketId} className="flex items-center justify-between p-2 hover:bg-neutral-800 rounded-lg group">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${getAvatarColor(user.username)}`}>{user.username.charAt(0)}</div>
-                              <div><p className="text-sm font-medium">{user.username}</p><p className="text-[10px] text-gray-400">{user.socketId === roomHostId ? "Host" : "Participant"}</p></div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {user.isHandRaised && <Hand size={14} className="text-yellow-500" />}
-                              {user.isMuted ? <MicOff size={14} className="text-red-500" /> : <Mic size={14} className="text-gray-400" />}
-                              {user.isVideoOff ? <VideoOff size={14} className="text-red-500" /> : <Video size={14} className="text-gray-400" />}
-                              {amIHost && (
-                                <div className="opacity-0 group-hover:opacity-100 flex gap-1 ml-2">
-                                  <button onClick={() => handleKickUser(user.socketId)} title="Kick" className="p-1 hover:bg-red-500/20 text-red-500 rounded"><UserMinus size={14} /></button>
-                                  <button onClick={() => handleTransferHost(user.socketId)} title="Make Host" className="p-1 hover:bg-yellow-500/20 text-yellow-500 rounded"><Crown size={14} /></button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {showChat && (
-                    <>
-                      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {messages.length === 0 && <div className="text-center text-gray-500 text-sm mt-10">No messages yet.</div>}
-                        {messages.map((m, i) => (
-                          <div key={i} className={`flex flex-col ${m.isMe ? "items-end" : "items-start"}`}>
-                            <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${m.isMe ? "bg-blue-600 text-white rounded-tr-none" : "bg-neutral-800 text-gray-200 rounded-tl-none"}`}>
-                              <p className="font-bold text-[10px] opacity-50 mb-1">{m.sender}</p>{m.text}
-                            </div>
-                            <span className="text-[10px] text-gray-500 mt-1">{new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="p-4 border-t border-neutral-800">
-                        <div className="flex gap-2">
-                          <input className="flex-1 bg-neutral-800 border border-neutral-700 rounded-full px-4 text-sm focus:outline-none focus:border-blue-500" placeholder="Type a message..." value={currentMessage} onChange={(e) => setCurrentMessage(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSendMessage()} />
-                          <button onClick={handleSendMessage} className="bg-blue-600 p-2.5 rounded-full hover:bg-blue-700 text-white"><Send size={18} /></button>
-                        </div>
-                      </div>
-                    </>
+                  {amIHost && (
+                    <button
+                      onClick={handleEndPoll}
+                      className="w-full mt-6 bg-[#ea4335] text-white py-3 rounded-full font-medium hover:bg-[#d93025] transition-colors cursor-pointer"
+                    >
+                      End Poll
+                    </button>
                   )}
                 </div>
-              </div>
-            )}
+              ) : isCreatingPoll ? (
+                <div className="space-y-4">
+                  <input
+                    placeholder="Ask a question..."
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    className="w-full bg-[#303134] border border-[#5f6368] rounded px-4 py-3 text-white focus:outline-none focus:border-[#8ab4f8]"
+                  />
+                  {pollOptions.map((opt, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        placeholder={`Option ${i + 1}`}
+                        value={opt}
+                        onChange={(e) => {
+                          const newOpts = [...pollOptions];
+                          newOpts[i] = e.target.value;
+                          setPollOptions(newOpts);
+                        }}
+                        className="w-full bg-[#303134] border border-[#5f6368] rounded px-4 py-3 text-white focus:outline-none focus:border-[#8ab4f8]"
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          onClick={() =>
+                            setPollOptions(
+                              pollOptions.filter((_, idx) => idx !== i),
+                            )
+                          }
+                          className="p-3 text-gray-400 hover:text-red-400 cursor-pointer"
+                        >
+                          <X size={20} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setPollOptions([...pollOptions, ""])}
+                    className="text-[#8ab4f8] text-sm font-medium hover:underline cursor-pointer"
+                  >
+                    + Add Option
+                  </button>
+                  <div className="flex gap-3 pt-4 border-t border-[#3c4043]">
+                    <button
+                      onClick={() => setIsCreatingPoll(false)}
+                      className="flex-1 py-3 rounded-full hover:bg-[#3c4043] transition-colors text-white font-medium cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreatePollSubmit}
+                      className="flex-1 bg-[#8ab4f8] text-[#202124] py-3 rounded-full hover:bg-[#d2e3fc] transition-colors font-medium cursor-pointer"
+                    >
+                      Launch Poll
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center space-y-4 py-8">
+                  <div className="bg-[#303134] p-6 rounded-full">
+                    <BarChart2 size={40} className="text-[#8ab4f8]" />
+                  </div>
+                  <h4 className="text-xl font-normal text-white">
+                    Engage your audience
+                  </h4>
+                  <p className="text-sm text-gray-400 max-w-[250px]">
+                    Polls let you quickly check in with your audience and gather
+                    feedback.
+                  </p>
+                  {amIHost ? (
+                    <button
+                      onClick={() => setIsCreatingPoll(true)}
+                      className="bg-[#8ab4f8] text-[#202124] px-8 py-3 rounded-full font-medium mt-4 hover:bg-[#d2e3fc] transition-colors cursor-pointer shadow-lg"
+                    >
+                      Start a poll
+                    </button>
+                  ) : (
+                    <p className="text-[#8ab4f8] bg-[#8ab4f8]/10 px-4 py-2 rounded-full mt-4 text-sm">
+                      Waiting for host to start a poll...
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-
-          {/* DESKTOP FOOTER */}
-          <div className="hidden md:flex h-20 bg-neutral-900 border-t border-neutral-800 items-center justify-center z-20 px-4 gap-4 relative">
-            <button onClick={() => setShowSettings(true)} className="p-4 rounded-full bg-neutral-700 hover:bg-neutral-600 absolute left-4"><Settings size={24} /></button>
-            <button onClick={handleAudio} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${audio ? "bg-neutral-700" : "bg-red-500"}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</div><span className="text-[10px] text-gray-400 font-medium">Mic</span></button>
-            <button onClick={handleVideo} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${video ? "bg-neutral-700" : "bg-red-500"}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</div><span className="text-[10px] text-gray-400 font-medium">Cam</span></button>
-            <button onClick={handleToggleHand} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${isHandRaised ? "bg-yellow-500 text-black" : "bg-neutral-700 text-white"}`}><Hand size={24} /></div><span className="text-[10px] text-gray-400 font-medium">Hand</span></button>
-            <div className="relative">
-              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="flex flex-col items-center gap-1 min-w-[50px]"><div className="p-3 rounded-xl bg-neutral-700 hover:bg-neutral-600"><Smile size={24} /></div><span className="text-[10px] text-gray-400 font-medium">Emoji</span></button>
-              {showEmojiPicker && <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-neutral-800 border border-neutral-700 p-2 rounded-full flex gap-2 shadow-xl animate-in slide-in-from-bottom-5">{EMOJI_LIST.map((emoji) => (<button key={emoji} onClick={() => handleSendEmoji(emoji)} className="text-2xl hover:scale-125 transition-transform p-1">{emoji}</button>))}</div>}
-            </div>
-            <button onClick={handleScreen} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${screen ? "bg-blue-600" : "bg-neutral-700"}`}>{screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}</div><span className="text-[10px] text-gray-400 font-medium">Share</span></button>
-            <button onClick={toggleCaptions} className="flex flex-col items-center gap-1 min-w-[50px]" title="Captions"><div className={`p-3 rounded-xl transition-all ${showCaptions ? "bg-indigo-600 text-white" : "bg-neutral-700 text-white"}`}><Captions size={24} /></div><span className="text-[10px] text-gray-400 font-medium">Caps</span></button>
-            <button onClick={handleToggleRecord} className="flex flex-col items-center gap-1 min-w-[50px]" title="Record"><div className={`p-3 rounded-xl transition-all ${isRecording ? "bg-red-600 animate-pulse text-white" : "bg-neutral-700 text-white"}`}><Disc size={24} /></div><span className="text-[10px] text-gray-400 font-medium">Rec</span></button>
-            <button onClick={handleEndCall} className="flex flex-col items-center gap-1 min-w-[50px]"><div className="p-3 rounded-xl bg-red-600 text-white"><PhoneOff size={24} /></div><span className="text-[10px] text-red-500 font-bold">End</span></button>
-            <button onClick={handleToggleLock} className="flex flex-col items-center gap-1 min-w-[50px]" title={isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}><div className={`p-3 rounded-xl transition-all duration-300 transform ${isMeetingLocked ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.6)] scale-110" : "bg-neutral-700 text-white hover:bg-neutral-600"}`}>{isMeetingLocked ? <Lock size={24} /> : <Unlock size={24} />}</div><span className="text-[10px] text-gray-400 font-medium">{isMeetingLocked ? "Unlock" : "Lock"}</span></button>
-            <div className="absolute right-6 gap-3 flex">
-              <button onClick={() => setShowInfo(!showInfo)} className="p-3 rounded-xl bg-neutral-800"><Info size={24} /></button>
-              <button onClick={() => setShowParticipants(!showParticipants)} className="p-3 rounded-xl bg-neutral-800 relative"><Users size={24} />{amIHost && waitingUsers && waitingUsers.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waitingUsers.length}</span>}</button>
-              <button onClick={() => setShowChat(!showChat)} className="p-3 rounded-xl bg-neutral-800 relative"><MessageSquare size={24} />{unreadMessages > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadMessages}</span>}</button>
-            </div>
-          </div>
-
-          {/* MOBILE SLIDER (FOOTER) */}
-          <div className="md:hidden fixed bottom-0 left-0 right-0 h-24 bg-neutral-900 border-t border-neutral-800 flex items-center justify-between px-4 z-50">
-            <div className="flex w-full items-center justify-between overflow-x-auto no-scrollbar gap-6 px-2">
-              <button onClick={handleAudio} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${audio ? "bg-neutral-800" : "bg-red-500/20 text-red-500"}`}>{audio ? <Mic size={24} /> : <MicOff size={24} />}</div><span className="text-[10px] text-gray-400">Mic</span></button>
-              <button onClick={handleVideo} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${video ? "bg-neutral-800" : "bg-red-500/20 text-red-500"}`}>{video ? <Video size={24} /> : <VideoOff size={24} />}</div><span className="text-[10px] text-gray-400">Cam</span></button>
-              <button onClick={handleToggleHand} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${isHandRaised ? "bg-yellow-500 text-black" : "bg-neutral-800"}`}><Hand size={24} /></div><span className="text-[10px] text-gray-400">Hand</span></button>
-              <button onClick={() => setShowChat(!showChat)} className="flex flex-col items-center gap-1 min-w-[50px] relative"><div className="p-3 rounded-xl bg-neutral-800"><MessageSquare size={24} /></div>{unreadMessages > 0 && <span className="absolute top-0 right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-neutral-900"></span>}<span className="text-[10px] text-gray-400">Chat</span></button>
-              <button onClick={() => setShowParticipants(!showParticipants)} className="flex flex-col items-center gap-1 min-w-[50px] relative"><div className="p-3 rounded-xl bg-neutral-800"><Users size={24} /></div>{amIHost && waitingUsers.length > 0 && <span className="absolute top-0 right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-neutral-900"></span>}<span className="text-[10px] text-gray-400">People</span></button>
-              <button onClick={handleScreen} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${screen ? "bg-blue-600" : "bg-neutral-800"}`}>{screen ? <MonitorOff size={24} /> : <ScreenShare size={24} />}</div><span className="text-[10px] text-gray-400">Share</span></button>
-              <button onClick={toggleCaptions} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${showCaptions ? "bg-indigo-600 text-white" : "bg-neutral-800"}`}><Captions size={24} /></div><span className="text-[10px] text-gray-400">Caps</span></button>
-              <button onClick={handleToggleRecord} className="flex flex-col items-center gap-1 min-w-[50px]"><div className={`p-3 rounded-xl ${isRecording ? "bg-red-500/20 text-red-500 animate-pulse" : "bg-neutral-800"}`}><Disc size={24} /></div><span className="text-[10px] text-gray-400">Rec</span></button>
-              <button onClick={() => setShowMobileMenu(true)} className="flex flex-col items-center gap-1 min-w-[50px]"><div className="p-3 rounded-xl bg-neutral-800"><MoreHorizontal size={24} /></div><span className="text-[10px] text-gray-400">More</span></button>
-              <button onClick={handleEndCall} className="flex flex-col items-center gap-1 min-w-[50px]"><div className="p-3 rounded-xl bg-red-600 text-white"><PhoneOff size={24} /></div><span className="text-[10px] text-red-500 font-bold">End</span></button>
-            </div>
-          </div>
-
-          {showMobileMenu && (
-            <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowMobileMenu(false)}>
-              <div className="bg-neutral-900 w-full rounded-t-2xl p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-lg">More Options</h3><button onClick={() => setShowMobileMenu(false)}><X size={24} /></button></div>
-                <button onClick={() => { setShowInfo(true); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800"><Info size={24} /> Meeting Info</button>
-                {amIHost && (
-                  <>
-                    <button onClick={() => { handleMuteAll(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800 text-red-400"><MicOff size={24} /> Mute All</button>
-                    <button onClick={() => { handleStopVideoAll(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800 text-red-400"><VideoOff size={24} /> Stop All Video</button>
-                    <button onClick={() => { handleToggleLock(); setShowMobileMenu(false); }} className="w-full flex items-center gap-4 p-4 rounded-xl bg-neutral-800">{isMeetingLocked ? <Unlock size={24} /> : <Lock size={24} />} {isMeetingLocked ? "Unlock Meeting" : "Lock Meeting"}</button>
-                  </>
-                )}
-                <div className="flex justify-between bg-neutral-800 p-4 rounded-xl">{EMOJI_LIST.map((emoji) => (<button key={emoji} onClick={() => { handleSendEmoji(emoji); setShowMobileMenu(false); }} className="text-3xl hover:scale-125 transition-transform">{emoji}</button>))}</div>
-              </div>
-            </div>
-          )}
         </div>
       )}
+
+      {showWhiteboard && (
+        <CollaborativeWhiteboard
+          socket={socketRef.current}
+          roomId={meetingCode.trim().toLowerCase()}
+          onClose={() => handleToggleWhiteboard(false)}
+          isHost={amIHost}
+        />
+      )}
+
+      {/* Floating Reactions */}
+      <div className="fixed bottom-24 left-0 w-[40%] h-3/4 pointer-events-none z-[45] overflow-hidden">
+        {floatingReactions.map((reaction) => (
+          <div
+            key={reaction.id}
+            className="absolute bottom-0 flex flex-col items-center animate-[floatUp_3s_ease-out_forwards]"
+            style={{ left: `${reaction.left}%` }}
+          >
+            <div className="text-4xl md:text-5xl filter drop-shadow-lg transform transition-transform hover:scale-110">{reaction.emoji}</div>
+            <div className="bg-black/60 text-white text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-full mt-2 backdrop-blur-sm whitespace-nowrap shadow-md border border-white/10">
+              {reaction.senderName}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <style>{`
+        @keyframes floatUp {
+          0% { transform: translateY(100px) scale(0.5); opacity: 0; }
+          15% { transform: translateY(0px) scale(1.2); opacity: 1; }
+          30% { transform: translateY(-100px) scale(1) rotate(-5deg); opacity: 1; }
+          60% { transform: translateY(-300px) scale(1) rotate(5deg); opacity: 0.9; }
+          100% { transform: translateY(-500px) scale(0.8) rotate(0deg); opacity: 0; }
+        }
+      `}</style>
     </div>
+    </MeetingContext.Provider>
   );
 }

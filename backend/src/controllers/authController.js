@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/user.js';
 import sendEmail from '../utils/emailService.js';
 
-// Helper: Generate and Save OTP
 const generateAndSaveOtp = async (user) => {
   const otp = otpGenerator.generate(6, {
     upperCaseAlphabets: false,
@@ -16,13 +15,11 @@ const generateAndSaveOtp = async (user) => {
   const hashedOtp = await bcrypt.hash(otp, salt);
 
   user.otp = hashedOtp;
-  user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  user.otpExpires = Date.now() + 10 * 60 * 1000;
   await user.save();
 
   return otp;
 };
-
-// --- CONTROLLERS ---
 
 export const sendOtp = async (req, res) => {
   const { email } = req.body;
@@ -39,7 +36,6 @@ export const sendOtp = async (req, res) => {
   try {
     let user = await User.findOne({ email });
 
-    // Create temporary user if doesn't exist
     if (!user) {
       user = new User({
         email,
@@ -49,7 +45,6 @@ export const sendOtp = async (req, res) => {
       console.log(`Temporary user created for signup: ${email}`);
     }
 
-    // Prevent spam if already verified and no active OTP
     if (user.isVerified && !user.otp) {
       return res.status(400).json({ message: "Email already verified. Please log in." });
     }
@@ -57,15 +52,46 @@ export const sendOtp = async (req, res) => {
     const otp = await generateAndSaveOtp(user);
 
     const emailContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px;">
-        <h1 style="color: #333;">Welcome to Confera</h1>
-        <p>Your verification code is:</p>
-        <h2 style="font-size: 28px; color: #007bff; text-align: center; letter-spacing: 8px;">${otp}</h2>
-        <p style="color: #666;">This code expires in 10 minutes.</p>
-        <hr style="border: 1px solid #eee; margin: 30px 0;">
-        <p style="color: #888; font-size: 12px;">If you didn't request this, ignore this email.</p>
+  <div style="background-color: #f6f8fa; padding: 40px 20px; font-family: 'Tahoma', 'Georgia', sans-serif;">
+    <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e1e4e8; overflow: hidden; box-shadow: 0 1px 3px rgba(27,31,35,0.04);">
+      
+      <!-- Header -->
+      <div style="padding: 32px 40px 24px; text-align: center; border-bottom: 1px solid #eaecef;">
+        <img src="https://res.cloudinary.com/dithpp9nq/image/upload/v1780751743/BrandLogo_wbrtj4.png" alt="Confera" style="height: 80px; display: block; margin: 0 auto; object-fit: contain;" />
       </div>
-    `;
+
+      <!-- Body -->
+      <div style="padding: 40px;">
+        <h2 style="margin-top: 0; color: #24292e; font-size: 20px; font-weight: 600; margin-bottom: 16px;">
+          Verify your email address
+        </h2>
+        <p style="color: #586069; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
+          Welcome to Confera. To complete your registration and secure your account, please enter the following verification code:
+        </p>
+
+        <div style="background-color: #f6f8fa; border-radius: 6px; padding: 24px; text-align: center; margin: 32px 0; border: 1px solid #eaecef; overflow-x: auto;">
+          <span style="font-family: 'Tahoma', 'Georgia', monospace; font-size: 30px; font-weight: 600; color: #24292e; letter-spacing: 4px; white-space: nowrap;">
+            ${otp}
+          </span>
+        </div>
+
+        <p style="color: #586069; font-size: 14px; text-align: center; margin-top: 0;">
+          This code will expire in <strong style="color: #24292e;">10 minutes</strong>.
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="background-color: #fafbfc; padding: 24px 40px; text-align: center; border-top: 1px solid #eaecef;">
+        <p style="color: #6a737d; font-size: 12px; line-height: 1.5; margin: 0;">
+          If you didn't attempt to register for Confera, please safely ignore this email or contact support.
+          <br><br>
+          &copy; ${new Date().getFullYear()} Confera. All rights reserved.
+        </p>
+      </div>
+      
+    </div>
+  </div>
+`;
 
     await sendEmail(email, "Confera Verification Code", emailContent);
 
@@ -94,7 +120,6 @@ export const verifyOtp = async (req, res) => {
     const isMatch = await bcrypt.compare(otp, user.otp);
     if (!isMatch) return res.status(400).json({ message: "Invalid OTP" });
 
-    // Clear OTP and mark verified
     user.otp = undefined;
     user.otpExpires = undefined;
     user.isVerified = true;
@@ -121,21 +146,57 @@ export const forgotPassword = async (req, res) => {
   try {
     const user = await User.findOne({ email });
 
-    if (!user || !user.isVerified) {
-      // Security: don't reveal existence
-      return res.status(200).json({ message: "If account exists, reset OTP has been sent." });
+    if (!user) {
+      return res.status(404).json({ message: "This email does not exist." });
+    }
+
+    if (!user.isVerified) {
+      return res.status(400).json({ message: "This email is not registered/verified yet." });
     }
 
     const otp = await generateAndSaveOtp(user);
 
     const emailContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
-        <h1 style="color: #dc3545;">Reset Your Confera Password</h1>
-        <p>Use this code to reset your password:</p>
-        <h2 style="font-size: 28px; color: #dc3545; text-align: center;">${otp}</h2>
-        <p style="color: #666;">Valid for 10 minutes.</p>
+  <div style="background-color: #f6f8fa; padding: 40px 20px; font-family: 'Tahoma', 'Georgia', sans-serif;">
+    <div style="max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #e1e4e8; overflow: hidden; box-shadow: 0 1px 3px rgba(27,31,35,0.04);">
+      
+      <!-- Header -->
+      <div style="padding: 32px 40px 24px; text-align: center; border-bottom: 1px solid #eaecef;">
+        <img src="https://res.cloudinary.com/dithpp9nq/image/upload/v1780751743/BrandLogo_wbrtj4.png" alt="Confera" style="height: 80px; display: block; margin: 0 auto; object-fit: contain;" />
       </div>
-    `;
+
+      <!-- Body -->
+      <div style="padding: 40px;">
+        <h2 style="margin-top: 0; color: #24292e; font-size: 20px; font-weight: 600; margin-bottom: 16px;">
+          Reset your password
+        </h2>
+        <p style="color: #586069; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
+          We received a request to reset the password for your Confera account. Please use the verification code below to set up a new password:
+        </p>
+
+        <div style="background-color: #f6f8fa; border-radius: 6px; padding: 24px; text-align: center; margin: 32px 0; border: 1px solid #eaecef; overflow-x: auto;">
+          <span style="font-family: 'Tahoma', 'Georgia', monospace; font-size: 30px; font-weight: 600; color: #24292e; letter-spacing: 4px; white-space: nowrap;">
+            ${otp}
+          </span>
+        </div>
+
+        <p style="color: #586069; font-size: 14px; text-align: center; margin-top: 0;">
+          This code will expire in <strong style="color: #24292e;">10 minutes</strong>.
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div style="background-color: #fafbfc; padding: 24px 40px; text-align: center; border-top: 1px solid #eaecef;">
+        <p style="color: #6a737d; font-size: 12px; line-height: 1.5; margin: 0;">
+          If you didn't request a password reset, you can safely ignore this email. Your password will not change and your account remains secure.
+          <br><br>
+          &copy; ${new Date().getFullYear()} Confera. All rights reserved.
+        </p>
+      </div>
+      
+    </div>
+  </div>
+`;
 
     await sendEmail(email, "Confera Password Reset", emailContent);
 

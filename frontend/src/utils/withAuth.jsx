@@ -14,7 +14,7 @@ const withAuth = (WrappedComponent) => {
         }, [userData, isLoading, router]);
 
         if (isLoading) {
-            return null; // Or a spinner
+            return null;
         }
 
         if (!userData) {

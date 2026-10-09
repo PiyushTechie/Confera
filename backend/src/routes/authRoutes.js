@@ -32,7 +32,7 @@ router.get(
         const token = crypto.randomBytes(20).toString("hex");
         req.user.token = token;
         await req.user.save();
-        res.redirect(`${process.env.CLIENT_URL}/home?token=${token}`);
+        res.redirect(`http://localhost:5173/home?token=${token}`);
     } catch (error) {
         console.error("Google Auth Error:", error);
         res.redirect(`${process.env.CLIENT_URL}/auth`);

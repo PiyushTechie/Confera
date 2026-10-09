@@ -2,6 +2,7 @@ import axios, { HttpStatusCode } from "axios";
 import { createContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import server from "../environment";
+
 export const AuthContext = createContext({});
 
 const client = axios.create({
@@ -20,18 +21,24 @@ client.interceptors.request.use((config) => {
 export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useNavigate();
+  const navigate = useNavigate();
 
-  const fetchUserData = async (token) => {
+  const safeParse = (value) => {
     try {
-      const response = await client.get("/activity");
+      if (!value || value === "undefined") return null;
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  };
 
-      setUserData((prev) => {
-        const current = prev || { token: token };
-        return { ...current, history: response.data };
-      });
-    } catch (error) {
-      console.error("Failed to fetch user history:", error);
+  const fetchUserHistory = async () => {
+    try {
+      const res = await client.get("/activity");
+      return res.data;
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+      return [];
     }
   };
 
@@ -43,33 +50,30 @@ export const AuthProvider = ({ children }) => {
 
         if (urlToken) {
           localStorage.setItem("token", urlToken);
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
 
-          setUserData({ token: urlToken, history: [] });
-          await fetchUserData(urlToken);
+        const token = urlToken || localStorage.getItem("token");
+        if (!token) {
+          setUserData(null);
           return;
         }
 
-        const localToken = localStorage.getItem("token");
-        const localUser = localStorage.getItem("userData");
-
-        if (localToken) {
-          if (localUser) {
-            setUserData(JSON.parse(localUser));
-          } else {
-            setUserData({ token: localToken });
-          }
-
-          await fetchUserData(localToken);
+        const cachedUser = safeParse(localStorage.getItem("userData")) || {};
+        
+        let history = [];
+        try {
+            history = await fetchUserHistory();
+        } catch (e) {
+            console.warn("Could not fetch initial history", e);
         }
-      } catch (error) {
-        console.error("Auth Check Error:", error);
-        localStorage.removeItem("token");
-        localStorage.removeItem("userData");
+
+        const finalUser = { ...cachedUser, history };
+        setUserData(finalUser);
+        localStorage.setItem("userData", JSON.stringify(finalUser));
+      } catch (err) {
+        console.error("Auth Check Error:", err);
+        localStorage.clear();
         setUserData(null);
       } finally {
         setIsLoading(false);
@@ -79,63 +83,74 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const handleRegister = async (name, username, password, email) => {
-    let request = await client.post("/register", { name, username, password, email });
-    if (request.status === HttpStatusCode.Created) return request.data.message;
+  const handleRegister = async (name, password, email) => {
+    const res = await client.post("/register", { name, password, email });
+    if (res.status === HttpStatusCode.Created) return res.data.message;
   };
 
-  const handleLogin = async (username, password) => {
-    let request = await client.post("/login", { username, password });
-    if (request.status === HttpStatusCode.Ok) {
-      localStorage.setItem("token", request.data.token);
-      localStorage.setItem("userData", JSON.stringify(request.data.user));
-      setUserData(request.data.user);
-      router("/home");
+  const handleLogin = async (email, password) => {
+    const res = await client.post("/login", { email, password });
+
+    if (res.status === HttpStatusCode.Ok) {
+      localStorage.setItem("token", res.data.token);
+      const userPayload = res.data.user || {
+          name: res.data.name,
+          email: res.data.email || email,
+          username: res.data.username
+      };
+      localStorage.setItem("userData", JSON.stringify(userPayload));
+      setUserData(userPayload);
+      navigate("/home");
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userData");
+    localStorage.clear();
     setUserData(null);
-    router("/auth");
+    navigate("/auth");
   };
 
   const addToUserHistory = async (meetingDetails) => {
     try {
-      const token = localStorage.getItem("token");
       const meeting_code =
-        typeof meetingDetails === "object" ? meetingDetails.id : meetingDetails;
+        typeof meetingDetails === "object"
+          ? meetingDetails.id
+          : meetingDetails;
 
-      await client.post("/activity", {
-        token: token, // <--- ADD THIS LINE
-        meeting_code: meeting_code,
-      });
+      const token = localStorage.getItem("token");
+      if (!token) {
+          console.warn("Cannot add history: No token found.");
+          return;
+      }
+
+      await client.post("/activity", 
+        { meeting_code },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        }
+      );
 
       if (userData) {
-        const newHistoryItem =
-          typeof meetingDetails === "object"
-            ? meetingDetails
-            : { meetingCode: meetingDetails, date: new Date() };
-        const newHistory = [...(userData.history || []), newHistoryItem];
-        const updatedUser = { ...userData, history: newHistory };
-
-        setUserData(updatedUser);
-        localStorage.setItem("userData", JSON.stringify(updatedUser));
+        const updated = {
+          ...userData,
+          history: [...(userData.history || []), { meeting_code, date: new Date() }],
+        };
+        setUserData(updated);
+        localStorage.setItem("userData", JSON.stringify(updated));
       }
-    } catch (e) {
-      console.error(e);
+      console.log("History added successfully");
+    } catch (err) {
+      console.error("History update failed:", err);
     }
   };
 
   const getHistoryOfUser = async () => {
     try {
-      const token = localStorage.getItem("token");
-      let response = await client.get("/activity", {
-        params: { token: token },
-      });
-      return response.data;
-    } catch (e) {
+      const res = await client.get("/activity");
+      return res.data;
+    } catch {
       return [];
     }
   };
@@ -154,16 +169,7 @@ export const AuthProvider = ({ children }) => {
       }}
     >
       {isLoading ? (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100vh",
-            background: "#fff",
-            color: "#333",
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
           Loading...
         </div>
       ) : (

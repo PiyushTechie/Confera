@@ -1,314 +1,391 @@
-import React from 'react';
-import styled from 'styled-components';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Shield, Zap, Users, Video, CheckCircle, Globe, Play, 
-  MonitorUp, MessageSquare, Lock, Wifi, Smartphone, 
-  Server, Code, ChevronRight, Check
+  Video, Globe, Shield, Zap, Sparkles, MessageSquare, 
+  MonitorUp, Code, Lock, Play, ChevronRight, CheckCircle, 
+  ArrowRight, Users, LayoutDashboard, Share2
 } from 'lucide-react';
 import Navbar from '../components/Navbar'; 
 import Footer from '../components/Footer'; 
+import CursorGrid from '../components/CursorGrid';
+import { Button } from '../components/Button';
 import { Link } from 'react-router-dom';
-import '../index.css'
+import '../index.css';
+
 const LandingPage = () => {
+  const [activeTab, setActiveTab] = useState(0);
+  const [textIndex, setTextIndex] = useState(0);
+  const rotatingTexts = ["actually work.", "build culture.", "drive results.", "empower teams."];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTextIndex((prev) => (prev + 1) % rotatingTexts.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const tabs = [
+    {
+      id: 0,
+      title: "Create Instant Rooms",
+      icon: <Zap size={20} />,
+      content: "Generate a secure, randomized meeting link in milliseconds. No downloads, no waiting rooms unless you want them.",
+      image: "https://images.unsplash.com/photo-1573164713988-8665fc963095?q=80&w=2069&auto=format&fit=crop"
+    },
+    {
+      id: 1,
+      title: "Share Seamlessly",
+      icon: <Share2 size={20} />,
+      content: "Send the link via Slack, Email, or SMS. Guests join instantly through their browser on any device.",
+      image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=2070&auto=format&fit=crop"
+    },
+    {
+      id: 2,
+      title: "Collaborate Live",
+      icon: <LayoutDashboard size={20} />,
+      content: "Crystal clear 4K video, synchronized whiteboards, and real-time chat ensure your team stays aligned.",
+      image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?q=80&w=2070&auto=format&fit=crop"
+    }
+  ];
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans selection:bg-indigo-100 overflow-x-hidden">
+    <div className="min-h-screen flex flex-col bg-[#fafbfc] text-slate-900 selection:bg-indigo-100 overflow-x-hidden font-sans">
       <Navbar />
 
-      <main className="relative pt-32 pb-20 px-6 lg:px-8 bg-white">
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-b from-indigo-50 to-white rounded-full blur-3xl opacity-60 translate-x-1/3 -translate-y-1/4" />
-            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-50 rounded-full blur-3xl opacity-60 -translate-x-1/3 translate-y-1/4" />
-        </div>
+      {/* --- HERO SECTION --- */}
+      <main className="relative pt-32 pb-32 px-6 lg:px-8 border-b border-slate-100 bg-white overflow-hidden min-h-screen flex items-center justify-center">
+        <CursorGrid color="#4f46e5" />
+        <div className="max-w-7xl mx-auto flex flex-col items-center text-center relative z-10 pt-10 px-6 lg:px-8 w-full pointer-events-none">
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-8 max-w-5xl mx-auto pointer-events-auto"
+          >
+            <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-50 border border-slate-200 text-slate-600 font-medium text-sm shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Introducing Confera v2.0
+            </motion.div>
 
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-20 items-center relative z-10">
-          <div className="space-y-8 text-center lg:text-left">
-            <h1 className="font-outfit text-5xl md:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900">
-              Connect deeper <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                anywhere.
-              </span>
-            </h1>
+            <motion.h1 variants={itemVariants} className="font-heading text-6xl md:text-7xl lg:text-8xl font-extrabold leading-[1.1] tracking-tight text-slate-900 drop-shadow-sm max-w-4xl mx-auto">
+              Meetings that <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">empower teams.</span>
+            </motion.h1>
             
-            <p className="font-outfit text-lg text-slate-600 leading-relaxed max-w-xl mx-auto lg:mx-0">
-              Experience the next evolution of video conferencing. 
-              Crystal clear 4K video, spatial audio, and zero-latency collaboration for teams that move fast.
-            </p>
+            <motion.p variants={itemVariants} className="text-xl text-slate-500 leading-relaxed max-w-2xl mx-auto pt-4">
+              Enterprise-grade video conferencing that runs natively in your browser. Lightning-fast, secure, and designed for professional teams.
+            </motion.p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-4">
+            <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
               <Link to="/auth" style={{ textDecoration: 'none' }}>
-                <GetStartedBtnStyle>
-                  <button className="button">
-                    Start Free Meeting
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </GetStartedBtnStyle>
+                  <Button size="lg" variant="primary" icon={<ArrowRight className="w-5 h-5" />} iconPosition="right">
+                    Start a Free Meeting
+                  </Button>
               </Link>
-              <button className="flex items-center gap-2 px-6 py-4 rounded-full font-bold text-slate-700 hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all">
-                 <Play className="w-4 h-4 fill-current" />
+              <Button size="lg" variant="outline" icon={<Play className="w-4 h-4 fill-current" />}>
                  Watch Demo
-              </button>
-            </div>
-          </div>
+              </Button>
+            </motion.div>
+          </motion.div>
 
-          <div className="relative h-[500px] w-full flex items-center justify-center hidden md:flex">
-            
-             <div className="relative z-10 w-full max-w-sm aspect-[4/5] bg-slate-50 rounded-[2.5rem] border-8 border-slate-900 shadow-2xl shadow-indigo-500/20 transform -rotate-2 overflow-hidden">
-                
-                <img 
-                    src="https://images.unsplash.com/photo-1616587894289-86480e533129?q=80&w=2070&auto=format&fit=crop" 
-                    alt="App Interface Preview" 
-                    className="w-full h-full object-cover" 
-                />
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-                <div className="absolute bottom-8 left-6 right-6 bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-lg">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
-                            <Video size={20} />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-slate-800">HD Video Calls</p>
-                            <p className="text-xs text-slate-500">Crystal clear quality.</p>
-                        </div>
-                    </div>
-                </div>
-
-             </div>
-
-             <div className="absolute -z-10 top-8 right-16 w-full max-w-sm aspect-[4/5] bg-indigo-100/50 rounded-[2.5rem] transform rotate-3 border border-indigo-200" />
-          </div>
+          {/* Dashboard mock removed per user request */}
         </div>
       </main>
 
-      <section className="py-10 border-y border-slate-100 bg-slate-50/50">
+      {/* --- LOGO CLOUD --- */}
+      <section className="py-12 border-y border-slate-100 bg-white">
          <div className="max-w-7xl mx-auto px-6 text-center">
-            <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-6">Trusted by 2,000+ teams and developers</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale">
-                <div className="font-bold text-xl text-slate-500 flex items-center gap-2"><Zap size={20}/> ACME Corp</div>
-                <div className="font-bold text-xl text-slate-500 flex items-center gap-2"><Globe size={20}/> GlobalTech</div>
-                <div className="font-bold text-xl text-slate-500 flex items-center gap-2"><Shield size={20}/> SecureNet</div>
-                <div className="font-bold text-xl text-slate-500 flex items-center gap-2"><Code size={20}/> DevHouse</div>
-            </div>
-            
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-600 shadow-sm">
-                  <Lock size={12} className="text-green-500"/> WebRTC Powered
-               </span>
-               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-600 shadow-sm">
-                  <Shield size={12} className="text-indigo-500"/> End-to-End Encrypted
-               </span>
-               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-600 shadow-sm">
-                  <Globe size={12} className="text-blue-500"/> Browser Based
-               </span>
+            <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-8">Trusted by the world's most innovative teams</p>
+            <div className="flex flex-wrap justify-center items-center gap-10 md:gap-20 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                <div className="font-heading font-bold text-2xl flex items-center gap-2"><Zap size={24}/> Linear</div>
+                <div className="font-heading font-bold text-2xl flex items-center gap-2"><Globe size={24}/> Vercel</div>
+                <div className="font-heading font-bold text-2xl flex items-center gap-2"><Shield size={24}/> Stripe</div>
+                <div className="font-heading font-bold text-2xl flex items-center gap-2"><Code size={24}/> GitHub</div>
             </div>
          </div>
       </section>
 
-      <section className="py-24 px-6 bg-white">
+      {/* --- BENTO GRID SECTION --- */}
+      <section className="py-32 px-6 bg-[#fafbfc]">
         <div className="max-w-7xl mx-auto">
-           <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">Everything you need to collaborate</h2>
-              <p className="text-slate-500 text-lg max-w-2xl mx-auto">Powerful features wrapped in a simple interface. No bloat, just performance.</p>
-           </div>
+           <motion.div 
+             initial={{ opacity: 0, y: 20 }}
+             whileInView={{ opacity: 1, y: 0 }}
+             viewport={{ once: true }}
+             className="text-center mb-20"
+           >
+              <h2 className="font-heading text-4xl md:text-5xl font-bold text-slate-900 mb-6">Designed for speed. <br/> Engineered for scale.</h2>
+              <p className="text-slate-500 text-xl max-w-2xl mx-auto">Everything you need to run high-quality video meetings without the heavy desktop apps.</p>
+           </motion.div>
 
-           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[
-                { icon: Video, title: "HD Video & Audio", desc: "Crystal clear 4K video rendering with noise cancellation." },
-                { icon: MonitorUp, title: "One-click Screen Share", desc: "Share your entire screen, window, or a specific tab instantly." },
-                { icon: MessageSquare, title: "Real-time Chat", desc: "Text, emojis, and link sharing without interrupting the flow." },
-                { icon: Users, title: "Multi-participant", desc: "Host group calls with stable low-latency connections." },
-                { icon: Globe, title: "No Downloads", desc: "Runs entirely in the browser. Send a link, start a meeting." },
-                { icon: Shield, title: "Secure by Design", desc: "Peer-to-peer encryption ensures your data stays private." },
-              ].map((feature, idx) => (
-                 <div key={idx} className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all group">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm mb-6 group-hover:scale-110 transition-transform">
-                       <feature.icon size={24} />
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[320px]">
+              {/* Big Tile */}
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="md:col-span-2 md:row-span-2 rounded-[2rem] bg-white border border-slate-200 p-10 flex flex-col justify-between relative overflow-hidden shadow-sm hover:shadow-xl group"
+              >
+                 <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-50 to-transparent opacity-50" />
+                 <div className="relative z-10">
+                    <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
+                        <Video size={28} />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-3">{feature.title}</h3>
-                    <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
+                    <h3 className="font-heading text-3xl font-bold text-slate-900 mb-4">Mediasoup SFU Architecture</h3>
+                    <p className="text-slate-600 text-lg max-w-md">Our advanced Selective Forwarding Unit (SFU) routes video efficiently, saving your CPU and allowing hundreds of participants with crystal clear 4K rendering.</p>
                  </div>
-              ))}
+                 <div className="relative z-10 w-full flex-1 mt-8 bg-slate-100 rounded-2xl overflow-hidden border border-slate-200">
+                    <img src="https://images.unsplash.com/photo-1573164713988-8665fc963095?q=80&w=2069&auto=format&fit=crop" alt="Meeting" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                 </div>
+              </motion.div>
+
+              {/* Small Tile 1 */}
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="rounded-[2rem] bg-slate-900 text-white p-10 flex flex-col relative overflow-hidden shadow-xl"
+              >
+                 <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-6">
+                    <Lock size={24} />
+                 </div>
+                 <h3 className="font-heading text-2xl font-bold mb-3">Enterprise Security</h3>
+                 <p className="text-slate-400">End-to-End encryption via DTLS-SRTP. We cannot see or hear your meetings. Ever.</p>
+                 <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-indigo-500 rounded-full blur-[60px] opacity-30" />
+              </motion.div>
+
+              {/* Small Tile 2 */}
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="rounded-[2rem] bg-white border border-slate-200 p-10 flex flex-col shadow-sm hover:shadow-xl group"
+              >
+                 <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
+                    <Globe size={24} />
+                 </div>
+                 <h3 className="font-heading text-2xl font-bold text-slate-900 mb-3">Runs in the Browser</h3>
+                 <p className="text-slate-600">Send a link, and they're in. Works perfectly on Chrome, Safari, Firefox, and mobile.</p>
+              </motion.div>
+              
+              {/* Small Tile 3 */}
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="md:col-span-3 rounded-[2rem] bg-white border border-slate-200 p-10 flex flex-col md:flex-row items-center gap-10 shadow-sm hover:shadow-xl"
+              >
+                 <div className="flex-1">
+                    <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 mb-6">
+                        <MessageSquare size={24} />
+                    </div>
+                    <h3 className="font-heading text-3xl font-bold text-slate-900 mb-4">Real-time Collaboration</h3>
+                    <p className="text-slate-600 text-lg">More than just video. Share your screen instantly, drop files in the chat, use live emoji reactions, and draw together on the synchronized whiteboard.</p>
+                 </div>
+                 <div className="flex-1 w-full h-48 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-center overflow-hidden">
+                    <div className="flex -space-x-4">
+                        {["👍","❤️","🎉","😂"].map((emoji, i) => (
+                            <motion.div 
+                                key={i}
+                                animate={{ y: [0, -20, 0], opacity: [0.5, 1, 0.5] }}
+                                transition={{ repeat: Infinity, duration: 2, delay: i * 0.2 }}
+                                className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center text-3xl border border-slate-100"
+                            >
+                                {emoji}
+                            </motion.div>
+                        ))}
+                    </div>
+                 </div>
+              </motion.div>
+
            </div>
         </div>
       </section>
 
-      <section className="py-24 px-6 bg-slate-50">
-         <div className="max-w-7xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 text-center mb-16">Start meeting in seconds</h2>
-            
-            <div className="grid md:grid-cols-3 gap-12 relative">
-               <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-0.5 bg-slate-200 -z-10" />
-
-               {[
-                 { num: "1", title: "Create Room", desc: "Click 'New Meeting' to generate a unique secure room ID." },
-                 { num: "2", title: "Share Link", desc: "Copy the code or link and send it to your team or friends." },
-                 { num: "3", title: "Join Instantly", desc: "Guests join via browser. No login or installs required." },
-               ].map((step, idx) => (
-                  <div key={idx} className="flex flex-col items-center text-center">
-                     <div className="w-16 h-16 bg-indigo-600 text-white rounded-full flex items-center justify-center text-2xl font-bold shadow-lg shadow-indigo-200 mb-6">
-                        {step.num}
-                     </div>
-                     <h3 className="text-xl font-bold text-slate-900 mb-2">{step.title}</h3>
-                     <p className="text-slate-600">{step.desc}</p>
-                  </div>
-               ))}
-            </div>
-         </div>
-      </section>
-
-      <section className="py-24 px-6 bg-white">
-         <div className="max-w-7xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-12">Built for every conversation</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-               {[
-                 { icon: Users, title: "Remote Teams", desc: "Daily stand-ups & sprint planning." },
-                 { icon: MonitorUp, title: "Online Classes", desc: "Tutoring and interactive workshops." },
-                 { icon: Code, title: "Tech Interviews", desc: "Live coding sessions with zero lag." },
-                 { icon: Video, title: "Communities", desc: "Casual hangouts and group events." },
-               ].map((item, idx) => (
-                  <div key={idx} className="p-6 border border-slate-200 rounded-2xl hover:shadow-lg transition-shadow">
-                     <item.icon className="w-8 h-8 text-indigo-500 mb-4" />
-                     <h3 className="font-bold text-lg text-slate-900">{item.title}</h3>
-                     <p className="text-slate-500 text-sm mt-2">{item.desc}</p>
-                  </div>
-               ))}
-            </div>
-         </div>
-      </section>
-
-      <section className="py-24 px-6 bg-indigo-900 text-white relative overflow-hidden">
-         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500 rounded-full blur-[120px] opacity-20 pointer-events-none" />
-         
-         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
+      {/* --- HOW IT WORKS (TABS) --- */}
+      <section className="py-32 px-6 bg-white border-y border-slate-100">
+         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
             <div>
-               <h2 className="text-3xl md:text-5xl font-bold mb-6">Why we are different</h2>
-               <p className="text-indigo-200 text-lg mb-8">Most tools are bloated, slow, and require heavy installs. We built Cenfora for speed, privacy, and simplicity.</p>
+               <h2 className="font-heading text-4xl md:text-5xl font-bold text-slate-900 mb-6">How it works</h2>
+               <p className="text-slate-500 text-xl mb-10">We stripped away the complexity so you can focus on the conversation.</p>
                
                <div className="space-y-4">
-                  {[
-                    "Faster join time than Zoom/Teams",
-                    "No application installation required",
-                    "Optimized for unstable/low bandwidth",
-                    "Privacy-first P2P architecture",
-                    "Clean, distraction-free interface"
-                  ].map((item, i) => (
-                     <div key={i} className="flex items-center gap-3">
-                        <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
-                           <Check size={14} strokeWidth={3} />
+                  {tabs.map((tab, idx) => (
+                     <div 
+                        key={tab.id}
+                        onClick={() => setActiveTab(idx)}
+                        className={`p-6 rounded-2xl cursor-pointer transition-all border ${activeTab === idx ? 'bg-white border-indigo-200 shadow-xl shadow-indigo-100' : 'bg-transparent border-transparent hover:bg-slate-50'}`}
+                     >
+                        <div className="flex items-center gap-4 mb-2">
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activeTab === idx ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                              {tab.icon}
+                           </div>
+                           <h3 className={`font-heading text-xl font-bold ${activeTab === idx ? 'text-slate-900' : 'text-slate-500'}`}>{tab.title}</h3>
                         </div>
-                        <span className="font-medium">{item}</span>
+                        <AnimatePresence>
+                           {activeTab === idx && (
+                              <motion.p 
+                                 initial={{ opacity: 0, height: 0 }}
+                                 animate={{ opacity: 1, height: 'auto' }}
+                                 exit={{ opacity: 0, height: 0 }}
+                                 className="text-slate-600 mt-4 ml-14"
+                              >
+                                 {tab.content}
+                              </motion.p>
+                           )}
+                        </AnimatePresence>
                      </div>
                   ))}
                </div>
             </div>
-            <div className="bg-indigo-800/50 backdrop-blur-md p-8 rounded-3xl border border-indigo-500/30">
-               <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center">
-                     <Zap className="text-white" />
-                  </div>
-                  <div>
-                     <h3 className="font-bold text-xl">Lightning Fast</h3>
-                     <p className="text-indigo-300 text-sm">Benchmarks vs Competitors</p>
-                  </div>
-               </div>
-               <div className="space-y-4">
-                  <div>
-                     <div className="flex justify-between text-sm mb-1"><span>Cenfora</span> <span className="font-bold">0.4s</span></div>
-                     <div className="h-3 bg-indigo-950 rounded-full overflow-hidden">
-                        <div className="h-full w-[90%] bg-gradient-to-r from-green-400 to-emerald-500" />
-                     </div>
-                  </div>
-                  <div>
-                     <div className="flex justify-between text-sm mb-1 text-indigo-300"><span>Competitor Z</span> <span>4.2s</span></div>
-                     <div className="h-3 bg-indigo-950 rounded-full overflow-hidden">
-                        <div className="h-full w-[30%] bg-indigo-700" />
-                     </div>
-                  </div>
-               </div>
+
+            <div className="relative h-[600px] w-full rounded-[2.5rem] bg-slate-50 border border-slate-200 overflow-hidden shadow-2xl">
+               <AnimatePresence mode="wait">
+                  <motion.img 
+                     key={activeTab}
+                     src={tabs[activeTab].image}
+                     initial={{ opacity: 0, scale: 1.05 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     exit={{ opacity: 0 }}
+                     transition={{ duration: 0.5 }}
+                     className="absolute inset-0 w-full h-full object-cover"
+                     alt="Feature preview"
+                  />
+               </AnimatePresence>
             </div>
          </div>
       </section>
 
-      <section className="py-24 px-6 bg-slate-50">
-         <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">Simple, transparent pricing</h2>
-            <p className="text-slate-500 mb-12">No hidden fees. Cancel anytime.</p>
+      {/* --- TESTIMONIALS --- */}
+      <section className="py-24 px-6 bg-white border-t border-slate-100">
+         <div className="max-w-7xl mx-auto">
+            <motion.div 
+               initial={{ opacity: 0, y: 20 }}
+               whileInView={{ opacity: 1, y: 0 }}
+               viewport={{ once: true }}
+               className="text-center mb-16"
+            >
+               <h2 className="font-heading text-4xl md:text-5xl font-bold text-slate-900 mb-4">Loved by remote teams</h2>
+               <p className="text-slate-500 text-xl max-w-2xl mx-auto">Don't just take our word for it. Hear from the people who use Confera every day.</p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+               {[
+                 { quote: "Confera completely changed how our engineering team does standups. The zero latency screen sharing is magic.", author: "Sarah Jenkins", role: "CTO at TechCorp" },
+                 { quote: "We ditched Zoom for Confera last month. The browser-based approach means our clients never have to install anything.", author: "Michael Chang", role: "Product Manager" },
+                 { quote: "The best SFU video conferencing tool I've ever used. The crystal clear 4K rendering is unmatched.", author: "Emily Rodriguez", role: "Lead Designer" }
+               ].map((test, idx) => (
+                  <motion.div 
+                     initial={{ opacity: 0, y: 20 }}
+                     whileInView={{ opacity: 1, y: 0 }}
+                     viewport={{ once: true }}
+                     transition={{ delay: idx * 0.1 }}
+                     key={idx} 
+                     className="p-8 rounded-3xl bg-[#fafbfc] border border-slate-200"
+                  >
+                     <div className="flex text-yellow-400 mb-4">
+                        {[1,2,3,4,5].map(star => (
+                           <svg key={star} className="w-5 h-5 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                        ))}
+                     </div>
+                     <p className="text-slate-700 text-lg mb-6 leading-relaxed">"{test.quote}"</p>
+                     <div>
+                        <p className="font-heading font-bold text-slate-900">{test.author}</p>
+                        <p className="text-sm text-slate-500">{test.role}</p>
+                     </div>
+                  </motion.div>
+               ))}
+            </div>
+         </div>
+      </section>
+
+      {/* --- PRICING --- */}
+      <section className="py-32 px-6 bg-[#fafbfc]">
+         <div className="max-w-5xl mx-auto text-center">
+            <motion.h2 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="font-heading text-4xl md:text-5xl font-bold text-slate-900 mb-6"
+            >
+              Simple, transparent pricing
+            </motion.h2>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-slate-500 mb-20 text-xl"
+            >
+              No hidden fees. Cancel anytime.
+            </motion.p>
             
-            <div className="grid md:grid-cols-2 gap-8 items-start">
-               <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-shadow">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Starter</h3>
-                  <div className="text-4xl font-bold text-slate-900 mb-6">$0</div>
-                  <ul className="space-y-3 text-left mb-8">
-                     {["Unlimited 1-on-1 meetings", "40 min group limit", "Screen sharing", "HD Quality"].map(feat => (
-                        <li key={feat} className="flex items-center gap-2 text-slate-600">
-                           <CheckCircle size={18} className="text-slate-400"/> {feat}
+            <div className="grid md:grid-cols-2 gap-8 items-center max-w-4xl mx-auto">
+               <motion.div 
+                 initial={{ opacity: 0, x: -20 }}
+                 whileInView={{ opacity: 1, x: 0 }}
+                 viewport={{ once: true }}
+                 className="bg-white p-12 rounded-[2.5rem] border border-slate-200 shadow-md text-left"
+               >
+                  <h3 className="font-heading text-2xl font-bold text-slate-900 mb-2">Basic</h3>
+                  <p className="text-slate-500 mb-6">For casual hangouts</p>
+                  <div className="font-heading text-6xl font-extrabold text-slate-900 mb-8">$0</div>
+                  <ul className="space-y-5 mb-10">
+                     {["Unlimited 1-on-1 meetings", "40 min group limit", "Basic Screen Sharing", "Standard Quality"].map(feat => (
+                        <li key={feat} className="flex items-center gap-3 text-slate-700">
+                           <CheckCircle size={20} className="text-indigo-500"/> <span className="font-medium text-lg">{feat}</span>
                         </li>
                      ))}
                   </ul>
-                  <button className="w-full py-3 rounded-xl border-2 border-slate-900 text-slate-900 font-bold hover:bg-slate-50 transition-colors">Start Free</button>
-               </div>
+                  <button className="w-full py-4 rounded-full border-2 border-slate-200 text-slate-900 font-bold hover:border-slate-900 hover:bg-slate-50 transition-colors">Start Free</button>
+               </motion.div>
                
-               <div className="bg-white p-8 rounded-3xl border-2 border-indigo-600 shadow-xl relative">
-                  <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-bl-xl rounded-tr-xl">POPULAR</div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Pro</h3>
-                  <div className="text-4xl font-bold text-slate-900 mb-6">$12<span className="text-lg font-normal text-slate-500">/mo</span></div>
-                  <ul className="space-y-3 text-left mb-8">
-                     {["Unlimited group time", "Recording & Transcripts", "Admin Controls", "Custom Branding", "Priority Support"].map(feat => (
-                        <li key={feat} className="flex items-center gap-2 text-slate-600">
-                           <CheckCircle size={18} className="text-indigo-600"/> {feat}
+               <motion.div 
+                 initial={{ opacity: 0, x: 20 }}
+                 whileInView={{ opacity: 1, x: 0 }}
+                 viewport={{ once: true }}
+                 className="bg-slate-900 text-white p-12 rounded-[2.5rem] shadow-2xl relative text-left transform md:-translate-y-8 md:scale-105 border border-slate-700"
+               >
+                  <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-500/20 to-transparent rounded-[2.5rem] pointer-events-none" />
+                  <div className="absolute -top-5 right-10 bg-indigo-500 text-white text-sm font-bold px-5 py-2 rounded-full shadow-lg shadow-indigo-500/50">POPULAR</div>
+                  
+                  <h3 className="font-heading text-2xl font-bold text-white mb-2">Pro</h3>
+                  <p className="text-slate-400 mb-6">For power users & teams</p>
+                  <div className="font-heading text-6xl font-extrabold text-white mb-8">$12<span className="text-2xl font-normal text-slate-500">/mo</span></div>
+                  <ul className="space-y-5 mb-10 relative z-10">
+                     {["Unlimited group meetings", "4K Video Quality", "Cloud Recording", "Custom Branding", "Priority Support"].map(feat => (
+                        <li key={feat} className="flex items-center gap-3 text-slate-300">
+                           <CheckCircle size={20} className="text-indigo-400"/> <span className="font-medium text-lg">{feat}</span>
                         </li>
                      ))}
                   </ul>
-                  <button className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Get Pro</button>
-               </div>
+                  <button className="w-full py-4 rounded-full bg-indigo-500 text-white font-bold hover:bg-indigo-400 transition-colors shadow-lg shadow-indigo-500/30 relative z-10">Get Pro</button>
+               </motion.div>
             </div>
          </div>
       </section>
 
-      <section className="py-20 px-6 bg-white border-t border-slate-100">
-         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 text-center">
-            <div className="p-6">
-               <div className="w-18 h-18 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-700">
-                  <Lock size={24} />
-               </div>
-               <h3 className="font-bold text-xl mb-2">End-to-End Encrypted</h3>
-               <p className="text-slate-500 text-md">Media streams are encrypted using DTLS-SRTP. We cannot see or hear your meetings.</p>
-            </div>
-            <div className="p-6">
-               <div className="w-18 h-18 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-700">
-                  <Server size={24} />
-               </div>
-               <h3 className="font-bold text-xl mb-2">Scalable Infrastructure</h3>
-               <p className="text-slate-500 text-md">Powered by global edge nodes to ensure low latency regardless of your location.</p>
-            </div>
-            <div className="p-6">
-               <div className="w-18 h-18 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-700">
-                  <Wifi size={24} />
-               </div>
-               <h3 className="font-bold text-xl mb-2">99.9% Uptime</h3>
-               <p className="text-slate-500 text-md">Reliable connection management keeps you online even when your network flickers.</p>
-            </div>
-         </div>
-      </section>
-
-      <section className="py-24 px-6">
-         <div className="max-w-5xl mx-auto bg-slate-900 rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-indigo-900 to-purple-900 opacity-50" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500 rounded-full blur-[150px] opacity-30 pointer-events-none" />
+      {/* --- MASSIVE CTA FOOTER --- */}
+      <section className="py-32 px-6">
+         <div className="max-w-6xl mx-auto rounded-[3rem] p-16 text-center relative overflow-hidden bg-slate-900 shadow-2xl">
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-600 via-purple-700 to-slate-900 opacity-90" />
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/10 rounded-full blur-[100px]" />
             
-            <div className="relative z-10">
-               <h2 className="text-4xl md:text-6xl font-bold text-white mb-6">Ready to connect?</h2>
-               <p className="text-slate-300 text-xl mb-10 max-w-2xl mx-auto">Join thousands of users experiencing the future of video communication today.</p>
+            <div className="relative z-10 max-w-3xl mx-auto">
+               <h2 className="font-heading text-5xl md:text-6xl font-bold text-white mb-8 leading-tight">Ready to revolutionize your meetings?</h2>
+               <p className="text-indigo-100 text-xl mb-12">Join thousands of teams already using Confera to collaborate faster and better.</p>
                
                <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
                   <Link to="/auth" style={{ textDecoration: 'none' }}>
-                     <button className="px-8 py-4 bg-white text-indigo-900 font-bold text-lg rounded-full hover:bg-indigo-50 transition-colors shadow-xl shadow-white/10">
-                        Create Your Room Now
+                     <button className="px-10 py-5 bg-white text-indigo-900 font-bold text-lg rounded-full hover:bg-indigo-50 transition-all shadow-xl shadow-white/10 hover:scale-105 active:scale-95">
+                        Create Your Free Room
                      </button>
                   </Link>
-                  <br></br>
-                  <p className="text-sm text-slate-400">Free forever during beta. No credit card.</p>
                </div>
+               <p className="text-sm text-indigo-200 mt-6">No credit card required. Free forever on Basic.</p>
             </div>
          </div>
       </section>
@@ -317,61 +394,5 @@ const LandingPage = () => {
     </div>
   );
 };
-
-// --- STYLED COMPONENTS ---
-const GetStartedBtnStyle = styled.div`
-  .button {
-    position: relative;
-    transition: all 0.3s ease-in-out;
-    box-shadow: 0px 10px 20px rgba(79, 70, 229, 0.2);
-    padding-block: 1rem;
-    padding-inline: 2rem;
-    background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
-    border-radius: 9999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: #ffff;
-    gap: 12px;
-    font-weight: 700;
-    border: 2px solid #ffffff;
-    outline: none;
-    overflow: hidden;
-    font-size: 1.1rem;
-    font-family: 'Outfit', sans-serif;
-  }
-
-  .button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0px 15px 25px rgba(79, 70, 229, 0.4);
-  }
-
-  .button::before {
-    content: "";
-    position: absolute;
-    width: 100px;
-    height: 100%;
-    background-image: linear-gradient(
-      120deg,
-      rgba(255, 255, 255, 0) 30%,
-      rgba(255, 255, 255, 0.8),
-      rgba(255, 255, 255, 0) 70%
-    );
-    top: 0;
-    left: -100px;
-    opacity: 0.6;
-  }
-
-  .button:hover::before {
-    animation: shine 1.5s ease-out infinite;
-  }
-
-  @keyframes shine {
-    0% { left: -100px; }
-    60% { left: 100%; }
-    to { left: 100%; }
-  }
-`;
 
 export default LandingPage;

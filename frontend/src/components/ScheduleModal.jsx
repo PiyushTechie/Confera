@@ -3,7 +3,7 @@ import axios from "axios";
 import { X, Type, Loader2, CalendarDays, Clock } from "lucide-react";
 
 // Matches your backend URL
-const BACKEND_URL = "https://confera-backend-nixq.onrender.com";
+const BACKEND_URL = "http://localhost:8000";
 
 export default function ScheduleModal({ isOpen, onClose, onSuccess, meetingToEdit }) {
   const [formData, setFormData] = useState({ title: "", date: "", time: "" });
